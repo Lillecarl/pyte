@@ -135,6 +135,9 @@ def test_missing_params():
 
 
 def test_overflow():
+    # Parameters are not capped: the kitty keyboard protocol uses
+    # functional key codes above 9999. (The screen clamps positions
+    # itself where needed.)
     handler = argcheck()
     screen = pyte.Screen(80, 24)
     screen.cursor_position = handler
@@ -142,7 +145,7 @@ def test_overflow():
     stream = pyte.Stream(screen)
     stream.feed(ctrl.CSI + "999999999999999;99999999999999" + esc.HVP)
     assert handler.count == 1
-    assert handler.args == (9999, 9999)
+    assert handler.args == (999999999999999, 99999999999999)
 
 
 def test_interrupt():

@@ -240,7 +240,6 @@ class Stream:
 
         ESC, CSI_C1 = ctrl.ESC, ctrl.CSI_C1
         OSC_C1 = ctrl.OSC_C1
-        SP_OR_GT = ctrl.SP + ">"
         NUL_OR_DEL = ctrl.NUL + ctrl.DEL
         CAN_OR_SUB = ctrl.CAN + ctrl.SUB
         ALLOWED_IN_CSI = "".join([ctrl.BEL, ctrl.BS, ctrl.HT, ctrl.LF,
@@ -321,15 +320,26 @@ class Stream:
                 #        arguments.
                 params = []
                 current = ""
+                subparams = None
                 private = False
                 while True:
                     char = yield None
-                    if char == "?":
-                        private = True
+                    if char in "?<=>":
+                        # CSI private markers. "?" is the classic private
+                        # marker; ">", "<" and "=" are used by, e.g., the
+                        # kitty keyboard protocol.
+                        if char == "?":
+                            private = True
+                        elif not private:
+                            private = char
+                        elif private is True:
+                            private = "?" + char
+                        else:
+                            private += char
                     elif char in ALLOWED_IN_CSI:
                         basic_dispatch[char]()
-                    elif char in SP_OR_GT:
-                        pass  # Secondary DA is not supported atm.
+                    elif char == ctrl.SP:
+                        pass  # Intermediate byte. (E.g. DECSCUSR.)
                     elif char in CAN_OR_SUB:
                         # If CAN or SUB is received during a sequence, the
                         # current sequence is aborted; terminal displays
@@ -339,22 +349,44 @@ class Stream:
                         break
                     elif char.isdigit():
                         current += char
+                    elif char == ":":
+                        # Sub-parameters (used by, e.g., the kitty keyboard
+                        # protocol for event types and alternate keys).
+                        if subparams is None:
+                            subparams = [int(current or 0)]
+                        else:
+                            subparams.append(int(current or 0))
+                        current = ""
+                    elif char == ";":
+                        if subparams is None:
+                            params.append(int(current or 0))
+                        else:
+                            params.append(tuple(subparams + [int(current or 0)]))
+                            subparams = None
+                        current = ""
                     elif char == "$":
                         # XTerm-specific ESC]...$[a-z] sequences are not
                         # currently supported.
                         yield None
                         break
                     else:
-                        params.append(min(int(current or 0), 9999))
-
-                        if char == ";":
-                            current = ""
+                        # Final byte of the CSI sequence.
+                        #
+                        # NOTE: Parameters are not capped, because the kitty
+                        # keyboard protocol uses functional key codes above
+                        # 9999.
+                        if subparams is None:
+                            params.append(int(current or 0))
                         else:
-                            if private:
-                                csi_dispatch[char](*params, private=True)
-                            else:
-                                csi_dispatch[char](*params)
-                            break  # CSI is finished.
+                            params.append(tuple(subparams + [int(current or 0)]))
+
+                        if private is True:
+                            csi_dispatch[char](*params, private=True)
+                        elif private:
+                            csi_dispatch[char](*params, private=private)
+                        else:
+                            csi_dispatch[char](*params)
+                        break  # CSI is finished.
             elif char == OSC_C1:
                 code = yield None
                 if code == "R":

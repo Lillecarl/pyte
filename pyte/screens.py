@@ -1061,11 +1061,11 @@ class Screen:
         if mode == 0 and not kwargs.get("private"):
             self.write_process_input(ctrl.CSI + "?6c")
 
-    def report_device_status(self, mode: int) -> None:
+    def report_device_status(self, mode: int, **kwargs: Any) -> None:
         """Report terminal status or cursor position.
 
         :param int mode: if 5 -- terminal status, 6 -- cursor position,
-                         otherwise a noop.
+                        otherwise a noop.
 
         .. versionadded:: 0.5.0
         """
