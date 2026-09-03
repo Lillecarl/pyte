@@ -367,3 +367,26 @@ def test_byte_stream_select_other_charset():
     # c) enable utf-8
     stream.select_other_charset("G")
     assert stream.use_utf8
+
+
+def test_too_many_params():
+    # A sequence that carries more parameters than the command takes is
+    # not an error. xterm reads the ones it needs and drops the rest.
+    # Before this, the extra parameter raised a TypeError and stopped
+    # the whole stream.
+    screen = pyte.Screen(80, 24)
+    stream = pyte.Stream(screen)
+    stream.feed(ctrl.CSI + "3;9;9" + esc.CHA)  # CHA takes one parameter.
+    assert screen.cursor.x == 2
+
+    stream.feed("ok")
+    assert screen.display[0].strip() == "ok"
+
+
+def test_a_private_marker_on_a_command_that_does_not_take_one():
+    # "CSI ? 5 G" names no private command. The marker is dropped and
+    # the command runs, rather than raising a TypeError.
+    screen = pyte.Screen(80, 24)
+    stream = pyte.Stream(screen)
+    stream.feed(ctrl.CSI + "?5" + esc.CHA)
+    assert screen.cursor.x == 4

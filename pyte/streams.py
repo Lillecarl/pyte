@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 import codecs
+import inspect
 import itertools
 import re
 import warnings
@@ -35,6 +36,43 @@ if TYPE_CHECKING:
     from .screens import Screen
 
     ParserGenerator = Generator[bool | None, str, None]
+
+
+def limit_parameters(handler: "Callable[..., None]") -> "Callable[..., None]":
+    """
+    A handler that quietly drops the parameters it has no room for.
+
+    A terminal reads the parameters that a sequence needs and ignores
+    the rest. Without this, a sequence such as "CSI 1;1 G", which
+    carries one parameter too many, raises a TypeError and stops the
+    stream. One stray sequence may not stop a whole terminal.
+    """
+    try:
+        signature = inspect.signature(handler)
+    except (TypeError, ValueError):
+        return handler
+
+    count = 0
+    for parameter in signature.parameters.values():
+        if parameter.kind is parameter.VAR_POSITIONAL:
+            return handler  # It takes as many as arrive.
+        if parameter.kind in (
+            parameter.POSITIONAL_ONLY,
+            parameter.POSITIONAL_OR_KEYWORD,
+        ):
+            count += 1
+
+    takes_private = "private" in signature.parameters or any(
+        parameter.kind is parameter.VAR_KEYWORD
+        for parameter in signature.parameters.values()
+    )
+
+    def call(*params: "Any", **kwargs: "Any") -> None:
+        if not takes_private:
+            kwargs.pop("private", None)
+        handler(*params[:count], **kwargs)
+
+    return call
 
 
 #: Longest OSC code that the parser reads. (kitty uses codes of up to
@@ -263,7 +301,11 @@ class Stream:
         sharp_dispatch = create_dispatcher(self.sharp)
         escape_mapping = self.escape
         escape_dispatch = create_dispatcher(self.escape)
-        csi_dispatch = create_dispatcher(self.csi)
+        # Only a CSI sequence carries parameters, so only its handlers
+        # need the guard against a sequence that carries too many.
+        csi_dispatch = defaultdict(lambda: debug, {
+            event: limit_parameters(handler)
+            for event, handler in create_dispatcher(self.csi).items()})
 
         # String sequences (APC/DCS) dispatch to optional screen
         # methods. Screens that don't implement them get ``debug``.
