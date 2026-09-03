@@ -390,3 +390,26 @@ def test_a_private_marker_on_a_command_that_does_not_take_one():
     stream = pyte.Stream(screen)
     stream.feed(ctrl.CSI + "?5" + esc.CHA)
     assert screen.cursor.x == 4
+
+
+def test_define_charset_in_utf8_mode():
+    # "ESC ( 0" names the line drawing set of the DEC terminals, which
+    # is how ncurses draws a box. xterm and kitty both read it in UTF-8
+    # mode, and pyte dropped it there, so a box showed letters.
+    screen = pyte.Screen(3, 3)
+    handler = screen.define_charset = argcheck()
+    stream = pyte.Stream(screen)
+    stream.feed(ctrl.ESC + "(0")
+    assert handler.count == 1
+    assert handler.args == ("0",)
+    assert handler.kwargs == {"mode": "("}
+
+
+def test_shifts_in_utf8_mode():
+    # The same holds for shift in and shift out, which pick G0 and G1.
+    screen = pyte.Screen(3, 3)
+    handler = screen.shift_in = screen.shift_out = argcheck()
+    stream = pyte.Stream(screen)
+    stream.feed(ctrl.SI)
+    stream.feed(ctrl.SO)
+    assert handler.count == 2

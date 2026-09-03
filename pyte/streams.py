@@ -381,24 +381,18 @@ class Stream:
                     elif char == "%":
                         self.select_other_charset((yield None))
                     elif char in "()":
-                        code = yield None
-                        if self.use_utf8:
-                            continue
-
-                        # See http://www.cl.cam.ac.uk/~mgk25/unicode.html#term
-                        # for the why on the UTF-8 restriction.
-                        listener.define_charset(code, mode=char)
+                        # "ESC ( 0" names the line drawing set of the
+                        # DEC terminals, which is how ncurses draws a
+                        # box. xterm and kitty both read it in UTF-8
+                        # mode, so this does too. The Unicode FAQ says
+                        # to drop it there, but a program that draws a
+                        # box then shows letters.
+                        listener.define_charset((yield None), mode=char)
                     else:
                         escape_dispatch[char]()
                     continue    # Don't go to CSI.
 
             if char in basic:
-                # Ignore shifts in UTF-8 mode. See
-                # http://www.cl.cam.ac.uk/~mgk25/unicode.html#term for
-                # the why on UTF-8 restriction.
-                if (char == ctrl.SI or char == ctrl.SO) and self.use_utf8:
-                    continue
-
                 basic_dispatch[char]()
             elif char == CSI_C1:
                 # All parameters are unsigned, positive decimal integers, with
