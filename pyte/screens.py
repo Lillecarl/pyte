@@ -1110,6 +1110,18 @@ class Screen:
         is to ignore the sequence.
         """
 
+    def osc(self, code: str, param: str) -> None:
+        """
+        Parse an OSC sequence other than the title and the icon name.
+
+        Receives the numeric code as a string and everything after the
+        first semicolon. Colour control, the clipboard, desktop
+        notifications and hyperlinks arrive here. Not implemented: the
+        default is to ignore the sequence.
+
+        .. versionadded:: 0.8.3
+        """
+
     def debug(self, *args: Any, **kwargs: Any) -> None:
         """Endpoint for unrecognized escape sequences.
 

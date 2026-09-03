@@ -37,6 +37,11 @@ if TYPE_CHECKING:
     ParserGenerator = Generator[bool | None, str, None]
 
 
+#: Longest OSC code that the parser reads. (kitty uses codes of up to
+#: five digits, such as ``OSC 30001``.)
+MAX_OSC_CODE_LENGTH = 8
+
+
 class Stream:
     """A stream is a state machine that parses a stream of bytes and
     dispatches events based on what it sees.
@@ -261,6 +266,7 @@ class Stream:
         # methods. Screens that don't implement them get ``debug``.
         apc_dispatch = getattr(listener, "apc", debug)
         dcs_dispatch = getattr(listener, "dcs", debug)
+        osc_dispatch = getattr(listener, "osc", debug)
 
         while True:
             # ``True`` tells ``Screen.feed`` that it is allowed to send
@@ -440,27 +446,45 @@ class Stream:
                             csi_dispatch[event](*params)
                         break  # CSI is finished.
             elif char == OSC_C1:
-                code = yield None
-                if code == "R":
+                char = yield None
+                if char == "R":
                     continue  # Reset palette. Not implemented.
-                elif code == "P":
+                elif char == "P":
                     continue  # Set palette. Not implemented.
 
+                # The code is a number of any length. Reading a single
+                # character would turn "OSC 11" into "OSC 1", and every
+                # code above nine into the wrong one.
+                code = ""
+                while char.isdigit() and len(code) < MAX_OSC_CODE_LENGTH:
+                    code += char
+                    char = yield None
+
+                # `char` now holds the delimiter after the code: a ";"
+                # or a terminator. Everything up to the terminator is
+                # the payload.
                 param = ""
                 while True:
-                    char = yield None
                     if char == ESC:
                         char += yield None
                     if char in OSC_TERMINATORS:
                         break
-                    else:
-                        param += char
+                    param += char
+                    char = yield None
 
-                param = param[1:]  # Drop the ;.
-                if code in "01":
-                    listener.set_icon_name(param)
-                if code in "02":
-                    listener.set_title(param)
+                if param.startswith(";"):
+                    param = param[1:]
+
+                if code in ("0", "1", "2"):
+                    if code in ("0", "1"):
+                        listener.set_icon_name(param)
+                    if code in ("0", "2"):
+                        listener.set_title(param)
+                elif code:
+                    # Every other code goes to the optional `osc` hook:
+                    # colour control, the clipboard, notifications and
+                    # the rest travel this way.
+                    osc_dispatch(code, param)
             elif char not in NUL_OR_DEL:
                 draw(char)
 
