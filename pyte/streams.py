@@ -367,6 +367,7 @@ class Stream:
                 current = ""
                 subparams = None
                 private = False
+                interm = ""
                 while True:
                     char = yield None
                     if char in "?<=>":
@@ -384,7 +385,10 @@ class Stream:
                     elif char in ALLOWED_IN_CSI:
                         basic_dispatch[char]()
                     elif char == ctrl.SP:
-                        pass  # Intermediate byte. (E.g. DECSCUSR.)
+                        # Intermediate byte. It belongs to the name of
+                        # the sequence: "CSI Ps SP q" (DECSCUSR) is not
+                        # "CSI Ps q", and "CSI Ps SP D" is not CUB.
+                        interm += char
                     elif char in CAN_OR_SUB:
                         # If CAN or SUB is received during a sequence, the
                         # current sequence is aborted; terminal displays
@@ -425,12 +429,15 @@ class Stream:
                         else:
                             params.append(tuple(subparams + [int(current or 0)]))
 
+                        # An intermediate byte makes another sequence:
+                        # it is part of the key that names the handler.
+                        event = interm + char
                         if private is True:
-                            csi_dispatch[char](*params, private=True)
+                            csi_dispatch[event](*params, private=True)
                         elif private:
-                            csi_dispatch[char](*params, private=private)
+                            csi_dispatch[event](*params, private=private)
                         else:
-                            csi_dispatch[char](*params)
+                            csi_dispatch[event](*params)
                         break  # CSI is finished.
             elif char == OSC_C1:
                 code = yield None

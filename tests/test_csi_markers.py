@@ -75,3 +75,35 @@ def test_secondary_da_marker_is_dispatched():
     # passed through as ``private``.
     assert feed("\x1b[>c") == [
         ("report_device_attributes", (0,), {"private": ">"})]
+
+
+# ----------------------------------------------------------------------
+# Intermediate bytes.
+
+
+def test_a_plain_final_byte_keeps_its_handler():
+    assert feed("\x1b[3D") == [("cursor_back", (3,), {})]
+
+
+def test_an_intermediate_byte_names_another_sequence():
+    # "CSI Ps SP D" is kitty's unscroll, not CUB. The intermediate byte
+    # used to be dropped, so the two ran the same handler.
+    assert feed("\x1b[3 D") == [("debug", (3,), {})]
+
+
+def test_the_cursor_style_sequence_is_not_a_plain_one():
+    # "CSI Ps SP q" is DECSCUSR.
+    assert feed("\x1b[2 q") == [("debug", (2,), {})]
+
+
+def test_a_custom_map_can_take_an_intermediate_sequence():
+    class UnscrollStream(pyte.Stream):
+        csi = dict(pyte.Stream.csi, **{" D": "unscroll"})
+
+    screen = Recorder()
+    UnscrollStream(screen).feed("\x1b[4 D")
+    assert screen.events == [("unscroll", (4,), {})]
+
+
+def test_an_intermediate_byte_keeps_the_private_marker():
+    assert feed("\x1b[?3 D") == [("debug", (3,), {"private": True})]
