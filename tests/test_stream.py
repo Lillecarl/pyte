@@ -252,6 +252,38 @@ def test_dollar_skip():
     assert handler.count == 0
 
 
+def test_dollar_is_an_intermediate_byte():
+    """
+    "CSI Ps $ p" (DECRQM) is not "CSI Ps p". The "$" names the
+    sequence, so it belongs to the key that picks the handler.
+    """
+    calls = []
+
+    class Screen(pyte.Screen):
+        def request_mode(self, *args, **kwargs):
+            calls.append((args, kwargs))
+
+    stream = pyte.Stream()
+    stream.csi = dict(stream.csi, **{"$p": "request_mode"})
+    stream.attach(Screen(3, 3))
+
+    stream.feed(ctrl.CSI + "?2004$p")
+    assert calls == [((2004,), {"private": True})]
+
+    del calls[:]
+    stream.feed(ctrl.CSI + "4$p")
+    assert calls == [((4,), {})]
+
+
+def test_an_unknown_dollar_sequence_is_not_drawn():
+    "It reaches `debug`, like every other sequence without a handler."
+    screen = pyte.Screen(3, 3)
+    handler = screen.draw = argcheck()
+    stream = pyte.Stream(screen)
+    stream.feed(ctrl.CSI + "1;2$z" + "ok")
+    assert handler.count == 1  # Only the "ok".
+
+
 @pytest.mark.parametrize("input,expected", [
     (b"foo", [["draw", ["foo"], {}]]),
     (b"\x1b[1;24r\x1b[4l\x1b[24;1H", [

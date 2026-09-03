@@ -250,6 +250,9 @@ class Stream:
         ALLOWED_IN_CSI = "".join([ctrl.BEL, ctrl.BS, ctrl.HT, ctrl.LF,
                                   ctrl.VT, ctrl.FF, ctrl.CR])
         OSC_TERMINATORS = {ctrl.ST_C0, ctrl.ST_C1, ctrl.BEL}
+        # Intermediate bytes of a CSI sequence. They name the sequence
+        # together with the final byte, so the dispatch key holds them.
+        INTERMEDIATE_IN_CSI = ctrl.SP + "$"
 
         def create_dispatcher(mapping: Mapping[str, str]) -> dict[str, Callable[..., None]]:
             return defaultdict(lambda: debug, {
@@ -390,10 +393,12 @@ class Stream:
                             private += char
                     elif char in ALLOWED_IN_CSI:
                         basic_dispatch[char]()
-                    elif char == ctrl.SP:
+                    elif char in INTERMEDIATE_IN_CSI:
                         # Intermediate byte. It belongs to the name of
                         # the sequence: "CSI Ps SP q" (DECSCUSR) is not
-                        # "CSI Ps q", and "CSI Ps SP D" is not CUB.
+                        # "CSI Ps q", and "CSI Ps SP D" is not CUB. The
+                        # "$" names the mode and area sequences, e.g.
+                        # "CSI ? Ps $ p" (DECRQM).
                         interm += char
                     elif char in CAN_OR_SUB:
                         # If CAN or SUB is received during a sequence, the
@@ -419,11 +424,6 @@ class Stream:
                             params.append(tuple(subparams + [int(current or 0)]))
                             subparams = None
                         current = ""
-                    elif char == "$":
-                        # XTerm-specific ESC]...$[a-z] sequences are not
-                        # currently supported.
-                        yield None
-                        break
                     else:
                         # Final byte of the CSI sequence.
                         #
