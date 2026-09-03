@@ -1091,6 +1091,25 @@ class Screen:
         .. versionadded:: 0.5.0
         """
 
+    def apc(self, data: str) -> None:
+        """
+        Parse APC string sequence (``ESC _ ... ST``).
+
+        Receives the opaque payload. The kitty graphics protocol
+        sequences arrive here. Not implemented: the default is to
+        ignore the sequence.
+        """
+
+    def dcs(self, data: str) -> None:
+        """
+        Parse DCS string sequence (``ESC P ... ST``).
+
+        Receives the opaque payload, including any parameter and
+        intermediate bytes before the final character. Sixel images and
+        other DCS sequences arrive here. Not implemented: the default
+        is to ignore the sequence.
+        """
+
     def debug(self, *args: Any, **kwargs: Any) -> None:
         """Endpoint for unrecognized escape sequences.
 

@@ -130,7 +130,7 @@ class Stream:
         basic.values(), escape.values(), sharp.values(), csi.values(),
         ["define_charset"],
         ["set_icon_name", "set_title"],  # OSC.
-        ["draw", "debug"]))
+        ["draw", "debug", "apc", "dcs"]))
 
     #: A regular expression pattern matching everything what can be
     #: considered plain text.
@@ -253,8 +253,14 @@ class Stream:
 
         basic_dispatch = create_dispatcher(basic)
         sharp_dispatch = create_dispatcher(self.sharp)
+        escape_mapping = self.escape
         escape_dispatch = create_dispatcher(self.escape)
         csi_dispatch = create_dispatcher(self.csi)
+
+        # String sequences (APC/DCS) dispatch to optional screen
+        # methods. Screens that don't implement them get ``debug``.
+        apc_dispatch = getattr(listener, "apc", debug)
+        dcs_dispatch = getattr(listener, "dcs", debug)
 
         while True:
             # ``True`` tells ``Screen.feed`` that it is allowed to send
@@ -279,6 +285,45 @@ class Stream:
                     char = CSI_C1  # Go to CSI.
                 elif char == "]":
                     char = OSC_C1  # Go to OSC.
+                elif char in escape_mapping:
+                    # Custom escape sequences take precedence over the
+                    # string sequences below.
+                    escape_dispatch[char]()
+                    continue    # Don't go to CSI.
+                elif char in "_PX^":
+                    # APC ("_"), DCS ("P"), SOS ("X") and PM ("^") are
+                    # string sequences: an opaque payload terminated by
+                    # ST ("ESC \" or the 8-bit C1 ST), aborted by CAN or
+                    # SUB. The kitty graphics protocol and sixel images
+                    # travel in these. (Versionadded:: 0.8.3)
+                    dispatch = {
+                        "_": apc_dispatch,
+                        "P": dcs_dispatch,
+                    }.get(char)
+
+                    data = ""
+                    aborted = False
+                    while True:
+                        char = yield None
+                        if char == ctrl.CAN or char == ctrl.SUB:
+                            # Aborted. Nothing is dispatched.
+                            aborted = True
+                            break
+                        elif char == ctrl.ST_C1:
+                            break
+                        elif char == ESC:
+                            char = yield None
+                            if char == "\\":
+                                break
+                            # ESC followed by anything else stays part
+                            # of the payload. (Same behavior as the OSC
+                            # handling above.)
+                            data += ESC
+                        data += char
+
+                    if dispatch is not None and not aborted:
+                        dispatch(data)
+                    continue    # Don't go to CSI.
                 else:
                     if char == "#":
                         sharp_dispatch[(yield None)]()
