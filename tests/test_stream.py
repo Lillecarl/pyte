@@ -413,3 +413,23 @@ def test_shifts_in_utf8_mode():
     stream.feed(ctrl.SI)
     stream.feed(ctrl.SO)
     assert handler.count == 2
+
+
+def test_every_intermediate_byte_belongs_to_the_sequence():
+    # ECMA-48 gives the intermediate bytes the whole range 0x20 to
+    # 0x2f. Reading one of them as the final byte ends the sequence
+    # there, and the real final byte lands on the screen as text.
+    # "CSI Ps ' }" is DECIC, which pyte does not act on.
+    screen = pyte.Screen(3, 3)
+    stream = pyte.Stream(screen)
+    stream.feed(ctrl.CSI + "2'}hi")
+    assert screen.display[0] == "hi "
+
+
+def test_hpa_reads_the_backquote():
+    # The final byte of HPA is the backquote. The apostrophe is an
+    # intermediate byte and names no command of its own.
+    screen = pyte.Screen(80, 24)
+    stream = pyte.Stream(screen)
+    stream.feed(ctrl.CSI + "5`")
+    assert screen.cursor.x == 4

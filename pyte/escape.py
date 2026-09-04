@@ -148,5 +148,7 @@ DSR = "n"
 #: without any arguments, whole screen is used.
 DECSTBM = "r"
 
-#: *Horizontal position adjust*: Same as :data:`CHA`.
-HPA = "'"
+#: *Horizontal position absolute*: Same as :data:`CHA`. The final byte
+#: is the backquote. An apostrophe is an intermediate byte, and names
+#: other sequences: "CSI Ps ' }" is DECIC, and "CSI Ps ' ~" is DECDC.
+HPA = "`"

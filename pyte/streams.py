@@ -288,9 +288,14 @@ class Stream:
         ALLOWED_IN_CSI = "".join([ctrl.BEL, ctrl.BS, ctrl.HT, ctrl.LF,
                                   ctrl.VT, ctrl.FF, ctrl.CR])
         OSC_TERMINATORS = {ctrl.ST_C0, ctrl.ST_C1, ctrl.BEL}
-        # Intermediate bytes of a CSI sequence. They name the sequence
-        # together with the final byte, so the dispatch key holds them.
-        INTERMEDIATE_IN_CSI = ctrl.SP + "$"
+        # Intermediate bytes of a CSI sequence. ECMA-48 gives them the
+        # whole range 0x20 to 0x2f. They name the sequence together with
+        # the final byte, so the dispatch key holds them.
+        #
+        # Reading the whole range matters even for a sequence we do not
+        # act on. A "*" read as a final byte ends the sequence there,
+        # and the real final byte lands on the screen as text.
+        INTERMEDIATE_IN_CSI = "".join(chr(code) for code in range(0x20, 0x30))
 
         def create_dispatcher(mapping: Mapping[str, str]) -> dict[str, Callable[..., None]]:
             return defaultdict(lambda: debug, {
