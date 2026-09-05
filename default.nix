@@ -1,14 +1,15 @@
-# The package this repository builds, and the tests that judge it. Nothing
-# else belongs here: the dev shell and the collection that assembles this
-# with its siblings live in pyterm.
+# The package this repository builds. The suites that judge it live in
+# `nix/checks.nix`, which declares its own inputs, so nothing that only a test
+# needs is named here.
+#
+# Nothing else belongs in this repository: the dev shell and the collection
+# that assembles this with its siblings live in pyterm.
 {
   lib,
   buildPythonPackage,
   flit-core,
   wcwidth,
-  python,
-  pytest,
-  runCommand,
+  callPackage,
 }:
 let
   package = buildPythonPackage {
@@ -33,28 +34,16 @@ let
     };
   };
 
-  pythonWithTests = python.withPackages (ps: [
-    package
-    pytest
-  ]);
-
   # Only the tests, not the whole repository. A copy of everything makes
   # the test run rebuild on every unrelated edit.
+  #
+  # It is built here and not in `nix/checks.nix`, because `./.` there is the
+  # `nix` directory and this needs the root of the repository.
   testSources = lib.fileset.toSource {
     root = ./.;
     fileset = ./tests;
   };
 
-  checks.tests =
-    runCommand "pyte-tests" { nativeBuildInputs = [ pythonWithTests ]; }
-      ''
-        cp -r ${testSources}/tests .
-        chmod -R +w .
-        export HOME="$TMPDIR"
-        export LANG=C.UTF-8
-        export PYTHONDONTWRITEBYTECODE=1
-        python -m pytest tests -q -p no:cacheprovider
-        touch "$out"
-      '';
+  checks = callPackage ./nix/checks.nix { inherit package testSources; };
 in
 package
