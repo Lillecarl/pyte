@@ -11,3 +11,6 @@ __pycache__/
 # build output
 dist/
 docs/_build/
+
+# The symlinks that `nix build` leaves behind.
+result*
