@@ -21,7 +21,7 @@ let
     build-system = [ flit-core ];
     dependencies = [ wcwidth ];
 
-    # The suite runs as `checks.tests`, against the installed package.
+    # The suite runs as `checks.unit`, against the installed package.
     doCheck = false;
     pythonImportsCheck = [ "pyte" ];
 

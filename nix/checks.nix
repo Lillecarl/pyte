@@ -32,8 +32,8 @@ let
   '';
 in
 {
-  tests = suite {
-    name = "pyte-tests";
+  unit = suite {
+    name = "pyte-unit";
     inputs = [ pythonWithTests ];
     setup = prepare;
   } "python -m pytest tests -q -p no:cacheprovider";
