@@ -296,6 +296,10 @@ class Screen:
         self.title = ""
         self.icon_name = ""
 
+        #: Whether a reply spells a C1 control as ``ESC`` and a letter.
+        #: Seven bit is the DEC factory default, and S8C1T turns it off.
+        self.seven_bit_controls = True
+
         self.charset = 0
         self.g0_charset = cs.LAT1_MAP
         self.g1_charset = cs.VT100_MAP
@@ -993,6 +997,18 @@ class Screen:
         for y in range(self.lines):
             for x in range(self.columns):
                 self.buffer[y][x] = self.buffer[y][x]._replace(data="E")
+
+    def set_seven_bit_controls(self) -> None:
+        """S7C1T (``ESC SP F``): answer a query with ``ESC`` and a letter.
+
+        This screen writes nothing back, so it holds the choice and
+        does no more. A screen that answers reads the flag.
+        """
+        self.seven_bit_controls = True
+
+    def set_eight_bit_controls(self) -> None:
+        """S8C1T (``ESC SP G``): answer a query with one C1 byte."""
+        self.seven_bit_controls = False
 
     def select_graphic_rendition(self, *attrs: int, private: bool = False) -> None:
         """Set display attributes.

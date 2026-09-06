@@ -137,6 +137,18 @@ class Stream:
         esc.DECALN: "alignment_display",
     }
 
+    #: "space" escape sequences -- ``ESC SP <N>``.
+    #:
+    #: ECMA-48 calls these announcers. Only the two that pick the form
+    #: of a C1 control have a handler; the rest name a conformance
+    #: level, and the stream eats them. Eating them is the point: the
+    #: space is an intermediate byte, so a stream that does not read it
+    #: puts the final byte on the screen as text.
+    space = {
+        esc.S7C1T: "set_seven_bit_controls",
+        esc.S8C1T: "set_eight_bit_controls",
+    }
+
     #: CSI escape sequences -- ``CSI P1;P2;...;Pn <fn>``.
     csi = {
         esc.ICH: "insert_characters",
@@ -170,7 +182,8 @@ class Stream:
 
     #: A set of all events dispatched by the stream.
     events = frozenset(itertools.chain(
-        basic.values(), escape.values(), sharp.values(), csi.values(),
+        basic.values(), escape.values(), sharp.values(), space.values(),
+        csi.values(),
         ["define_charset"],
         ["set_icon_name", "set_title"],  # OSC.
         ["draw", "debug", "apc", "dcs"]))
@@ -304,6 +317,7 @@ class Stream:
 
         basic_dispatch = create_dispatcher(basic)
         sharp_dispatch = create_dispatcher(self.sharp)
+        space_dispatch = create_dispatcher(self.space)
         escape_mapping = self.escape
         escape_dispatch = create_dispatcher(self.escape)
         # Only a CSI sequence carries parameters, so only its handlers
@@ -383,6 +397,8 @@ class Stream:
                 else:
                     if char == "#":
                         sharp_dispatch[(yield None)]()
+                    elif char == " ":
+                        space_dispatch[(yield None)]()
                     elif char == "%":
                         self.select_other_charset((yield None))
                     elif char in "()":

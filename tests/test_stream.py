@@ -284,6 +284,35 @@ def test_an_unknown_dollar_sequence_is_not_drawn():
     assert handler.count == 1  # Only the "ok".
 
 
+def test_the_space_of_an_announcer_is_an_intermediate_byte():
+    """
+    "ESC SP G" is S8C1T, and the space names it. A stream that does not
+    read the space stops at it, and the "G" lands on the screen as text.
+    """
+    screen = pyte.Screen(3, 3)
+    handler = screen.draw = argcheck()
+    stream = pyte.Stream(screen)
+    stream.feed("\x1b G")
+    assert handler.count == 0
+    assert screen.seven_bit_controls is False
+
+    stream.feed("\x1b F")
+    assert handler.count == 0
+    assert screen.seven_bit_controls is True
+
+
+def test_an_unknown_announcer_is_eaten_as_well():
+    """
+    "ESC SP L" names an ANSI conformance level. pyte does nothing with
+    it, and the "L" still must not be drawn.
+    """
+    screen = pyte.Screen(3, 3)
+    handler = screen.draw = argcheck()
+    stream = pyte.Stream(screen)
+    stream.feed("\x1b L" + "ok")
+    assert handler.count == 1  # Only the "ok".
+
+
 @pytest.mark.parametrize("input,expected", [
     (b"foo", [["draw", ["foo"], {}]]),
     (b"\x1b[1;24r\x1b[4l\x1b[24;1H", [

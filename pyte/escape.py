@@ -46,6 +46,19 @@ DECRC = "8"
 DECALN = "8"
 
 
+# "Space" escape sequences -- ``ESC SP <N>``.
+# ------------------------------------------
+
+#: *Select 7-bit C1 controls*: the terminal answers a query with
+#: ``ESC`` and the letter, which is two bytes.
+S7C1T = "F"
+
+#: *Select 8-bit C1 controls*: the terminal answers a query with the
+#: single C1 byte instead. A program that parses strictly asks for this
+#: so that it looks for one byte and not two.
+S8C1T = "G"
+
+
 # ECMA-48 CSI sequences.
 # ---------------------
 
