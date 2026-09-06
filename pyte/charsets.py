@@ -6,9 +6,15 @@
     they are defined for linux terminal, see
     ``linux/drivers/tty/consolemap.c`` @ http://git.kernel.org
 
-    .. note:: ``VT100_MAP`` and ``IBMPC_MAP`` were taken unchanged
-              from linux kernel source and therefore are licensed
-              under **GPL**.
+    .. note:: ``VT100_MAP`` and ``IBMPC_MAP`` come from linux kernel
+              source and therefore are licensed under **GPL**.
+
+    ``VT100_MAP`` differs from the kernel table at one position. The
+    kernel draws ``h`` as U+2591 LIGHT SHADE. The DEC special graphics
+    set puts the newline symbol there, and Alacritty, WezTerm,
+    libvterm, Ghostty and xterm.js all draw U+2424 SYMBOL FOR NEWLINE.
+    Only kitty keeps the shade. Five emulators against one is a rule
+    and not a choice, so this table follows the five.
 
     :copyright: (c) 2011-2012 by Selectel.
     :copyright: (c) 2012-2017 by pyte authors and contributors,
@@ -34,7 +40,7 @@ VT100_MAP = "".join(chr(c) for c in [
     0x0050, 0x0051, 0x0052, 0x0053, 0x0054, 0x0055, 0x0056, 0x0057,
     0x0058, 0x0059, 0x005a, 0x005b, 0x005c, 0x005d, 0x005e, 0x00a0,
     0x25c6, 0x2592, 0x2409, 0x240c, 0x240d, 0x240a, 0x00b0, 0x00b1,
-    0x2591, 0x240b, 0x2518, 0x2510, 0x250c, 0x2514, 0x253c, 0x23ba,
+    0x2424, 0x240b, 0x2518, 0x2510, 0x250c, 0x2514, 0x253c, 0x23ba,
     0x23bb, 0x2500, 0x23bc, 0x23bd, 0x251c, 0x2524, 0x2534, 0x252c,
     0x2502, 0x2264, 0x2265, 0x03c0, 0x2260, 0x00a3, 0x00b7, 0x007f,
     0x0080, 0x0081, 0x0082, 0x0083, 0x0084, 0x0085, 0x0086, 0x0087,
