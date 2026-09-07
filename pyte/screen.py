@@ -4792,17 +4792,40 @@ class Screen:
         cursor_position = self.pt_cursor_position
         cy, cx = (cursor_position.y, cursor_position.x)
 
-        # Reading the cell the cursor stands on makes it, which is what
-        # keeps the cursor on a character that a resize would otherwise
-        # trim off the end of a line. The buffer is a defaultdict, so
-        # this is a write, and it is meant.
-        cursor_character = data_buffer[cursor_position.y][cursor_position.x].char
+        # A screen that nobody has written on has nothing to lay out.
+        if not data_buffer:
+            return
+
+        # The character the cursor stands on, for the check at the end.
+        #
+        # **The read goes through `.get`**: the buffer and the rows in
+        # it are defaultdicts, so asking makes a cell, and asking about
+        # a cursor parked past the end of a line gave that line a run
+        # of blanks nobody wrote. Lillecarl/pymux#143.
+        #
+        # **Only a character a program wrote counts.** The trim below
+        # takes the blanks an erase left off the end of a line, so a
+        # cursor standing on one has nothing to keep: it ends up past
+        # the end of the line, which is where it was.
+        row = data_buffer.get(cursor_position.y)
+        cell = None if row is None else row.get(cursor_position.x)
+        cursor_character = (
+            cell.char if isinstance(cell, WrittenCell) else None
+        )
 
         # Unwrap the rows that have to be laid out again into the lines
         # a program wrote. That is the screen and the lines that reach
         # it, and never the whole history: the cost of a reflow is the
         # size of the screen and not the depth of the scrollback.
         last = max(data_buffer)
+
+        # The cursor stands inside the range whether it stands on a
+        # character or not. A cursor on a row nobody wrote is a cursor
+        # the unwrapping never sees, and it would keep the numbers it
+        # had while every row around it took new ones.
+        if cursor_position.y > last:
+            last = cursor_position.y
+
         offset = self._first_row_to_lay_out(last)
         all_lines, found = self.page.unwrap(offset, last, cursor=(cy, cx))
         if found is not None:
@@ -4822,22 +4845,17 @@ class Screen:
         # otherwise we can't calculate `max_y` correctly. (This is important
         # for the `clear` command.)
         #
-        # **The cell the cursor stands on is held back.** Reading it
-        # above makes it, so a cursor parked past the end of a line
-        # gives that line a run of blanks nobody wrote, and the first
-        # resize after that turns an empty line into a line of spaces.
-        # Trimming it instead loses the cursor: `test_reflow_history`
-        # says a narrowing keeps it on the bottom row, and it does not
-        # without this. Lillecarl/pymux#143.
-        for line_index, line in enumerate(all_lines):
+        # The cursor needs nothing held back here. It travels as an
+        # offset from the start of its line, and an offset past the
+        # end of one is where it stands on a full row or on a row a
+        # program moved onto and did not write. Lillecarl/pymux#143.
+        for line in all_lines:
             cells = line.cells
             while (
                 len(cells) > 1
                 and not isinstance(cells[-1], WrittenCell)
                 and cells[-1].appearance == PLAIN_APPEARANCE
             ):
-                if line_index == cy and len(cells) - 1 == cx:
-                    break
                 cells.pop()
 
         # The rows the lines came from go, and the lines take their
@@ -4886,6 +4904,18 @@ class Screen:
                 new_column_index += char.width
                 highest = new_row_index
 
+            # A cursor that stands past the end of its line lands the
+            # same distance past the last cell of it, wrapping the way
+            # a character would. No cell in the loop above matched it,
+            # because there is no cell there. Lillecarl/pymux#143.
+            if cy == line_index and cx >= len(line.cells):
+                cursor_row = new_row_index
+                cursor_column = new_column_index + cx - len(line.cells)
+                while cursor_column >= width:
+                    cursor_column -= width
+                    cursor_row += 1
+                new_cursor_position = (cursor_row, cursor_column)
+
             # A DEC line attribute belongs to the whole line, so every
             # row the line now takes carries it.
             if line.attribute is not None:
@@ -4916,19 +4946,23 @@ class Screen:
         cursor_position.y, cursor_position.x = cy, cx
         self.pt_cursor_position = cursor_position
 
-        # If everything goes well, the cursor should still be on the same character.
-        if (
-            cursor_character
-            != data_buffer[cursor_position.y][cursor_position.x].char
+        # If everything goes well, the cursor should still be on the same
+        # character. A cursor that stood on no character has none to keep,
+        # and `.get` asks without making one.
+        row = data_buffer.get(cursor_position.y)
+        cell = None if row is None else row.get(cursor_position.x)
+        if cursor_character is not None and cursor_character != (
+            None if cell is None else cell.char
         ):
             # FIXME:
             raise Exception(
-                "Reflow failed: {!r} {!r}".format(
-                    cursor_character,
-                    data_buffer[cursor_position.y][cursor_position.x].char,
-                )
+                "Reflow failed: {!r} {!r}".format(cursor_character, cell)
             )
 
-        self.max_y = highest
+        # The cursor is on the screen, so the screen reaches it. It can
+        # stand past the last cell of the last line and so on a row
+        # that holds none, which no longer exists now that a reflow
+        # does not make one for it. Lillecarl/pymux#143.
+        self.max_y = max(highest, cursor_position.y)
 
         self.max_y = min(self.max_y, cursor_position.y + self.lines - 1)

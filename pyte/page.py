@@ -318,6 +318,14 @@ class Page:
         The answer says where it landed, as a line and an offset in it,
         or `None` when it was not in the range.
 
+        **The offset can be past the end of the line.** A cursor stands
+        where the next character goes, and that is one column past the
+        last one on a full row, and any column at all on a row a
+        program moved the cursor onto without writing. So the offset
+        counts from the start of the line whether the line reaches it
+        or not, and the caller places it the same distance past the
+        cells it laid out. Lillecarl/pymux#143.
+
         The range is a range and not the whole buffer, because the whole
         buffer is what a reflow costs today. A caller that wants only
         the rows on the screen asks for those.
@@ -357,10 +365,20 @@ class Page:
                     line.attribute = row.attribute
 
                 # `default` answers an empty row without writing to it.
-                for column in range(0, max(row, default=-1) + 1):
+                held = max(row, default=-1) + 1
+                for column in range(0, held):
                     if number == cursor_row and column == cursor_column:
                         found = (len(lines) - 1, len(cells))
                     cells.append(row[column])
+            else:
+                held = 0
+
+            # The cursor stands past the last cell of its row: on the
+            # column a full row wraps from, or anywhere on a row a
+            # program moved onto and did not write. The offset says how
+            # far past the line the caller has to put it.
+            if number == cursor_row and cursor_column >= held:
+                found = (len(lines) - 1, len(cells) + cursor_column - held)
 
             if not self.wrapped(number + 1):
                 line = None
