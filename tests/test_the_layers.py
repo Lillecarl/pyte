@@ -50,12 +50,17 @@ PURE = {
     "xcms",
 }
 
-#: The disassembler, which is a program and not a layer.
+#: The modules that are not the screen. Each one is a program or a
+#: helper for one, so each one may touch a file.
 #:
 #: `debug.py` writes a JSON line per parsed event, so it holds a file
 #: and imports `os`. `__main__.py` is the command line around it, so it
 #: reads standard input. `__init__.py` wires the two together.
-TOOLS = {"__init__", "__main__", "debug"}
+#:
+#: `environment.py` says what a program run on this screen sees. The
+#: entry that describes the screen is a file, and the answer depends on
+#: whether it is there, so it looks at a directory.
+TOOLS = {"__init__", "__main__", "debug", "environment"}
 
 #: What the pure layer may take from outside: data, arithmetic and
 #: tables.
