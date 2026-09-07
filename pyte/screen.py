@@ -4760,27 +4760,44 @@ class Screen:
         under it: the buffer can start above the floor, and a reflow
         that laid out from under the lowest row would write the rows
         out one number too low and move the whole buffer down.
+
+        It learns that row on the way rather than asking `min` for it.
+        The walk passes every row between `last` and the floor, so it
+        has seen the lowest one by the time it gets there, and asking
+        `min` would read every key of the buffer to find a number that
+        only matters when the walk runs all the way down.
+        Lillecarl/pymux#145.
         """
         data_buffer = self.page.data_buffer
-        floor = min(data_buffer)
         wanted = min(self.line_offset, self.pt_cursor_position.y)
         lines = self.lines
 
         collected = 0
-        for number in range(last, floor - 1, -1):
+        lowest = last
+        for number in range(last, self.history_floor - 1, -1):
             row = data_buffer.get(number)
 
-            # A row a wrap made is the middle of a line, and a line is
-            # taken whole. A row the buffer does not hold is a blank
-            # line, and a blank line starts one.
-            if row is not None and row.wrapped:
-                continue
+            if row is not None:
+                lowest = number
+
+                # A row a wrap made is the middle of a line, and a line
+                # is taken whole. A row the buffer does not hold is a
+                # blank line, and a blank line starts one.
+                if row.wrapped:
+                    continue
 
             collected += 1
             if collected >= lines and number <= wanted:
-                return number
+                # `lowest` and not `number`: the walk goes down to the
+                # floor, and the floor only says that nothing lives
+                # under it. Every row between the two is a row the
+                # buffer does not hold, and laying out from under the
+                # lowest row it holds writes every row one number too
+                # low. `lowest` is `number` itself on a row that is
+                # there.
+                return lowest
 
-        return floor
+        return lowest
 
     def _reflow(self) -> None:
         """
@@ -4817,6 +4834,11 @@ class Screen:
         # a program wrote. That is the screen and the lines that reach
         # it, and never the whole history: the cost of a reflow is the
         # size of the screen and not the depth of the scrollback.
+        # This still walks every key of the buffer, and `highest_row`
+        # cannot take its place: a reflow ends by holding `max_y` down
+        # to the screen, and the rows above it stay, so the bound that
+        # `highest_row` rests on does not hold here.
+        # Lillecarl/pymux#145.
         last = max(data_buffer)
 
         # The cursor stands inside the range whether it stands on a
