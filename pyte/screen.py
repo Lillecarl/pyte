@@ -19,7 +19,16 @@ different, and is now simply what this package does:
 from collections import defaultdict, namedtuple
 from enum import IntEnum, IntFlag, StrEnum
 from functools import lru_cache
-from typing import Callable, DefaultDict, Dict, List, NamedTuple, Set, Tuple
+from typing import (
+    Callable,
+    DefaultDict,
+    Dict,
+    Iterable,
+    List,
+    NamedTuple,
+    Set,
+    Tuple,
+)
 
 from wcwidth import wcwidth  # type: ignore[import-untyped]
 
@@ -1139,6 +1148,13 @@ class Screen:
 
         self._history_cleanup_counter = 0
 
+        # How many times this screen has written a row, and the count at
+        # which each row last changed. Together they say which rows a
+        # reader has to draw again. `touch` says why the state is shaped
+        # this way. Lillecarl/pymux#126.
+        self.writes = 0
+        self.written_at: Dict[int, int] = {}
+
         self.savepoints: List[_Savepoint] = []
         self.lines = lines
         self.columns = columns
@@ -1591,9 +1607,55 @@ class Screen:
         # apart from each other, so this is rebuilt from both.
         self._appearance = PLAIN_APPEARANCE
 
+    # -- which rows have changed ------------------------------------------
+    #
+    # A front end draws every visible row of every frame, because
+    # nothing says which rows moved. These three say it.
+    #
+    # **The state that decides a redraw lives on the reader.** A set of
+    # dirty rows here would need somebody to empty it, and there is no
+    # such person: two widgets draw one screen, and pymux gives several
+    # clients one pane. A screen that knew its readers would have to
+    # register them, and a pure layer that tracks its consumers is not
+    # pure. A count that only goes up needs no emptying. Each reader
+    # keeps the count it last drew, per row, and a reader that attaches
+    # late remembers nothing, so every row looks new and it draws the
+    # whole screen once. Lillecarl/pymux#126.
+
+    def touch(self, row: int) -> None:
+        "Say that one row of `data_buffer` has changed."
+        self.writes += 1
+        self.written_at[row] = self.writes
+
+    def touch_rows(self, rows: Iterable[int]) -> None:
+        "Say that each of these rows has changed."
+        writes = self.writes
+        written_at = self.written_at
+        for row in rows:
+            writes += 1
+            written_at[row] = writes
+        self.writes = writes
+
+    def touch_everything(self) -> None:
+        """
+        Say that every row a reader could hold has changed.
+
+        A reset, a switch to the other page and a reflow all replace the
+        buffer rather than write into it. The rows a reader remembers
+        are gone, and the rows that take their numbers are new, so both
+        sets have to say so. A row that no longer exists says so as
+        well: without that, a reader keeps drawing one that went.
+        """
+        self.touch_rows(set(self.written_at) | set(self.page.data_buffer))
+
     def _reset_screen(self) -> None:
         """Reset the Screen content. (also called when switching from/to
         alternate buffer."""
+        # Before the page goes, so that the rows it held are counted.
+        # The first call of all builds the page, and there is nothing to
+        # count then.
+        if hasattr(self, "page"):
+            self.touch_everything()
         self.page = Page(default_char=Cell(" ", PLAIN_APPEARANCE))
 
         self.data_buffer = self.page.data_buffer
@@ -2047,9 +2109,15 @@ class Screen:
                 and self._alternate_screen is not None
             )
             if keeps_the_content:
+                # The buffer is replaced rather than written into, so
+                # both sets of rows have to say so: the ones a reader
+                # holds, and the ones that take their numbers.
+                # Lillecarl/pymux#126.
+                self.touch_everything()
                 self.page = self._alternate_screen
                 for name, value in self._alternate_screen_vars.items():
                     setattr(self, name, value)
+                self.touch_everything()
                 self._alternate_screen = None
                 self._alternate_screen_vars = {}
 
@@ -2163,9 +2231,13 @@ class Screen:
                     name: getattr(self, name) for name in self.swap_variables
                 }
 
+            # The rows of the screen that is being left, and then the
+            # rows of the one that comes back. Lillecarl/pymux#126.
+            self.touch_everything()
             for k, v in self._original_screen_vars.items():
                 setattr(self, k, v)
             self.page = self._original_screen
+            self.touch_everything()
 
             self._original_screen = None
             self._original_screen_vars = {}
@@ -2295,6 +2367,14 @@ class Screen:
         # to wrap. After that the loop has placed the cursor itself.
         waiting_to_wrap = self.pending_wrap
 
+        # The row this run starts on. A run that wraps writes to the
+        # rows below as well, and the cursor only ever moves down while
+        # it draws, so the rows this run changed are the ones from here
+        # to wherever the cursor ends up. Counting them after the loop
+        # keeps the loop itself, which runs once per character, exactly
+        # as it was. Lillecarl/pymux#126.
+        first_row = cursor_position_y
+
         for char in chars:
             # Create 'Cell' instance.
             pt_char = char_cache[(char,) + key_tail]
@@ -2422,9 +2502,20 @@ class Screen:
             self.max_y = cursor_position_y
 
         cursor_position.x = cursor_position_x
-        # A run that draws nothing leaves the wait as it was.
+        # A run that draws nothing leaves the wait as it was, and it
+        # changed no row either.
         if chars:
             self.pending_wrap = waiting_to_wrap
+            # Nearly every run stays on one row, so that case is
+            # written out rather than called. A run that began with the
+            # cursor waiting to wrap counts the row it came from as
+            # well, which costs a reader one row it need not have
+            # drawn and never costs it a row it should have.
+            if cursor_position_y == first_row:
+                self.writes += 1
+                self.written_at[first_row] = self.writes
+            else:
+                self.touch_rows(range(first_row, cursor_position_y + 1))
 
     def _leave_the_pending_wrap(self) -> None:
         """
@@ -2577,6 +2668,14 @@ class Screen:
         data_buffer = self.data_buffer
         horizontal = self.horizontal_margins
 
+        # Every row of the region takes new content, whether it comes
+        # from another row or is empty. A scroll is the commonest thing
+        # a program does, so this is one call for the whole region
+        # rather than one per row. It comes before the move, so that a
+        # helper the move calls counts on top of a number that is
+        # already written back. Lillecarl/pymux#126.
+        self.touch_rows(row + line_offset for row in rows)
+
         for row in rows:
             origin = row + source
             inside = top <= origin <= bottom
@@ -2663,7 +2762,20 @@ class Screen:
         for line in list(data_buffer):
             if line < remove_above:
                 data_buffer.pop(line, None)
+                self._forget(line)
         self.graphics.prune_above(remove_above)
+
+    def _forget(self, row: int) -> None:
+        """
+        Drop the count of a row that has left the history for good.
+
+        The count is not moved on: it is taken away. A reader that
+        remembers such a row finds no count where it left one, which
+        differs from what it holds, so it draws the row again and finds
+        it gone. Moving the count on would work as well, and `written_at`
+        would then hold an entry for every row a long session ever wrote.
+        """
+        self.written_at.pop(row, None)
 
     def clear_history(self) -> None:
         """
@@ -2672,6 +2784,7 @@ class Screen:
         for line in list(self.data_buffer):
             if line < self.line_offset:
                 self.data_buffer.pop(line, None)
+                self._forget(line)
 
     def reverse_index(self) -> None:
         top, bottom = self.margins or Margins(0, self.lines - 1)
@@ -2964,6 +3077,7 @@ class Screen:
         """
         data_buffer = self.data_buffer
         appearance = self.erase_appearance()
+        self.touch(row)
 
         if appearance is None:
             data_buffer.pop(row, None)
@@ -3041,6 +3155,7 @@ class Screen:
 
         edge = right + 1
         line = self.data_buffer[self.pt_cursor_position.y]
+        self.touch(self.pt_cursor_position.y)
 
         # Move what sits at and after the cursor to the right. What
         # falls off the right edge is lost.
@@ -3079,6 +3194,7 @@ class Screen:
 
         edge = right + 1
         line = self.data_buffer[self.pt_cursor_position.y]
+        self.touch(self.pt_cursor_position.y)
 
         # Move what sits after the deleted characters to the left.
         moved = {}
@@ -3406,6 +3522,7 @@ class Screen:
         count = count or 1
         cursor_position = self.pt_cursor_position
         row = self.data_buffer[cursor_position.y]
+        self.touch(cursor_position.y)
         # ECH writes a cell even when nothing paints it: the erase has
         # to take the content away whether or not it has a colour.
         erased = ErasedCell(" ", self.erase_appearance() or PLAIN_APPEARANCE)
@@ -3450,6 +3567,7 @@ class Screen:
 
         for row in range(top, bottom + 1):
             line = data_buffer[row + line_offset]
+            self.touch(row + line_offset)
             for column in columns:
                 origin = column + source
                 cell = line.get(origin) if left <= origin <= right else None
@@ -3576,6 +3694,7 @@ class Screen:
             columns = range(0, self.columns)
 
         line = data_buffer[pt_cursor_position.y]
+        self.touch(pt_cursor_position.y)
         holds = self._erase_holds
         erased = ErasedCell(" ", appearance) if appearance else None
 
@@ -3717,6 +3836,8 @@ class Screen:
             # and ED 1 only take a part of that row.
             self._forget_line_attributes(erased_rows)
 
+            self.touch_rows(interval)
+
             for line in interval:
                 if reads_the_marks:
                     # A cell that carries a mark stays, so the row
@@ -3849,6 +3970,7 @@ class Screen:
         line_offset = self.line_offset
         for row in range(top, bottom + 1):
             line = data_buffer[row + line_offset]
+            self.touch(row + line_offset)
             for column in range(left, right + 1):
                 line[column] = cell
             self.repair_wide_char(line, left)
@@ -3896,6 +4018,7 @@ class Screen:
         line_offset = self.line_offset
         for row in range(top, bottom + 1):
             line = data_buffer[row + line_offset]
+            self.touch(row + line_offset)
             for column in range(left, right + 1):
                 if reads_the_marks:
                     cell = line.get(column)
@@ -3954,6 +4077,7 @@ class Screen:
 
         for row in range(height):
             line = data_buffer[target_top + row + line_offset]
+            self.touch(target_top + row + line_offset)
             for column, cell in enumerate(read[row]):
                 if cell is None:
                     line.pop(target_left + column, None)
@@ -4089,6 +4213,7 @@ class Screen:
         """
         for y in range(0, self.lines):
             line = self.data_buffer[y + self.line_offset]
+            self.touch(y + self.line_offset)
             for x in range(0, self.columns):
                 line[x] = _CHAR_CACHE["E", PLAIN_APPEARANCE]
         self.margins = None
@@ -4400,6 +4525,7 @@ class Screen:
         data_buffer = self.data_buffer
         for row in range(self.max_y - count + 1, self.max_y + 1):
             data_buffer.pop(row, None)
+            self.touch(row)
 
         self.max_y -= count
         self.graphics.prune_below(self.max_y)
@@ -5635,10 +5761,18 @@ class Screen:
             if row_index > cy + self.lines:
                 del data_buffer[row_index]
 
+        # A reflow puts every character somewhere else, so the rows a
+        # reader holds and the rows that take their numbers are both
+        # new. This is counted before the swap, and `touch_everything`
+        # reads the old buffer; the new one comes next, and every row of
+        # it is a row nobody has a count for.
+        self.touch_everything()
+
         self.page.data_buffer = new_data_buffer
         self.data_buffer = new_data_buffer
         self.wrapped_lines = new_wrapped_lines
         self.line_attributes = new_line_attributes
+        self.touch_everything()
 
         cursor_position.y, cursor_position.x = cy, cx
         self.pt_cursor_position = cursor_position

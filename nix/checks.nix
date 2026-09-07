@@ -11,6 +11,7 @@
 {
   python,
   pytest,
+  hypothesis,
   callPackage,
   package,
   testSources,
@@ -18,9 +19,14 @@
 let
   inherit (callPackage ./suite.nix { }) suite;
 
+  # hypothesis generates the sequences that `test_row_versions.py` puts
+  # through a screen. A recording holds what one program happened to
+  # write, and the paths that move whole ranges of rows are the ones a
+  # recording is least likely to reach.
   pythonWithTests = python.withPackages (ps: [
     package
     pytest
+    hypothesis
   ]);
 
   # Narrow a run to one file or one test while hunting:
