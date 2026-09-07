@@ -924,6 +924,12 @@ class Screen:
         columns = columns if columns is not None else self.columns
 
         if self.lines != lines or self.columns != columns:
+            # The last row of the screen the buffer was written into.
+            # It is read here, before the height changes, because the
+            # reflow looks for the top of the buffer there. A shorter
+            # screen moves that row down past rows the buffer holds.
+            bottom = self.line_offset + self.lines - 1
+
             self.lines = lines
             self.columns = columns
 
@@ -939,7 +945,7 @@ class Screen:
             # is the last rows of it, and the cursor is held inside the
             # screen rather than the screen held to the cursor.
             # Lillecarl/pymux#146.
-            self._reflow()
+            self._reflow(bottom)
 
             # A program that asked for it learns the new size in band.
             self.notify_of_resize()
@@ -3832,7 +3838,9 @@ class Screen:
         # and this is the one path that brings such a row back onto the
         # screen. Lay them out again. Lillecarl/pymux#135.
         if self.line_offset < self.reflow_floor:
-            self._reflow()
+            # The height did not change here, so the last row of the
+            # screen is the one the buffer was written into.
+            self._reflow(self.line_offset + self.lines - 1)
 
     def placeholder_runs(
         self, first_row: int, last_row: int
@@ -4703,9 +4711,17 @@ class Screen:
     # rows, so the width those rows were laid out at never reaches it.
     # Lillecarl/pymux#135.
 
-    def _highest_row_the_buffer_holds(self) -> int:
+    def _highest_row_the_buffer_holds(self, bottom: int) -> int:
         """
         The highest row number the buffer holds. It holds one.
+
+        `bottom` is the last row of the screen those rows were written
+        into. **A resize has to read it before it changes the height**,
+        because the search below starts there and the new height moves
+        it. A shorter screen moved it down past rows of the buffer, and
+        the search stopped at the first row under the new bottom: six
+        rows of DECALN turned into three that a resize laid out again
+        and three that kept the old width above them.
 
         **Not `highest_row`.** That one answers `max_y` at the least,
         because a front end draws every row of the screen. This one
@@ -4717,27 +4733,27 @@ class Screen:
         catches it.
 
         **It looks down instead of reading every key.** No row of the
-        buffer sits above the last row of the screen, and
+        buffer sits above `bottom`, and
         `tests/test_the_top_of_the_buffer.py` is the proof of that
-        bound. So the search starts there and walks down the screen.
+        bound. So the first row the search meets going down is the
+        answer, whatever the search stops at.
 
         **The last row of the screen, and not `max_y`.** `max_y` is the
         highest row that was ever written, and a screen that has not
         filled up yet reaches further down than that: DECALN writes
         every row of a fresh screen and leaves `max_y` at 0.
 
-        The search gives up under the screen, and `max` answers what is
-        left. A screen a program cleared holds no row at all, and the
-        gap down to the last row of the history is as deep as the
-        history. That fall back costs what this method cost before:
-        `max` walks every key, which at fifty thousand rows is 392
-        microseconds of a resize that takes 1,200.
+        The search gives up after the rows of one screen, and `max`
+        answers what is left. A screen a program cleared holds no row
+        at all, and the gap down to the last row of the history is as
+        deep as the history. That fall back costs what this method cost
+        before: `max` walks every key, which at fifty thousand rows is
+        392 microseconds of a resize that takes 1,200.
         Lillecarl/pymux#145.
         """
         data_buffer = self.page.data_buffer
-        floor = self.line_offset
 
-        for number in range(floor + self.lines - 1, floor - 1, -1):
+        for number in range(bottom, bottom - self.lines, -1):
             if number in data_buffer:
                 return number
 
@@ -4806,9 +4822,13 @@ class Screen:
 
         return lowest
 
-    def _reflow(self) -> None:
+    def _reflow(self, bottom: int) -> None:
         """
         Reflow the screen using the given width.
+
+        `bottom` is the last row of the screen the buffer was written
+        into. A resize reads it before it changes the height, because
+        `_highest_row_the_buffer_holds` starts its search there.
         """
         width = self.columns
 
@@ -4841,7 +4861,7 @@ class Screen:
         # a program wrote. That is the screen and the lines that reach
         # it, and never the whole history: the cost of a reflow is the
         # size of the screen and not the depth of the scrollback.
-        last = self._highest_row_the_buffer_holds()
+        last = self._highest_row_the_buffer_holds(bottom)
 
         # The cursor stands inside the range whether it stands on a
         # character or not. A cursor on a row nobody wrote is a cursor

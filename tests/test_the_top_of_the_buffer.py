@@ -69,7 +69,7 @@ def say_nothing_sits_above_the_screen(screen) -> None:
     # and it also has to be what reading the whole buffer says.
     # Lillecarl/pymux#145.
     if buffer:
-        found = screen._highest_row_the_buffer_holds()
+        found = screen._highest_row_the_buffer_holds(last)
         assert found == max(buffer), (
             "the buffer top was read as %d and the whole buffer says %d (%s)"
             % (found, max(buffer), where)

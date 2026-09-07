@@ -156,6 +156,40 @@ def test_a_column_change_keeps_every_line(chunks, widths):
         assert logical_lines(screen) == before
 
 
+#: The sizes to resize through, height as well as width. A shorter
+#: screen is the case that a width alone never reaches: the reflow
+#: looks for the top of the buffer at the last row of the screen, and
+#: a smaller height moves that row down past rows the buffer holds.
+#: Lillecarl/pymux#145.
+SIZES = st.lists(
+    st.tuples(st.integers(1, 12), st.integers(4, 24)), min_size=1, max_size=4
+)
+
+
+@given(st.lists(a_chunk(), min_size=1, max_size=40), SIZES)
+@settings(
+    max_examples=300,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow],
+)
+def test_a_size_change_keeps_every_line(chunks, sizes):
+    """
+    The same through several heights as well as several widths.
+
+    A screen that has not filled up holds rows below `max_y`: DECALN
+    writes every row of a fresh screen and leaves `max_y` at 0. Making
+    that screen shorter left the rows under the new bottom laid out at
+    the old width, above the ones the reflow wrote.
+    """
+    screen = a_screen(columns=10, lines=6)
+    Stream(screen).feed("".join(chunks))
+
+    before = logical_lines(screen)
+    for lines, columns in sizes:
+        screen.resize(lines, columns)
+        assert logical_lines(screen) == before
+
+
 @given(st.lists(a_chunk(), min_size=1, max_size=40), WIDTHS)
 @settings(
     max_examples=300,
