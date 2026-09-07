@@ -16,7 +16,7 @@ What a colour *is* lives in `colors.py`, and the arithmetic behind it
 in `xcms.py`. Nothing about a colour space belongs here.
 """
 from enum import StrEnum
-from typing import Dict, List, Tuple
+from typing import Dict, List, NamedTuple, Tuple
 
 from .colors import PALETTE
 
@@ -32,6 +32,8 @@ __all__ = [
     "POINTER_SHAPE_ALIASES",
     "SPECIAL_COLOR_NAMES",
     "Osc",
+    "PointerShapeRead",
+    "PointerShapes",
     "asks_for_the_clipboard",
     "parse_hyperlink",
     "parse_kitty_color_query",
@@ -281,3 +283,108 @@ def pointer_shape_name(name: str) -> str | None:
     if name in POINTER_SHAPES:
         return name
     return POINTER_SHAPE_ALIASES.get(name)
+
+
+class PointerShapeRead(NamedTuple):
+    "What one \"OSC 22\" payload asks the screen to do."
+
+    #: The payload to answer with, or `None` when the sequence asked
+    #: no question.
+    answer: str | None
+
+    #: Did the shape change? Then the embedder has to look again.
+    changed: bool
+
+
+class PointerShapes:
+    """
+    The stack of pointer shapes that "OSC 22" keeps.
+
+    The main and the alternate screen each have their own, so this
+    rides in `Screen.swap_variables` the way `GraphicsState` does.
+
+    A pane has no pointer of its own. It holds the stack so that it
+    can tell an embedder what the program asked for, and so that it
+    can answer a program that asks what it holds.
+    """
+
+    __slots__ = ("stack",)
+
+    def __init__(self) -> None:
+        self.stack: List[str] = []
+
+    @property
+    def shape(self) -> str:
+        """
+        The shape now.
+
+        An empty string means that no program asked for one, and that
+        whoever draws the pointer picks it.
+        """
+        return self.stack[-1] if self.stack else ""
+
+    def read(self, param: str) -> PointerShapeRead:
+        """
+        Read one "OSC 22" payload.
+
+        A bare name or "=name" replaces the shape now, ">a,b" pushes,
+        "<" pops one, and an empty payload takes the shape away.
+        "?names" asks a question, which this answers.
+        """
+        operation = "="
+        if param and param[0] in "><=?":
+            operation, param = param[0], param[1:]
+
+        if operation == "?":
+            return PointerShapeRead(self._answer(param), False)
+
+        if operation == "<":
+            if not self.stack:
+                return PointerShapeRead(None, False)
+            self.stack.pop()
+            return PointerShapeRead(None, True)
+
+        changed = False
+        for name in param.split(","):
+            if not name and operation != "=":
+                continue  # A push of nothing pushes nothing.
+            shape = pointer_shape_name(name)
+            if shape is None:
+                continue  # Not a shape that a terminal knows.
+            if operation == "=":
+                if self.stack:
+                    self.stack[-1] = shape
+                else:
+                    self.stack.append(shape)
+            else:
+                if len(self.stack) >= MAX_POINTER_SHAPES:
+                    del self.stack[0]  # The oldest goes.
+                self.stack.append(shape)
+            changed = True
+        return PointerShapeRead(None, changed)
+
+    def _answer(self, param: str) -> str:
+        """
+        The payload of the answer to "OSC 22 ; ? names".
+
+        A name that this takes answers one, a name that nobody knows
+        answers zero, and "__current__" answers the shape now, or zero
+        when there is none. A pane has no pointer of its own, so the
+        default and the grabbed shape are both the plain default.
+
+        kitty answers for the table of CSS names, and takes a few more
+        names than it calls valid. This answers for the names it really
+        takes, which is what a program asking the question wants to
+        know.
+        """
+        answers = []
+        for query in param.split(","):
+            if query and pointer_shape_name(query) is not None:
+                answers.append("1")
+            elif query == "__current__":
+                answers.append(self.shape or "0")
+            elif query in ("__default__", "__grabbed__"):
+                answers.append("default")
+            else:
+                answers.append("0")
+        return "22;%s" % ",".join(answers)
