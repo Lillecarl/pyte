@@ -318,6 +318,13 @@ class Appearance:
 
 #: One `Appearance` for each way of drawing that a program has asked
 #: for. A screen reaches this once per SGR sequence.
+#:
+#: Ten thousand is far more than any program uses: a shell prompt has a
+#: handful and the busiest program on a screen has tens. It is large
+#: because the cost of holding one is a small object and the cost of
+#: dropping one is every cell that still points at it comparing unequal
+#: to the next. Both front ends size their own style cache off this
+#: one, so it is the number that decides all three.
 appearance_of: FastDictCache[
     Tuple[Rendition, str, str], Appearance
 ] = FastDictCache(Appearance, size=10 * 1000)
