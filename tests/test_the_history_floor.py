@@ -138,3 +138,29 @@ def test_the_other_page_has_a_floor_of_its_own():
     assert screen.history_floor == 0
     stream.feed("\x1b[?1049l")
     assert screen.history_floor == deep
+
+
+def test_unscroll_brings_the_floor_down_with_the_screen():
+    """
+    `unscroll` slides the screen down over rows a prune took away, so
+    the floor has to follow.
+
+    Without that the screen covers rows that sit under the floor, a
+    program writes on one of them, and the next prune walks from the
+    floor and never reaches it. Hypothesis found it with a wrap, an
+    unscroll and a rectangle erase.
+    """
+    screen = a_short_history()
+    stream = Stream(screen)
+    stream.feed("\nwider text that wraps around the end of a short row")
+    screen._remove_old_lines_from_history()
+    assert screen.history_floor > 0
+
+    stream.feed("\x1b[1 D")
+    assert screen.history_floor <= screen.line_offset
+
+    # The row at the new top of the screen is written on, and it is not
+    # under the floor.
+    stream.feed("\x1b[0;0;0;0$z")
+    buffer = screen.page.data_buffer
+    assert min(buffer) >= screen.history_floor

@@ -4616,6 +4616,17 @@ class Screen:
         self.max_y -= count
         self.graphics.prune_below(self.max_y)
 
+        # The screen slides down over rows that a prune took away, and
+        # a program may write on them again. `history_floor` says that
+        # no row lives under it, so it has to follow: without this, a
+        # row written at the new top of the screen sits under the floor,
+        # and the next prune walks from the floor and never reaches it.
+        #
+        # Lowering the floor is always safe. It says where a prune
+        # starts looking, and looking lower finds nothing that is not
+        # there.
+        self.history_floor = min(self.history_floor, self.line_offset)
+
         cursor_position = self.pt_cursor_position
         cursor_position.y = max(0, cursor_position.y - count)
         self.ensure_bounds()
