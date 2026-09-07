@@ -175,14 +175,14 @@ def test_a_kitty_colour_set_is_ignored():
 def test_the_title_still_works():
     screen, stream, responses = make_screen()
     stream.feed("\x1b]2;a title\x07")
-    assert screen.title == "a title"
+    assert screen.titles.window == "a title"
     assert responses == []
 
 
 def test_the_icon_name_still_works():
     screen, stream, responses = make_screen()
     stream.feed("\x1b]1;an icon\x07")
-    assert screen.icon_name == "an icon"
+    assert screen.titles.icon == "an icon"
 
 
 def test_an_unknown_sequence_is_consumed():

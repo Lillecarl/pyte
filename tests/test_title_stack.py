@@ -62,7 +62,7 @@ def test_a_push_and_a_pop_bring_both_titles_back():
     stream.feed("\x1b[22;0t")
     _titles(stream, "x", "x")
     stream.feed("\x1b[23;0t")
-    assert (screen.title, screen.icon_name) == ("window", "icon")
+    assert (screen.titles.window, screen.titles.icon) == ("window", "icon")
 
 
 def test_a_pop_of_the_icon_leaves_the_window_title():
@@ -71,7 +71,7 @@ def test_a_pop_of_the_icon_leaves_the_window_title():
     stream.feed("\x1b[22;0t")
     _titles(stream, "x", "x")
     stream.feed("\x1b[23;1t")
-    assert (screen.title, screen.icon_name) == ("x", "icon")
+    assert (screen.titles.window, screen.titles.icon) == ("x", "icon")
 
 
 def test_a_pop_of_the_window_title_leaves_the_icon():
@@ -80,7 +80,7 @@ def test_a_pop_of_the_window_title_leaves_the_icon():
     stream.feed("\x1b[22;0t")
     _titles(stream, "x", "x")
     stream.feed("\x1b[23;2t")
-    assert (screen.title, screen.icon_name) == ("window", "x")
+    assert (screen.titles.window, screen.titles.icon) == ("window", "x")
 
 
 def test_a_pop_takes_one_entry_off_whichever_title_it_names():
@@ -95,7 +95,7 @@ def test_a_pop_takes_one_entry_off_whichever_title_it_names():
     stream.feed("\x1b[22;0t")
     _titles(stream, "x", "x")
     stream.feed("\x1b[23;1t\x1b[23;2t")
-    assert (screen.title, screen.icon_name) == ("x", "icon")
+    assert (screen.titles.window, screen.titles.icon) == ("x", "icon")
 
 
 def test_a_push_remembers_both_titles_whichever_it_names():
@@ -104,7 +104,7 @@ def test_a_push_remembers_both_titles_whichever_it_names():
     stream.feed("\x1b[22;1t")  # The icon label alone.
     _titles(stream, "y", "z")
     stream.feed("\x1b[23;0t")
-    assert (screen.title, screen.icon_name) == ("window", "icon")
+    assert (screen.titles.window, screen.titles.icon) == ("window", "icon")
 
 
 def test_two_pushes_come_back_in_order():
@@ -114,16 +114,16 @@ def test_two_pushes_come_back_in_order():
     stream.feed("\x1b]1;now\x1b\\")
 
     stream.feed("\x1b[23;1t")
-    assert screen.icon_name == "second"
+    assert screen.titles.icon == "second"
     stream.feed("\x1b[23;1t")
-    assert screen.icon_name == "first"
+    assert screen.titles.icon == "first"
 
 
 def test_a_pop_of_an_empty_stack_changes_nothing():
     screen, stream, _answers = _screen()
     _titles(stream, "window", "icon")
     stream.feed("\x1b[23;0t")
-    assert (screen.title, screen.icon_name) == ("window", "icon")
+    assert (screen.titles.window, screen.titles.icon) == ("window", "icon")
 
 
 def test_a_pop_without_a_parameter_brings_both_back():
@@ -132,7 +132,7 @@ def test_a_pop_without_a_parameter_brings_both_back():
     stream.feed("\x1b[22t")
     _titles(stream, "x", "x")
     stream.feed("\x1b[23t")
-    assert (screen.title, screen.icon_name) == ("window", "icon")
+    assert (screen.titles.window, screen.titles.icon) == ("window", "icon")
 
 
 def test_the_stack_does_not_grow_without_end():
@@ -140,10 +140,10 @@ def test_the_stack_does_not_grow_without_end():
     screen, stream, _answers = _screen()
     for number in range(50):
         stream.feed("\x1b]1;%i\x1b\\\x1b[22;1t" % number)
-    assert len(screen.title_stack) == screen.TITLE_STACK_LIMIT
+    assert len(screen.titles.stack) == screen.titles.STACK_LIMIT
 
     stream.feed("\x1b[23;1t")
-    assert screen.icon_name == "49"
+    assert screen.titles.icon == "49"
 
 
 def test_a_reset_empties_the_stack():
@@ -151,4 +151,4 @@ def test_a_reset_empties_the_stack():
     _titles(stream, "window", "icon")
     stream.feed("\x1b[22;0t")
     stream.feed("\x1bc")  # RIS.
-    assert screen.title_stack == []
+    assert screen.titles.stack == []

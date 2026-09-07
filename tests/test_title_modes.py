@@ -42,42 +42,42 @@ def make_screen():
 
 def test_a_terminal_starts_with_no_title_mode():
     screen, _stream, _answers = make_screen()
-    assert screen.title_modes == set()
+    assert screen.titles.modes == set()
 
 
 def test_one_sequence_can_set_several_modes():
     screen, stream, _answers = make_screen()
     stream.feed(SET % "0;3")
-    assert screen.title_modes == {TitleMode.SET_HEX, TitleMode.QUERY_UTF8}
+    assert screen.titles.modes == {TitleMode.SET_HEX, TitleMode.QUERY_UTF8}
 
 
 def test_a_mode_can_be_taken_away_again():
     screen, stream, _answers = make_screen()
     stream.feed(SET % "0;1" + RESET % "1")
-    assert screen.title_modes == {TitleMode.SET_HEX}
+    assert screen.titles.modes == {TitleMode.SET_HEX}
 
 
 def test_a_sequence_with_no_parameter_names_the_first_mode():
     "A missing number is a zero here, the way it is everywhere else."
     screen, stream, _answers = make_screen()
     stream.feed(SET % "")
-    assert screen.title_modes == {TitleMode.SET_HEX}
+    assert screen.titles.modes == {TitleMode.SET_HEX}
     stream.feed(RESET % "")
-    assert screen.title_modes == set()
+    assert screen.titles.modes == set()
 
 
 def test_a_number_that_no_mode_has_is_ignored():
     "And it does not take the modes beside it in the same sequence."
     screen, stream, _answers = make_screen()
     stream.feed(SET % "0;9")
-    assert screen.title_modes == {TitleMode.SET_HEX}
+    assert screen.titles.modes == {TitleMode.SET_HEX}
 
 
 def test_a_reset_takes_every_title_mode_away():
     screen, stream, _answers = make_screen()
     stream.feed(SET % "0;1")
     stream.feed("\x1bc")  # RIS.
-    assert screen.title_modes == set()
+    assert screen.titles.modes == set()
 
 
 # ----------------------------------------------------------------------
@@ -98,7 +98,7 @@ def test_the_marker_is_what_makes_it_a_title_mode():
     stream = Stream(screen)
     stream.feed("\x1b[>4t")
     assert asks == []
-    assert screen.title_modes == set()
+    assert screen.titles.modes == set()
 
 
 def test_a_plain_scroll_down_still_scrolls():
@@ -115,25 +115,25 @@ def test_a_plain_scroll_down_still_scrolls():
 def test_a_title_is_plain_text_until_a_program_says_otherwise():
     screen, stream, _answers = make_screen()
     stream.feed(TITLE % "ab")
-    assert screen.title == "ab"
+    assert screen.titles.window == "ab"
 
 
 def test_a_hexadecimal_title_is_decoded():
     screen, stream, _answers = make_screen()
     stream.feed(SET % "0" + TITLE % "6162")
-    assert screen.title == "ab"
+    assert screen.titles.window == "ab"
 
 
 def test_a_hexadecimal_icon_name_is_decoded():
     screen, stream, _answers = make_screen()
     stream.feed(SET % "0" + ICON % "61")
-    assert screen.icon_name == "a"
+    assert screen.titles.icon == "a"
 
 
 def test_the_bytes_of_a_hexadecimal_title_are_utf_8():
     screen, stream, _answers = make_screen()
     stream.feed(SET % "0" + TITLE % "c3a4")
-    assert screen.title == "ä"
+    assert screen.titles.window == "ä"
 
 
 @pytest.mark.parametrize("written", ["61z", "616", "hello"])
@@ -141,7 +141,7 @@ def test_a_title_that_is_not_hexadecimal_arrives_as_it_stands(written):
     "A title nobody can read is still better than no title at all."
     screen, stream, _answers = make_screen()
     stream.feed(SET % "0" + TITLE % written)
-    assert screen.title == written
+    assert screen.titles.window == written
 
 
 # ----------------------------------------------------------------------
@@ -193,5 +193,5 @@ def test_the_utf_8_modes_change_nothing():
     """
     screen, stream, answers = make_screen()
     stream.feed(SET % "2;3" + TITLE % "ä" + ASK_FOR_TITLE)
-    assert screen.title == "ä"
+    assert screen.titles.window == "ä"
     assert answers == ["\x1b]lä\x1b\\"]

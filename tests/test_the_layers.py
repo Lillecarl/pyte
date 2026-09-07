@@ -50,6 +50,7 @@ PURE = {
     "sixel",
     "streams",
     "terminfo",
+    "titles",
     "xcms",
 }
 

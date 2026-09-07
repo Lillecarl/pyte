@@ -103,7 +103,7 @@ def test_esc_inside_payload_does_not_terminate():
 def test_osc_still_works():
     screen = a_screen(20, 5)
     pyte.ByteStream(screen).feed(b"\x1b]2;my title\x07rest")
-    assert screen.title == "my title"
+    assert screen.titles.window == "my title"
     assert "rest" in "\n".join(display(screen))
 
 

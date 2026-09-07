@@ -73,11 +73,7 @@ from .parameters import (
     CursorShape,
     StatusDisplay,
     StatusLineType,
-    TitleMode,
-    TitlePart,
     WindowOp,
-    title_from_hex,
-    title_to_hex,
 )
 from .colors import (
     COLOR_OF_A_BACKGROUND,
@@ -102,6 +98,7 @@ from .osc import (
 )
 from .placeholders import PlaceholderRun, merge_runs, runs_in_line
 from .sixel import decode_sixel
+from .titles import Titles
 from .terminfo import (
     CAPABILITIES,
     DEVICE_EXTENSIONS,
@@ -447,16 +444,11 @@ class Screen:
         # there rather than making a new one.
         self.savepoints: List[_Savepoint] = []
 
-        self.title = ""
-        self.icon_name = ""
-
-        # The titles that "CSI 22 t" remembered. A reset empties it,
-        # the way it empties everything else that a program set.
-        self.title_stack: List[Tuple[str, str]] = []
-
-        # The title modes that "CSI > Ps t" set. A terminal starts with
-        # none of them, so a title is plain text in and plain text out.
-        self.title_modes: Set[int] = set()
+        # The window title, the icon label, the stack that "CSI 22 t"
+        # pushes them onto and the modes that say how they are written.
+        # A reset gives a fresh one, the way it takes away everything
+        # else that a program set.
+        self.titles = Titles()
 
         # Reset the kitty keyboard protocol flag stack as well. (RIS is a
         # full terminal reset. It also clears all graphics.)
@@ -1789,7 +1781,7 @@ class Screen:
         two apart by the marker.
         """
         if private == ">":
-            self._change_title_modes(params, False)
+            self.titles.change_modes(params, False)
             return
         count = params[0] if params else None
         self._scroll_region(-(count or 1))
@@ -4126,7 +4118,7 @@ class Screen:
         `pyte.images` assumes, so both sides count alike.
         """
         if private == ">":
-            self._change_title_modes(params, True)
+            self.titles.change_modes(params, True)
             return
 
         what = params[0] if params else 0
@@ -4140,13 +4132,13 @@ class Screen:
         elif what == WindowOp.RESIZE_PIXELS:
             self._resize_in_pixels(params)
         elif what == WindowOp.REPORT_ICON_LABEL:
-            self.reply_osc("L%s" % self._title_to_report(self.icon_name))
+            self.reply_osc("L%s" % self.titles.to_report(self.titles.icon))
         elif what == WindowOp.REPORT_WINDOW_TITLE:
-            self.reply_osc("l%s" % self._title_to_report(self.title))
+            self.reply_osc("l%s" % self.titles.to_report(self.titles.window))
         elif what == WindowOp.PUSH_TITLE:
-            self._push_title()
+            self.titles.push()
         elif what == WindowOp.POP_TITLE:
-            self._pop_title(which)
+            self.titles.pop(which)
         elif what == WindowOp.REPORT_CELL_SIZE_PIXELS:
             # Cell size in pixels: height first, then width.
             self.reply_csi(
@@ -4235,37 +4227,6 @@ class Screen:
 
     #: How many titles "CSI 22 t" remembers. xterm keeps ten, and a
     #: program that pushes and never pops must not grow the pane.
-    TITLE_STACK_LIMIT = 10
-
-    def _push_title(self) -> None:
-        """
-        "CSI 22 ; Ps t": remember the titles that are set now.
-
-        One stack holds both of them, whichever title the parameter
-        names. A pop then takes one entry off and writes back the
-        title that its own parameter names, so a push of the icon
-        label and a pop of the window title read the same entry.
-        xterm answers this way, and the conformance suite reads it.
-        """
-        self.title_stack.append((self.icon_name, self.title))
-        del self.title_stack[: -self.TITLE_STACK_LIMIT]
-
-    def _pop_title(self, which: int) -> None:
-        """
-        "CSI 23 ; Ps t": bring back the titles that a push remembered.
-
-        Zero brings back both, one the icon label and two the window
-        title. An empty stack leaves both of them alone.
-        """
-        if not self.title_stack:
-            return
-
-        icon_name, title = self.title_stack.pop()
-        if which in (TitlePart.BOTH, TitlePart.ICON):
-            self.icon_name = icon_name
-        if which in (TitlePart.BOTH, TitlePart.WINDOW):
-            self.title = title
-
     def report_checksum(self, *params: int, **kwargs) -> None:
         """
         DECRQCRA ("CSI Pid ; Pp ; Pt ; Pl ; Pb ; Pr * y"): the checksum
@@ -4528,61 +4489,13 @@ class Screen:
             return
         self.osc_func(code, param)
 
-    def _change_title_modes(self, params: Tuple[int, ...], on: bool) -> None:
-        """
-        SM_Title ("CSI > Ps t") and RM_Title ("CSI > Ps T").
-
-        Each parameter names one mode, so one sequence can change
-        several. A sequence that carries no parameter names mode zero,
-        the way a missing number is a zero everywhere else.
-
-        A number that no mode has is ignored. xterm does the same, and
-        a program that asks for a mode nobody carries should not lose
-        the modes it asked for in the same sequence.
-        """
-        for number in params or (0,):
-            if number not in tuple(TitleMode):
-                continue
-            if on:
-                self.title_modes.add(number)
-            else:
-                self.title_modes.discard(number)
-
-    def _title_a_program_means(self, param: str) -> str:
-        """
-        The title that a program means by `param`.
-
-        "CSI > 0 t" says a program writes a title in hexadecimal. A
-        program that turns the mode on and then sends something that is
-        not hexadecimal gets the string as it stands: a title nobody can
-        read is still better than no title at all.
-        """
-        if TitleMode.SET_HEX not in self.title_modes:
-            return param
-        decoded = title_from_hex(param)
-        return param if decoded is None else decoded
-
-    def _title_to_report(self, title: str) -> str:
-        """
-        The title as "CSI 20 t" and "CSI 21 t" report it.
-
-        "CSI > 1 t" says the terminal reports one in hexadecimal. That
-        is how a title reaches a program that cannot read the bytes of
-        it as text.
-
-        The two UTF-8 modes are recorded and change nothing here. They
-        pick between UTF-8 and Latin-1, and a pane reads and writes
-        UTF-8 everywhere, so there is no second reading to pick.
-        """
-        if TitleMode.QUERY_HEX in self.title_modes:
-            return title_to_hex(title)
-        return title
-
     def set_icon_name(self, param: str) -> None:
-        self.icon_name = self._title_a_program_means(param)
+        "\"OSC 0\" and \"OSC 1\": the label of the icon."
+        self.titles.set_icon(param)
 
     def set_title(self, param: str) -> None:
-        self.title = self._title_a_program_means(param)
+        "\"OSC 0\" and \"OSC 2\": the title of the window."
+        self.titles.set_window(param)
 
     def apc(self, data: str) -> None:
         """

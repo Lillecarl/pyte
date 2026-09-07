@@ -12,7 +12,8 @@ numbers are is a fact about the protocol, so it lives apart from the
 screen that obeys them.
 
 `modes.py` holds the parameters of "CSI Ps h", which are a group of
-their own, and `terminfo.py` holds the answers a program reads back.
+their own, `terminfo.py` holds the answers a program reads back, and
+`titles.py` holds the titles that `TitleMode` and `TitlePart` name.
 Lillecarl/pymux#129.
 """
 from enum import IntEnum
@@ -29,8 +30,6 @@ __all__ = (
     "TitleMode",
     "TitlePart",
     "WindowOp",
-    "title_from_hex",
-    "title_to_hex",
 )
 
 
@@ -167,27 +166,6 @@ class TitleMode(IntEnum):
 
     #: A title that the terminal reports is UTF-8 and not Latin-1.
     QUERY_UTF8 = 3
-
-
-def title_from_hex(text: str) -> str | None:
-    """
-    The title that a hexadecimal one carries, or None for one that is
-    not hexadecimal.
-
-    The bytes are UTF-8, because that is what a pane reads everywhere
-    else. An odd number of digits is not a title, and neither is a
-    digit that is not one.
-    """
-    try:
-        raw = bytes.fromhex(text)
-    except ValueError:
-        return None
-    return raw.decode("utf-8", "replace")
-
-
-def title_to_hex(text: str) -> str:
-    "A title as the two digits a byte that a hexadecimal query wants."
-    return text.encode("utf-8").hex()
 
 
 class TitlePart(IntEnum):

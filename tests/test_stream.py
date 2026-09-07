@@ -193,19 +193,19 @@ def test_set_title_icon_name(osc, st):
 
     # a) set only icon name
     stream.feed(osc + "1;foo" + st)
-    assert screen.icon_name == "foo"
+    assert screen.titles.icon == "foo"
 
     # b) set only title
     stream.feed(osc + "2;foo" + st)
-    assert screen.title == "foo"
+    assert screen.titles.window == "foo"
 
     # c) set both icon name and title
     stream.feed(osc + "0;bar" + st)
-    assert screen.title == screen.icon_name == "bar"
+    assert screen.titles.window == screen.titles.icon == "bar"
 
     # d) set both icon name and title then terminate with BEL
     stream.feed(osc + "0;bar" + st)
-    assert screen.title == screen.icon_name == "bar"
+    assert screen.titles.window == screen.titles.icon == "bar"
 
     # e) test ➜ ('\xe2\x9e\x9c') symbol, that contains string terminator \x9c
     stream.feed("➜")
