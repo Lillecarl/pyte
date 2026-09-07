@@ -17,8 +17,12 @@ import subprocess
 
 import pytest
 
-from pyte.screen import CAPABILITIES, TERMINAL_NAME
-from pyte.terminfo import PARENT, terminfo_source
+from pyte.terminfo import (
+    CAPABILITIES,
+    PARENT,
+    TERMINAL_NAME,
+    terminfo_source,
+)
 
 tic = shutil.which("tic")
 infocmp = shutil.which("infocmp")

@@ -13,7 +13,8 @@ program stops asking and draws what the terminal cannot draw.
 """
 import pytest
 
-from pyte.screen import CAPABILITIES, TERMINAL_NAME, Screen
+from pyte.screen import Screen
+from pyte.terminfo import CAPABILITIES, TERMINAL_NAME
 from pyte.streams import Stream
 
 

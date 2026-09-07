@@ -18,7 +18,7 @@ from pyte.environment import (
     scrub_terminal_identity,
     terminal_name,
 )
-from pyte.screen import TERMINAL_NAME
+from pyte.terminfo import TERMINAL_NAME
 
 
 @pytest.fixture

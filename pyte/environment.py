@@ -30,8 +30,7 @@ a cell imports it, and `tests/test_the_layers.py` says so.
 import os
 from typing import MutableMapping
 
-from .screen import TERMINAL_NAME
-from .terminfo import PARENT
+from .terminfo import PARENT, TERMINAL_NAME
 
 __all__ = [
     "DEFAULT_DATABASE",
