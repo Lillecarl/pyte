@@ -6,7 +6,8 @@ answers. A program tells them apart by the prefix of the reply.
 """
 import pytest
 
-from pyte.screen import ConformanceLevel, Screen
+from pyte.parameters import ConformanceLevel
+from pyte.screen import Screen
 from pyte.terminfo import (
     DEVICE_EXTENSIONS,
     XTERM_PATCH_LEVEL,

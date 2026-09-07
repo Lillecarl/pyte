@@ -42,6 +42,7 @@ PURE = {
     "modes",
     "osc",
     "page",
+    "parameters",
     "placeholders",
     "png",
     "screen",

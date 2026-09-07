@@ -12,7 +12,8 @@ where the gap was found.
 """
 import pytest
 
-from pyte.screen import Screen, TitleMode
+from pyte.parameters import TitleMode
+from pyte.screen import Screen
 from pyte.streams import Stream
 
 #: "CSI > Ps t": set a title mode. "CSI > Ps T": take it away.

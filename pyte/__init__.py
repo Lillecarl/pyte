@@ -9,7 +9,7 @@
     events draw.
 
     **It answers as a VT520 and honours DECSCL down to a VT100.**
-    `ConformanceLevel` in `screen.py` names the five, and the private
+    `ConformanceLevel` in `parameters.py` names the five, and the private
     modes a later terminal brought go away when a program asks for an
     earlier one: the left and right margin arrived on the VT400, and
     DECNCSM on the VT500. DA2 names the VT520 family. Nothing between
