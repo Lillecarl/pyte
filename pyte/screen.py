@@ -2844,18 +2844,26 @@ class Screen:
 
     def _forget(self, row: int) -> None:
         """
-        Drop the count of a row that has left the history for good.
+        Drop everything this screen remembers about a row that has left
+        the history for good.
 
-        The count is taken away rather than moved on, so `written_at`
-        stays as big as the history and not as big as the session.
+        Three things are kept per row beside its cells: the count at
+        which it last changed, whether a wrap brought it into being, and
+        the DEC line attribute it carries. **All three grew with the
+        session and not with the history**, because the row went and its
+        note stayed. A day at a shell leaves one for every row it ever
+        wrote. Lillecarl/pymux#8.
 
-        **Nothing draws a row that left the history**, so the row needs
-        no count to say that it went. It is under `history_floor`, and a
-        reader asks for the rows the buffer holds: a pane draws the rows
-        of the screen, and copy mode draws from the lowest row of the
-        buffer to the highest.
+        The count is taken away rather than moved on. **Nothing draws a
+        row that left the history**, so it needs no count to say that it
+        went: it is under `history_floor`, and a reader asks for the
+        rows the buffer holds. A pane draws the rows of the screen, and
+        copy mode draws from the lowest row of the buffer to the
+        highest.
         """
         self.written_at.pop(row, None)
+        self.wrapped_lines.discard(row)
+        self.line_attributes.pop(row, None)
 
     def clear_history(self) -> None:
         """

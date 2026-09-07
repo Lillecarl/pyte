@@ -63,10 +63,16 @@ def say_the_floor_holds(screen) -> None:
 
     assert not buffer or min(buffer) >= screen.history_floor
 
-    # A row that left the history takes its count with it, or
-    # `written_at` grows with the session instead of with the history.
-    counts = sorted(row for row in screen.written_at if row < remove_above)
-    assert not counts, "these counts should have gone: %s" % counts
+    # A row that left the history takes with it every note the screen
+    # kept about it, or the notes grow with the session instead of with
+    # the history.
+    for what, rows in (
+        ("counts", screen.written_at),
+        ("wrap marks", screen.wrapped_lines),
+        ("line attributes", screen.line_attributes),
+    ):
+        left = sorted(row for row in rows if row < remove_above)
+        assert not left, "these %s should have gone: %s" % (what, left)
 
 
 @given(st.lists(a_chunk(), min_size=1, max_size=40))
@@ -90,6 +96,29 @@ def test_the_buffer_stops_growing_at_the_limit():
     stream.feed("".join("line %d\r\n" % number for number in range(500)))
     screen._remove_old_lines_from_history()
     assert len(screen.page.data_buffer) <= LIMIT + LINES + 1
+
+
+def test_the_notes_about_a_row_go_when_the_row_does():
+    """
+    A wrap mark and a line attribute are kept by row number, and the
+    row numbers of a session never come back around. So a note that
+    outlives its row grows with the session and not with the history.
+    """
+    screen = a_short_history()
+    stream = Stream(screen)
+    # Every line wraps, and every line carries a DEC line attribute, so
+    # a note is written on nearly every row.
+    stream.feed(
+        "".join(
+            "\x1b#6" + "row %d " % number + "x" * COLUMNS + "\r\n"
+            for number in range(300)
+        )
+    )
+    screen._remove_old_lines_from_history()
+
+    assert len(screen.wrapped_lines) <= LIMIT + LINES + 1
+    assert len(screen.line_attributes) <= LIMIT + LINES + 1
+    assert len(screen.written_at) <= LIMIT + LINES + 1
 
 
 def test_the_other_page_has_a_floor_of_its_own():
