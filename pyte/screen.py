@@ -172,6 +172,9 @@ class Screen:
         # together. The alternate screen has a history of its own, and
         # it is usually empty.
         "history_floor",
+        # The same: it says which rows of this buffer are laid out at
+        # the width the screen has now.
+        "reflow_floor",
         "pt_cursor_position",
         # The wait to wrap belongs to the cursor, so it travels with it.
         "pending_wrap",
@@ -790,6 +793,12 @@ class Screen:
         #: find those hundred made printing a line three times as
         #: expensive as it is at two thousand. Lillecarl/pymux#8.
         self.history_floor = 0
+
+        #: The lowest row that is laid out at the width the screen has
+        #: now. A reflow lays out the screen and the lines that reach
+        #: it, and leaves the history alone, so a row under this one
+        #: keeps the width it was written at. Lillecarl/pymux#135.
+        self.reflow_floor = 0
 
     #: The two page widths that DECCOLM names.
     NARROW_PAGE = 80
@@ -3850,6 +3859,14 @@ class Screen:
         cursor_position.y = max(0, cursor_position.y - count)
         self.ensure_bounds()
 
+        # The screen has slid down over rows of the history, and a
+        # reflow leaves the history at the width it was written at. So
+        # the rows that just arrived may be laid out at another width,
+        # and this is the one path that brings such a row back onto the
+        # screen. Lay them out again. Lillecarl/pymux#135.
+        if self.line_offset < self.reflow_floor:
+            self._reflow()
+
     def placeholder_runs(
         self, first_row: int, last_row: int
     ) -> List[PlaceholderRun]:
@@ -4714,9 +4731,56 @@ class Screen:
     # ------------------------------------------------------------------
     # Laying the buffer out again at a new width.
     #
-    # It unwraps every line of the whole buffer and wraps it again, so
-    # it costs the history and not the screen. Lillecarl/pymux#135 is
-    # the plan to bound that.
+    # It lays out the screen and the lines that reach it, and leaves the
+    # history where it is. A reader of the history reads lines and not
+    # rows, so the width those rows were laid out at never reaches it.
+    # Lillecarl/pymux#135.
+
+    def _first_row_to_lay_out(self, last: int) -> int:
+        """
+        The first row a reflow has to lay out again.
+
+        It walks up from `last` and stops at the first row of a line,
+        once three things are true: it holds a line for every row of
+        the screen, it has reached the top of the screen, and it has
+        reached the cursor.
+
+        **A line for every row is enough at any width.** A line takes
+        at least one row however wide the screen becomes, so `lines` of
+        them always fill it. Widening takes rows away from a line and
+        never takes the line away.
+
+        The other two say what a reflow may not leave behind. A row of
+        the screen that keeps its old layout is a row a person sees at
+        the wrong width, and the cursor has to travel with the
+        character it stands on.
+
+        It stops at the lowest row the buffer holds at the latest.
+        **Not at `history_floor`**, which only says that nothing lives
+        under it: the buffer can start above the floor, and a reflow
+        that laid out from under the lowest row would write the rows
+        out one number too low and move the whole buffer down.
+        """
+        data_buffer = self.page.data_buffer
+        floor = min(data_buffer)
+        wanted = min(self.line_offset, self.pt_cursor_position.y)
+        lines = self.lines
+
+        collected = 0
+        for number in range(last, floor - 1, -1):
+            row = data_buffer.get(number)
+
+            # A row a wrap made is the middle of a line, and a line is
+            # taken whole. A row the buffer does not hold is a blank
+            # line, and a blank line starts one.
+            if row is not None and row.wrapped:
+                continue
+
+            collected += 1
+            if collected >= lines and number <= wanted:
+                return number
+
+        return floor
 
     def _reflow(self) -> None:
         """
@@ -4725,7 +4789,6 @@ class Screen:
         width = self.columns
 
         data_buffer = self.page.data_buffer
-        new_data_buffer = Page(default_char=Cell(" ", PLAIN_APPEARANCE)).data_buffer
         cursor_position = self.pt_cursor_position
         cy, cx = (cursor_position.y, cursor_position.x)
 
@@ -4735,14 +4798,13 @@ class Screen:
         # this is a write, and it is meant.
         cursor_character = data_buffer[cursor_position.y][cursor_position.x].char
 
-        # Unwrap the buffer into the lines a program wrote. This is the
-        # whole cost of a reflow, and it is the whole buffer today:
-        # bounding the range to the rows on the screen is
-        # Lillecarl/pymux#135.
-        offset = min(data_buffer)
-        all_lines, found = self.page.unwrap(
-            offset, max(data_buffer), cursor=(cy, cx)
-        )
+        # Unwrap the rows that have to be laid out again into the lines
+        # a program wrote. That is the screen and the lines that reach
+        # it, and never the whole history: the cost of a reflow is the
+        # size of the screen and not the depth of the scrollback.
+        last = max(data_buffer)
+        offset = self._first_row_to_lay_out(last)
+        all_lines, found = self.page.unwrap(offset, last, cursor=(cy, cx))
         if found is not None:
             cy, cx = found
 
@@ -4778,9 +4840,22 @@ class Screen:
                     break
                 cells.pop()
 
+        # The rows the lines came from go, and the lines take their
+        # place. They go first: a wider screen needs fewer rows for the
+        # same lines, and a row of the old layout left under the new
+        # ones would come back as soon as `max_y` grew again.
+        for number in range(offset, last + 1):
+            data_buffer.pop(number, None)
+
         # Wrap lines again according to the screen width.
         new_row_index = offset
         new_column_index = 0
+
+        #: The highest row this writes on. It is `max_y` at the end,
+        #: and it is counted here because reading it back is
+        #: `max(data_buffer)`, which walks the history that this method
+        #: exists to leave alone.
+        highest = offset - 1
 
         # Where the cursor lands, kept apart from where it stood.
         #
@@ -4801,20 +4876,23 @@ class Screen:
                 if new_column_index + char.width > width:
                     new_row_index += 1
                     new_column_index = 0
-                    new_data_buffer[new_row_index].wrapped = True
+                    data_buffer[new_row_index].wrapped = True
 
                 if cy == line_index and cx == column_index:
                     new_cursor_position = (new_row_index, new_column_index)
 
                 # Add character to new buffer.
-                new_data_buffer[new_row_index][new_column_index] = char
+                data_buffer[new_row_index][new_column_index] = char
                 new_column_index += char.width
+                highest = new_row_index
 
             # A DEC line attribute belongs to the whole line, so every
             # row the line now takes carries it.
             if line.attribute is not None:
                 for new_row in range(first_new_row, new_row_index + 1):
-                    new_data_buffer[new_row].attribute = line.attribute
+                    data_buffer[new_row].attribute = line.attribute
+                if new_row_index > highest:
+                    highest = new_row_index
 
             new_row_index += 1
             new_column_index = 0
@@ -4822,19 +4900,18 @@ class Screen:
         if new_cursor_position is not None:
             cy, cx = new_cursor_position
 
-        # A reflow puts every character somewhere else, so the rows a
-        # reader holds and the rows that take their numbers are both
-        # new. This is counted before the swap, and `touch_everything`
-        # reads the old buffer; the new one comes next, and every row of
-        # it is a row nobody has a count for.
+        # A reflow puts the characters of the rows it read somewhere
+        # else, so the rows a reader holds and the rows that take their
+        # numbers are both new. It says so about every row rather than
+        # about the ones it moved, because saying so costs one number
+        # either way and a reader that draws again is never wrong.
         self.touch_everything()
 
-        self.page.data_buffer = new_data_buffer
-        self.data_buffer = new_data_buffer
-        # A reflow numbers the rows again from zero, so the floor of the
-        # old numbering says nothing about the new one.
-        self.history_floor = 0
-        self.touch_everything()
+        #: The lowest row that is laid out at the width the screen has
+        #: now. Everything under it kept the width it was written at,
+        #: which no reader of the history minds. `unscroll` is the one
+        #: thing that brings such a row back onto the screen.
+        self.reflow_floor = offset
 
         cursor_position.y, cursor_position.x = cy, cx
         self.pt_cursor_position = cursor_position
@@ -4842,16 +4919,16 @@ class Screen:
         # If everything goes well, the cursor should still be on the same character.
         if (
             cursor_character
-            != new_data_buffer[cursor_position.y][cursor_position.x].char
+            != data_buffer[cursor_position.y][cursor_position.x].char
         ):
             # FIXME:
             raise Exception(
                 "Reflow failed: {!r} {!r}".format(
                     cursor_character,
-                    new_data_buffer[cursor_position.y][cursor_position.x].char,
+                    data_buffer[cursor_position.y][cursor_position.x].char,
                 )
             )
 
-        self.max_y = max(self.data_buffer)
+        self.max_y = highest
 
         self.max_y = min(self.max_y, cursor_position.y + self.lines - 1)
