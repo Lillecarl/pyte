@@ -4728,11 +4728,11 @@ class Screen:
         cursor_position = self.pt_cursor_position
         cy, cx = (cursor_position.y, cursor_position.x)
 
+        # Reading the cell the cursor stands on makes it, which is what
+        # keeps the cursor on a character that a resize would otherwise
+        # trim off the end of a line. The buffer is a defaultdict, so
+        # this is a write, and it is meant.
         cursor_character = data_buffer[cursor_position.y][cursor_position.x].char
-
-        # Ensure that the cursor position is present.
-        # (and avoid calling min() on empty collection.)
-        data_buffer[cursor_position.y][cursor_position.y]
 
         # Unwrap all the lines.
         offset = min(data_buffer)
@@ -4750,8 +4750,12 @@ class Screen:
             if not row.wrapped:
                 attributes[-1] = row.attribute
 
-            row[0]  # Avoid calling max() on empty collection.
-            for column_index in range(0, max(row) + 1):
+            # A row that holds no cell contributes none. `default`
+            # answers the empty row without writing to it: reading
+            # `row[0]` to dodge `max()` made a blank that nobody wrote,
+            # and a line then gained one character for every emptied
+            # row it wrapped through.
+            for column_index in range(0, max(row, default=-1) + 1):
                 if cy == row_index and cx == column_index:
                     cy = len(all_lines) - 1
                     cx = len(line)
