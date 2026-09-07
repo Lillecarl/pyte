@@ -1841,10 +1841,24 @@ class Screen:
             self.max_y = max(self.max_y, cursor_position.y)
 
             # Cleanup the history, but only every 100 calls.
-            self._history_cleanup_counter += 1
-            if self._history_cleanup_counter == 100:
+            #
+            # **The alternate screen prunes on every line.** It keeps
+            # no history at all, so a linefeed that scrolls it leaves
+            # exactly one row behind, and waiting for the hundredth
+            # would leave a hundred rows for copy mode to offer. One
+            # row is one `pop`, which is cheaper than the count that
+            # decides whether to look. Lillecarl/pymux#132.
+            #
+            # The field and not `in_alternate_screen`: this runs once
+            # per line a program prints, and the property costs a
+            # Python call there.
+            if self._original_screen is not None:
                 self._remove_old_lines_from_history()
-                self._history_cleanup_counter = 0
+            else:
+                self._history_cleanup_counter += 1
+                if self._history_cleanup_counter == 100:
+                    self._remove_old_lines_from_history()
+                    self._history_cleanup_counter = 0
         else:
             # Move cursor down, but scroll in the scrolling region.
             top, bottom = margins or Margins(0, self.lines - 1)
@@ -1991,8 +2005,25 @@ class Screen:
     def _remove_old_lines_from_history(self) -> None:
         """
         Remove top from the scroll buffer. (Outside bounds of history limit.)
+
+        **The alternate screen keeps nothing above itself.** A
+        full-screen program draws on a screen of its own, and what
+        scrolls off the top of it is gone: no scrollback reaches it,
+        and taking the first screen back gives that one's history. So
+        a row under `line_offset` is a row nobody can read.
+
+        They were kept to `history-limit`, which is the depth a person
+        chose for the scrollback of their shell. Copy mode is where
+        that showed: it reads from the lowest row of the buffer to the
+        highest, so the history it offered was taller than the screen
+        a program drew. Lillecarl/pymux#132.
         """
-        remove_above = max(0, self.pt_cursor_position.y - self.get_history_limit())
+        if self.in_alternate_screen:
+            remove_above = self.line_offset
+        else:
+            remove_above = max(
+                0, self.pt_cursor_position.y - self.get_history_limit()
+            )
         data_buffer = self.page.data_buffer
         for line in range(self.history_floor, remove_above):
             data_buffer.pop(line, None)
