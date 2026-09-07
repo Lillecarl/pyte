@@ -14,6 +14,13 @@ the code itself ("OSC 10" is the foreground, "OSC 11" the background,
 
 What a colour *is* lives in `colors.py`, and the arithmetic behind it
 in `xcms.py`. Nothing about a colour space belongs here.
+
+The state a pane keeps for an OSC lives here as well: `PointerShapes`
+holds the stack of "OSC 22" and `ColorOverrides` holds what "OSC 4",
+"OSC 5" and "OSC 10" set. That is where `GraphicsState` sits for the
+graphics protocol, in `images.py`. Neither one writes a sequence: each
+returns the payload to answer with, and the screen sends it.
+Lillecarl/pymux#129.
 """
 from enum import StrEnum
 from typing import Dict, List, NamedTuple, Tuple
