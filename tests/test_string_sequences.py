@@ -124,6 +124,11 @@ def test_escape_map_takes_precedence():
 
     screen = a_screen(20, 5, Recorder)
     stream = pyte.Stream(screen)
+    # A copy, and not the table itself. `escape` is an attribute of the
+    # class, so writing into it reaches every stream that any later test
+    # builds, and each of those attaches a screen that has no
+    # `prev_page`. One test then breaks every test that runs after it.
+    stream.escape = dict(stream.escape)
     stream.escape["P"] = "prev_page"
     # The parser snapshots the escape table at construction time; force
     # a new parser.

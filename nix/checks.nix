@@ -13,6 +13,9 @@
   pytest,
   hypothesis,
   callPackage,
+  ncurses,
+  xorg-server,
+  libx11,
   package,
   testSources,
 }:
@@ -45,12 +48,54 @@ let
     export LANG=C.UTF-8
     export PYTHONDONTWRITEBYTECODE=1
   '';
+
+  # `-displayfd` makes the server say which display it took, once it is
+  # ready to answer. Sleeping for a while instead is a race.
+  #
+  # Xcms needs a display, because it reads the screen description from the
+  # root window. A bare Xvfb carries none, so Xlib uses its built-in
+  # description, which is the one xterm uses on such a screen too.
+  display = ''
+    export PYTE_LIBX11=${libx11}/lib/libX11.so
+    Xvfb -displayfd 3 -screen 0 1280x1024x24 3> display.txt \
+      > xvfb.log 2>&1 &
+    trap 'kill %1' EXIT
+    while [ ! -s display.txt ]; do sleep 0.1; done
+    export DISPLAY=":$(cat display.txt)"
+  '';
+
+  runPytest = "python -m pytest $selection -q -p no:cacheprovider";
 in
 {
+  # Everything that needs nothing but python. `tests/conftest.py` says how
+  # a file lands in a group, and why the groups exist at all.
+  #
+  # ncurses is here for the one test that compiles the terminfo entry.
   unit = suite {
     name = "pyte-unit";
-    inputs = [ pythonWithTests ];
+    inputs = [
+      pythonWithTests
+      ncurses
+    ];
     env = { inherit selection; };
-    setup = prepare;
-  } "python -m pytest $selection -q -p no:cacheprovider";
+    setup = prepare + ''
+      export PYTE_GROUP=unit
+    '';
+  } runPytest;
+
+  # The colour specs, judged against the real Xlib. `pyte/xcms.py` is a
+  # port of the colour management of Xlib, and only a comparison against
+  # the original says whether the port is right.
+  xcms = suite {
+    name = "pyte-xcms";
+    inputs = [
+      pythonWithTests
+      xorg-server
+    ];
+    env = { inherit selection; };
+    setup = prepare + display + ''
+      python -c "import sys; sys.path.insert(0, 'tests'); import xlib_oracle; assert xlib_oracle.xlib_color('rgb:f/f/f') == (255, 255, 255)"
+      export PYTE_GROUP=xcms
+    '';
+  } runPytest;
 }
