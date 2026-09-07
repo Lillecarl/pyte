@@ -13,7 +13,7 @@ Lillecarl/pymux#129.
 """
 from collections import defaultdict, namedtuple
 from enum import IntEnum
-from typing import DefaultDict, List, NamedTuple
+from typing import DefaultDict, List, NamedTuple, Tuple
 
 from .cells import Cell
 
@@ -196,3 +196,68 @@ class Page:
         #: Does the cursor show? DECTCEM ("?25") sets it, and it belongs
         #: to the screen in front, so the alternate screen has its own.
         self.show_cursor = True
+
+    def wrapped(self, row: int) -> bool:
+        """
+        Did a wrap bring this row into being?
+
+        `.get` and not `[]`: the buffer makes a row for a number it does
+        not hold, and a row made below the floor of the history is a row
+        that came back from the dead. Lillecarl/pymux#134.
+        """
+        line = self.data_buffer.get(row)
+        return line is not None and line.wrapped
+
+    def unwrap(
+        self, first: int, last: int, cursor: "Tuple[int, int] | None" = None
+    ) -> "Tuple[List[LogicalLine], Tuple[int, int] | None]":
+        """
+        The rows from `first` to `last` as the lines a program wrote.
+
+        A run of rows joined by the wrap mark is one line, and a line
+        carries no width. That is what makes laying one out again all
+        that a column change has to do, and it is why the answer can be
+        kept: Lillecarl/pymux#135.
+
+        `cursor` is a row and a column to follow through the unwrapping.
+        The answer says where it landed, as a line and an offset in it,
+        or `None` when it was not in the range.
+
+        The range is a range and not the whole buffer, because the whole
+        buffer is what a reflow costs today. A caller that wants only
+        the rows on the screen asks for those.
+
+        Nothing here writes. A row the buffer does not hold contributes
+        no cells and ends the line before it, which is the same thing a
+        row of blanks does.
+        """
+        line = LogicalLine()
+        lines = [line]
+        cells = line.cells
+        found = None
+
+        # The cursor as two numbers, because the loop below runs once
+        # per cell of the range and building a tuple to compare there
+        # cost ten percent of a reflow. A row of -1 matches nothing.
+        cursor_row, cursor_column = cursor if cursor is not None else (-1, -1)
+
+        data_buffer = self.data_buffer
+        for number in range(first, last + 1):
+            row = data_buffer.get(number)
+
+            if row is not None:
+                if not row.wrapped:
+                    line.attribute = row.attribute
+
+                # `default` answers an empty row without writing to it.
+                for column in range(0, max(row, default=-1) + 1):
+                    if number == cursor_row and column == cursor_column:
+                        found = (len(lines) - 1, len(cells))
+                    cells.append(row[column])
+
+            if not self.wrapped(number + 1):
+                line = LogicalLine()
+                lines.append(line)
+                cells = line.cells
+
+        return lines, found

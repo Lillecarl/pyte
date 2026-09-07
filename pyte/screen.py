@@ -4735,48 +4735,20 @@ class Screen:
         # this is a write, and it is meant.
         cursor_character = data_buffer[cursor_position.y][cursor_position.x].char
 
-        # Unwrap the buffer into the lines a program wrote. A run of
-        # rows joined by the wrap mark is one line, and a line carries
-        # no width, which is why laying it out again is all a column
-        # change has to do.
+        # Unwrap the buffer into the lines a program wrote. This is the
+        # whole cost of a reflow, and it is the whole buffer today:
+        # bounding the range to the rows on the screen is
+        # Lillecarl/pymux#135.
         offset = min(data_buffer)
-        line = LogicalLine()
-        all_lines: List[LogicalLine] = [line]
-
-        # The cells of the line being built, held as a local. This is
-        # the one loop in this file that runs per cell of the whole
-        # buffer, and reading `line.cells` inside it costs an attribute
-        # lookup a cell: `checks.ptterm-instructions` measured that at
-        # five percent of a reflow.
-        cells = line.cells
-
-        for row_index in range(min(data_buffer), max(data_buffer) + 1):
-            row = data_buffer[row_index]
-
-            if not row.wrapped:
-                line.attribute = row.attribute
-
-            # A row that holds no cell contributes none. `default`
-            # answers the empty row without writing to it: reading
-            # `row[0]` to dodge `max()` made a blank that nobody wrote,
-            # and a line then gained one character for every emptied
-            # row it wrapped through.
-            for column_index in range(0, max(row, default=-1) + 1):
-                if cy == row_index and cx == column_index:
-                    cy = len(all_lines) - 1
-                    cx = len(cells)
-
-                cells.append(row[column_index])
-
-            # Create new line if the next line was not a wrapped line.
-            if not self.is_wrapped(row_index + 1):
-                line = LogicalLine()
-                all_lines.append(line)
-                cells = line.cells
+        all_lines, found = self.page.unwrap(
+            offset, max(data_buffer), cursor=(cy, cx)
+        )
+        if found is not None:
+            cy, cx = found
 
         # Take the blanks off the end of each line, so that a line that
-        # was never filled does not carry its width around. Not the
-        # cursor, and not a blank a background was painted on.
+        # was never filled does not carry its width around. Not a blank
+        # a background was painted on.
         #
         # A blank that a program wrote is content, and it stays. The
         # test is the class and not the character: a space out of
@@ -4787,6 +4759,14 @@ class Screen:
         # Also make sure that lines consist of at lesat one character,
         # otherwise we can't calculate `max_y` correctly. (This is important
         # for the `clear` command.)
+        #
+        # **The cell the cursor stands on is held back.** Reading it
+        # above makes it, so a cursor parked past the end of a line
+        # gives that line a run of blanks nobody wrote, and the first
+        # resize after that turns an empty line into a line of spaces.
+        # Trimming it instead loses the cursor: `test_reflow_history`
+        # says a narrowing keeps it on the bottom row, and it does not
+        # without this. Lillecarl/pymux#143.
         for line_index, line in enumerate(all_lines):
             cells = line.cells
             while (
