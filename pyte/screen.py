@@ -5791,12 +5791,6 @@ class Screen:
             new_row_index += 1
             new_column_index = 0
 
-        # TODO: when the window gets smaller, and the cursor is at the top of the screen,
-        #       remove lines at the bottom.
-        for row_index in range(min(data_buffer), max(data_buffer) + 1):
-            if row_index > cy + self.lines:
-                del data_buffer[row_index]
-
         # A reflow puts every character somewhere else, so the rows a
         # reader holds and the rows that take their numbers are both
         # new. This is counted before the swap, and `touch_everything`
