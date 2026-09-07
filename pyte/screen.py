@@ -1098,6 +1098,10 @@ class Screen:
         "tabstops",
         "pointer_shapes",
         "data_buffer",
+        # The floor of the buffer belongs to the buffer, so the two go
+        # together. The alternate screen has a history of its own, and
+        # it is usually empty.
+        "history_floor",
         "pt_cursor_position",
         # The wait to wrap belongs to the cursor, so it travels with it.
         "pending_wrap",
@@ -1676,6 +1680,16 @@ class Screen:
         self.pointer_shapes = []
 
         self.max_y = 0  # Max 'y' position to which is written.
+
+        #: The lowest row number the buffer can hold. Everything under
+        #: it left the history and is gone for good.
+        #:
+        #: It is here so that a prune costs the rows it drops and not
+        #: the rows it keeps. A pane at fifty thousand rows prunes a
+        #: hundred of them at a time, and reading the whole buffer to
+        #: find those hundred made printing a line three times as
+        #: expensive as it is at two thousand. Lillecarl/pymux#8.
+        self.history_floor = 0
 
     #: The two page widths that DECCOLM names.
     NARROW_PAGE = 80
@@ -2759,10 +2773,10 @@ class Screen:
         """
         remove_above = max(0, self.pt_cursor_position.y - self.get_history_limit())
         data_buffer = self.page.data_buffer
-        for line in list(data_buffer):
-            if line < remove_above:
-                data_buffer.pop(line, None)
-                self._forget(line)
+        for line in range(self.history_floor, remove_above):
+            data_buffer.pop(line, None)
+            self._forget(line)
+        self.history_floor = max(self.history_floor, remove_above)
         self.graphics.prune_above(remove_above)
 
     def _forget(self, row: int) -> None:
@@ -2781,10 +2795,11 @@ class Screen:
         """
         Delete all history from the scroll buffer.
         """
-        for line in list(self.data_buffer):
-            if line < self.line_offset:
-                self.data_buffer.pop(line, None)
-                self._forget(line)
+        data_buffer = self.data_buffer
+        for line in range(self.history_floor, self.line_offset):
+            data_buffer.pop(line, None)
+            self._forget(line)
+        self.history_floor = max(self.history_floor, self.line_offset)
 
     def reverse_index(self) -> None:
         top, bottom = self.margins or Margins(0, self.lines - 1)
@@ -5770,6 +5785,9 @@ class Screen:
 
         self.page.data_buffer = new_data_buffer
         self.data_buffer = new_data_buffer
+        # A reflow numbers the rows again from zero, so the floor of the
+        # old numbering says nothing about the new one.
+        self.history_floor = 0
         self.wrapped_lines = new_wrapped_lines
         self.line_attributes = new_line_attributes
         self.touch_everything()
