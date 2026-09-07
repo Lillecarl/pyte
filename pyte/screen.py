@@ -1879,6 +1879,39 @@ class Screen:
         #       the first index should be 0.
         return max(0, self.max_y - self.lines + 1)
 
+    def highest_row(self) -> int:
+        """
+        The highest row a front end has to draw.
+
+        That is the highest row of the buffer, or `max_y` when the
+        buffer stops above it. A front end counts its rows with this,
+        and it counts them on every frame.
+
+        **It does not read the buffer.** `max(data_buffer)` walks every
+        key, and the buffer holds the history: fifty thousand rows on a
+        pane a person set up to scroll back a long way, once per frame.
+        Lillecarl/pymux#130.
+
+        The search is the screen instead, and usually nothing at all. A
+        row is written where the cursor stands or inside the scrolling
+        region, and both are inside the screen, so **no row of the
+        buffer sits above `line_offset + lines - 1`**. Once the screen
+        has filled once, `line_offset` is `max_y - lines + 1` and that
+        last row is `max_y` itself, so the loop below runs no times. It
+        runs at most `lines` times on a screen that has not filled yet,
+        whatever the history holds.
+
+        `pyte/tests/test_the_top_of_the_buffer.py` is the proof: it
+        hunts generated output for a row above the screen, and for an
+        answer here that differs from reading the whole buffer.
+        """
+        data_buffer = self.page.data_buffer
+        highest = self.max_y
+        for row in range(highest + 1, self.line_offset + self.lines):
+            if row in data_buffer:
+                highest = row
+        return highest
+
     def set_margins(self, *params: int, **kwargs) -> None:
         """Selects top and bottom margins for the scrolling region.
         Margins determine which screen lines move during scrolling
