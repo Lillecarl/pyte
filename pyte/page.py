@@ -225,6 +225,29 @@ class Page:
         line = self.data_buffer.get(row)
         return line is not None and line.wrapped
 
+    def text(self, first: int, last: int) -> str:
+        """
+        The characters of the rows in the range, one after the other.
+
+        No line break comes out of it. A caller that wants the lines
+        asks `text_lines`, which puts the breaks where a program put
+        them.
+
+        Nothing here writes, and a row the buffer does not hold gives
+        no characters.
+        """
+        characters: List[str] = []
+        data_buffer = self.data_buffer
+
+        for number in range(first, last + 1):
+            row = data_buffer.get(number)
+            if row:
+                characters.extend(
+                    row[column].char for column in range(max(row) + 1)
+                )
+
+        return "".join(characters)
+
     def text_lines(self, first: int, last: int) -> "List[TextLine]":
         """
         The lines the range holds, as text and as the rows each one
@@ -265,10 +288,14 @@ class Page:
                 start = number
 
             if row:
-                # One join per row and not one per line: nearly every
-                # line is one row, and a second join over a list of one
-                # cost a third of the whole read. A line that spans
-                # rows adds to the string, which CPython does in place.
+                # It joins the row here rather than calling `text`,
+                # because copy mode runs this over fifty thousand rows
+                # and a call for each of them shows in the count. One
+                # join per row and not one per line for the same
+                # reason: nearly every line is one row, and joining a
+                # list of one cost a third of a read of the buffer. A
+                # line that spans rows adds to the string, which
+                # CPython does in place.
                 text += "".join(
                     row[column].char for column in range(max(row) + 1)
                 )

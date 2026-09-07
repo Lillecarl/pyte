@@ -140,6 +140,12 @@ def test_a_range_that_holds_nothing_gives_no_text_line():
     assert _a_page().text_lines(0, -1) == []
 
 
+def test_the_text_of_a_range_carries_no_break():
+    "A caller that wants the breaks asks for the lines."
+    page = _a_page("one", "two")
+    assert page.text(0, 1) == "onetwo"
+
+
 def test_the_rows_of_a_text_line_unwrap_to_its_cells():
     """
     The two halves agree: the rows a `TextLine` names hold that line
@@ -162,4 +168,5 @@ def test_nothing_is_written_by_reading():
     page = _a_page("one")
     page.unwrap(0, 10)
     page.text_lines(0, 10)
+    page.text(0, 10)
     assert set(page.data_buffer) == {0}
