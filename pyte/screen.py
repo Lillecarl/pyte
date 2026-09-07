@@ -1159,6 +1159,11 @@ class Screen:
         self.writes = 0
         self.written_at: Dict[int, int] = {}
 
+        # The count that a row with no count of its own carries. A
+        # reader reads it as the default of `written_at`, so it costs a
+        # reader nothing. `touch_everything` says why it exists.
+        self.everything_at = 0
+
         self.savepoints: List[_Savepoint] = []
         self.lines = lines
         self.columns = columns
@@ -1649,8 +1654,21 @@ class Screen:
         are gone, and the rows that take their numbers are new, so both
         sets have to say so. A row that no longer exists says so as
         well: without that, a reader keeps drawing one that went.
+
+        **It says it once, and not once per row.** Every row takes its
+        count from `everything_at` while it has none of its own, so
+        emptying `written_at` moves all of them at the same time. A row
+        written afterwards takes a larger count and moves again.
+
+        Writing on each row instead cost the whole buffer. Opening a
+        full screen program and closing it again touches every row four
+        times, which at fifty thousand rows of history was a million
+        and a half bytecode instructions for two escape sequences.
+        Lillecarl/pymux#8.
         """
-        self.touch_rows(set(self.written_at) | set(self.page.data_buffer))
+        self.writes += 1
+        self.everything_at = self.writes
+        self.written_at.clear()
 
     def _reset_screen(self) -> None:
         """Reset the Screen content. (also called when switching from/to
@@ -2783,11 +2801,14 @@ class Screen:
         """
         Drop the count of a row that has left the history for good.
 
-        The count is not moved on: it is taken away. A reader that
-        remembers such a row finds no count where it left one, which
-        differs from what it holds, so it draws the row again and finds
-        it gone. Moving the count on would work as well, and `written_at`
-        would then hold an entry for every row a long session ever wrote.
+        The count is taken away rather than moved on, so `written_at`
+        stays as big as the history and not as big as the session.
+
+        **Nothing draws a row that left the history**, so the row needs
+        no count to say that it went. It is under `history_floor`, and a
+        reader asks for the rows the buffer holds: a pane draws the rows
+        of the screen, and copy mode draws from the lowest row of the
+        buffer to the highest.
         """
         self.written_at.pop(row, None)
 

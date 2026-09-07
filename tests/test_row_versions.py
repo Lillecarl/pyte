@@ -68,7 +68,9 @@ class Believing:
 
     def read(self, rows) -> dict:
         for row_number in rows:
-            version = self.screen.written_at.get(row_number, 0)
+            version = self.screen.written_at.get(
+                row_number, self.screen.everything_at
+            )
             if self.at.get(row_number) != version:
                 self.drawn[row_number] = cells_of(self.screen, row_number)
                 self.at[row_number] = version
@@ -82,9 +84,15 @@ def everything(screen, reader) -> range:
     A row that a write took away is in here too: the reader has to
     learn that it went, and a range that stopped at the buffer would
     never ask.
+
+    **A row that left the history is not in here.** It is under
+    `history_floor` and no front end draws it: a pane draws the rows of
+    the screen, and copy mode draws from the lowest row of the buffer.
+    Asking about one would judge the screen on a promise nobody needs.
     """
     buffer = screen.page.data_buffer
     numbers = set(buffer) | set(reader.drawn)
+    numbers = {number for number in numbers if number >= screen.history_floor}
     if not numbers:
         return range(0)
     return range(min(numbers), max(numbers) + 1)
