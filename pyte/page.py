@@ -13,7 +13,7 @@ Lillecarl/pymux#129.
 """
 from collections import defaultdict, namedtuple
 from enum import IntEnum
-from typing import DefaultDict, NamedTuple
+from typing import DefaultDict, List, NamedTuple
 
 from .cells import Cell
 
@@ -22,6 +22,7 @@ __all__ = (
     "DoubleHeight",
     "HorizontalMargins",
     "LineAttribute",
+    "LogicalLine",
     "Margins",
     "PLAIN_LINE",
     "Page",
@@ -128,6 +129,41 @@ class Row(DefaultDict[int, Cell]):
         #: top or the bottom half of twice as high. `None` is a plain
         #: row, which is nearly all of them.
         self.attribute: LineAttribute | None = None
+
+
+class LogicalLine:
+    """
+    One line as a program wrote it: the cells between one newline and
+    the next, and what is true of the line rather than of a cell in it.
+
+    **There is no width in it.** A `Row` is a line cut to fit a screen,
+    and this is the line before the cut. That is the whole difference:
+    a column change decides where a line breaks and cannot touch what
+    the line holds.
+
+    `Screen._reflow` builds one of these for every line of the buffer,
+    lays them out at the new width, and throws them away. Keeping them
+    instead is Lillecarl/pymux#135, and this is the type that would be
+    kept.
+
+    The attribute comes from the row the line starts on, because that
+    is the row the program addressed when it sent "ESC # 6".
+    """
+
+    __slots__ = ("cells", "attribute")
+
+    def __init__(self, attribute: "LineAttribute | None" = None) -> None:
+        self.cells: List[Cell] = []
+
+        #: The DEC line attribute of this line, or `None` for a plain
+        #: one, which is nearly all of them.
+        self.attribute = attribute
+
+    def __repr__(self) -> str:
+        return "LogicalLine(%r, %r)" % (
+            "".join(cell.char for cell in self.cells),
+            self.attribute,
+        )
 
 
 class Page:

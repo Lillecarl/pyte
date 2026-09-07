@@ -59,6 +59,7 @@ from .page import (
     DoubleHeight,
     HorizontalMargins,
     LineAttribute,
+    LogicalLine,
     Margins,
     Page,
     Row,
@@ -4734,21 +4735,26 @@ class Screen:
         # this is a write, and it is meant.
         cursor_character = data_buffer[cursor_position.y][cursor_position.x].char
 
-        # Unwrap all the lines.
+        # Unwrap the buffer into the lines a program wrote. A run of
+        # rows joined by the wrap mark is one line, and a line carries
+        # no width, which is why laying it out again is all a column
+        # change has to do.
         offset = min(data_buffer)
-        line: List[Cell] = []
-        all_lines: List[List[Cell]] = [line]
+        line = LogicalLine()
+        all_lines: List[LogicalLine] = [line]
 
-        # The DEC line attribute of each unwrapped line. It comes from
-        # the row the line starts on, because that is the row the
-        # program addressed when it sent the sequence.
-        attributes: List[LineAttribute | None] = [None]
+        # The cells of the line being built, held as a local. This is
+        # the one loop in this file that runs per cell of the whole
+        # buffer, and reading `line.cells` inside it costs an attribute
+        # lookup a cell: `checks.ptterm-instructions` measured that at
+        # five percent of a reflow.
+        cells = line.cells
 
         for row_index in range(min(data_buffer), max(data_buffer) + 1):
             row = data_buffer[row_index]
 
             if not row.wrapped:
-                attributes[-1] = row.attribute
+                line.attribute = row.attribute
 
             # A row that holds no cell contributes none. `default`
             # answers the empty row without writing to it: reading
@@ -4758,15 +4764,15 @@ class Screen:
             for column_index in range(0, max(row, default=-1) + 1):
                 if cy == row_index and cx == column_index:
                     cy = len(all_lines) - 1
-                    cx = len(line)
+                    cx = len(cells)
 
-                line.append(row[column_index])
+                cells.append(row[column_index])
 
             # Create new line if the next line was not a wrapped line.
             if not self.is_wrapped(row_index + 1):
-                line = []
+                line = LogicalLine()
                 all_lines.append(line)
-                attributes.append(None)
+                cells = line.cells
 
         # Take the blanks off the end of each line, so that a line that
         # was never filled does not carry its width around. Not the
@@ -4781,30 +4787,31 @@ class Screen:
         # Also make sure that lines consist of at lesat one character,
         # otherwise we can't calculate `max_y` correctly. (This is important
         # for the `clear` command.)
-        for row_index, line in enumerate(all_lines):
+        for line_index, line in enumerate(all_lines):
+            cells = line.cells
             while (
-                len(line) > 1
-                and not isinstance(line[-1], WrittenCell)
-                and line[-1].appearance == PLAIN_APPEARANCE
+                len(cells) > 1
+                and not isinstance(cells[-1], WrittenCell)
+                and cells[-1].appearance == PLAIN_APPEARANCE
             ):
-                if row_index == cy and len(line) - 1 == cx:
+                if line_index == cy and len(cells) - 1 == cx:
                     break
-                line.pop()
+                cells.pop()
 
         # Wrap lines again according to the screen width.
         new_row_index = offset
         new_column_index = 0
 
-        for row_index, line in enumerate(all_lines):
+        for line_index, line in enumerate(all_lines):
             first_new_row = new_row_index
-            for column_index, char in enumerate(line):
+            for column_index, char in enumerate(line.cells):
                 # Check for space on the current line.
                 if new_column_index + char.width > width:
                     new_row_index += 1
                     new_column_index = 0
                     new_data_buffer[new_row_index].wrapped = True
 
-                if cy == row_index and cx == column_index:
+                if cy == line_index and cx == column_index:
                     cy = new_row_index
                     cx = new_column_index
 
@@ -4814,10 +4821,9 @@ class Screen:
 
             # A DEC line attribute belongs to the whole line, so every
             # row the line now takes carries it.
-            attribute = attributes[row_index]
-            if attribute is not None:
+            if line.attribute is not None:
                 for new_row in range(first_new_row, new_row_index + 1):
-                    new_data_buffer[new_row].attribute = attribute
+                    new_data_buffer[new_row].attribute = line.attribute
 
             new_row_index += 1
             new_column_index = 0
