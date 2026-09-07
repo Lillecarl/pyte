@@ -343,12 +343,22 @@ def _serialize(
     field that holds its default stays empty, and a field at the end
     that holds its default is left out. This follows the encoder of
     kitty, so that a pane sees what a real kitty gives it.
+
+    **The number of a "~" key always goes out.** In every other form
+    the number is 1 when there is nothing to say, so "CSI H" and
+    "CSI 1 H" are one key. In the "~" form the number *is* the key: 1
+    is Home, 2 is Insert, 3 is Delete, and "CSI ~" names none of them.
+    kitty never meets this, because it pairs no "~" with the number 1
+    (`serialize` in `kitty/key_encoding.c`, and Home is `S(1, 'H')`
+    there). A pane does, because it reads what the terminal of the
+    person sends, and xterm sends "CSI 1 ~" for Home.
+    Lillecarl/pymux#152.
     """
     second = mods_value != 1 or event != _PRESS
     third = bool(text)
 
     out = "\x1b["
-    if code != 1 or alternates or second or third:
+    if code != 1 or final == "~" or alternates or second or third:
         out += str(code)
     if alternates:
         out += ":" + ":".join(

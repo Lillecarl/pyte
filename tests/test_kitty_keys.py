@@ -24,6 +24,20 @@ def test_flags_zero_legacy_passthrough():
     assert translate_key_data("\x1bOP", flags=0) == "\x1bOP"
 
 
+def test_the_number_of_a_tilde_key_is_kept():
+    """
+    "CSI 1 ~" is Home on a VT220, and it is what xterm sends.
+
+    The number is the identity of the key in that form, so it always
+    goes out. Every other form has 1 for its default, and the rule that
+    leaves a default field empty took the 1 away here as well: a pane
+    read "CSI ~", which names no key. Lillecarl/pymux#152.
+    """
+    assert translate_key_data("\x1b[1~", flags=0) == "\x1b[1~"
+    assert translate_key_data("\x1b[1;5~", flags=0) == "\x1b[1;5~"
+    assert translate_key_data("\x1b[1~", flags=DISAMBIGUATE) == "\x1b[1~"
+
+
 def test_flags_zero_kitty_to_legacy():
     # Kitty sequences are translated to their legacy equivalents.
     assert translate_key_data("\x1b[97;5u", flags=0) == "\x01"
