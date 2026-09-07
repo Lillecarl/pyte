@@ -932,12 +932,16 @@ class Screen:
 
             self._reset_offset_and_margins()
 
-            # If the height was reduced, and there are lines below
-            # `cursor_position_y+lines`. Remove them by setting 'max_y'.
-            # (If we don't do this. Clearing the screen, followed by reducing
-            # the height will keep the cursor at the top, hiding some content.)
-            self.max_y = min(self.max_y, self.pt_cursor_position.y + lines - 1)
-
+            # A height that was reduced used to hold `max_y` down to
+            # the cursor here, so that clearing the screen and then
+            # making it shorter did not keep the cursor at the top with
+            # content hidden under it.
+            #
+            # **`_reflow` answers that now**, the way libvterm does:
+            # the content says how far the buffer reaches, the screen
+            # is the last rows of it, and the cursor is held inside the
+            # screen rather than the screen held to the cursor.
+            # Lillecarl/pymux#146.
             self._reflow()
 
             # A program that asked for it learns the new size in band.
@@ -4834,11 +4838,13 @@ class Screen:
         # a program wrote. That is the screen and the lines that reach
         # it, and never the whole history: the cost of a reflow is the
         # size of the screen and not the depth of the scrollback.
-        # This still walks every key of the buffer, and `highest_row`
-        # cannot take its place: a reflow ends by holding `max_y` down
-        # to the screen, and the rows above it stay, so the bound that
-        # `highest_row` rests on does not hold here.
-        # Lillecarl/pymux#145.
+        # `highest_row` and not `max(data_buffer)`. The highest row of
+        # the buffer is inside the screen, so the answer is `max_y` and
+        # a look at the rows of a screen that has not filled up yet.
+        # Reading the buffer for it walks every key of the history,
+        # which this method exists to leave alone.
+        # `tests/test_the_top_of_the_buffer.py` is the proof of the
+        # bound it rests on. Lillecarl/pymux#145.
         last = max(data_buffer)
 
         # The cursor stands inside the range whether it stands on a
@@ -4981,10 +4987,29 @@ class Screen:
                 "Reflow failed: {!r} {!r}".format(cursor_character, cell)
             )
 
+        # **The content says how far the buffer reaches.** The screen
+        # is the last `lines` rows of it, and everything above them is
+        # scrollback. A narrowing makes the content taller, so more of
+        # it becomes scrollback, and nothing is left where no reader of
+        # the screen can go.
+        #
+        # It used to hold `max_y` down to the cursor instead, which
+        # left the rows above it in the buffer for nothing to draw:
+        # six lines of "E" narrowed from ten columns to four gave
+        # eighteen rows and a screen that reached six of them.
+        # Lillecarl/pymux#146.
+        #
         # The cursor is on the screen, so the screen reaches it. It can
         # stand past the last cell of the last line and so on a row
         # that holds none, which no longer exists now that a reflow
         # does not make one for it. Lillecarl/pymux#143.
         self.max_y = max(highest, cursor_position.y)
 
-        self.max_y = min(self.max_y, cursor_position.y + self.lines - 1)
+        # The cursor stands on the character it stood on, and that
+        # character can have gone above the screen. libvterm puts the
+        # cursor at the top of the screen then, and says why in
+        # `src/screen.c`: "cursor would have moved entirely off the top
+        # of the screen; lets just place it at the top-left".
+        line_offset = self.line_offset
+        if cursor_position.y < line_offset:
+            cursor_position.y = line_offset

@@ -142,6 +142,36 @@ def test_no_row_of_the_screen_is_wider_than_the_screen(chunks, widths):
                 assert max(row) < screen.columns
 
 
+def test_a_narrowing_puts_the_rows_it_gains_above_the_screen():
+    """
+    A narrowing makes the content taller than the screen. The extra
+    rows become scrollback, and the cursor goes with the character it
+    stood on, which is now above the screen.
+
+    `_reflow` used to hold `max_y` down to the cursor instead. The
+    rows above it stayed in the buffer and nothing could draw them:
+    six lines of "E" at ten columns became eighteen rows at four, and
+    the screen reached six. Lillecarl/pymux#146.
+
+    libvterm fills the new screen from the bottom, pushes what does
+    not fit into the scrollback, and puts the cursor at the top of the
+    screen when its character went with it.
+    """
+    screen = a_screen(columns=10, lines=6)
+    Stream(screen).feed("\x1b#8")
+
+    screen.resize(6, 4)
+    data_buffer = screen.page.data_buffer
+
+    assert max(data_buffer) == 17
+    assert screen.max_y == 17
+    assert screen.line_offset == 12
+    assert screen.pt_cursor_position.y == 12
+
+    # The bound `highest_row` rests on: nothing above the screen.
+    assert max(data_buffer) <= screen.line_offset + screen.lines - 1
+
+
 def test_the_history_keeps_the_width_it_was_written_at():
     """
     The point of the bound, said directly: a row well above the screen
