@@ -3021,9 +3021,23 @@ class Screen:
 
         self._end_the_wrap_out_of_this_line(columns)
 
-        if erased is None and not line:
+        if erased is None and not line and line.attribute is None:
             # The line holds nothing, so it can go away and keep the
             # screen sparse.
+            #
+            # **A row with a DEC line attribute stays.** An erase
+            # empties the cells and says nothing about the size of the
+            # row: xterm's `ClearInLine` writes the cells and leaves
+            # the double size flag where it is, and `ClearBufRows`,
+            # which is ED, is the one that resets it. Dropping the row
+            # here dropped the attribute with it, so vttest drew the
+            # top half of its second double-height line small.
+            # Lillecarl/pymux#150.
+            #
+            # The continuation mark is the other thing a row carries,
+            # and it is not read here on purpose. Whether an erase ends
+            # a wrap is Lillecarl/pymux#142, which is open and asks for
+            # an answer from libvterm rather than a guess.
             data_buffer.pop(pt_cursor_position.y, None)
             return
 

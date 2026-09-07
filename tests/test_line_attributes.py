@@ -137,6 +137,23 @@ def test_erasing_the_screen_takes_every_attribute_off():
     assert _attributes(_screen("\x1b#6abcde\x1b[2J")) == {}
 
 
+def test_erasing_the_line_keeps_its_attribute():
+    """
+    "CSI 2 K" empties the row, and the row is still twice as high.
+
+    xterm keeps it. `ClearInLine` writes the cells of the row and
+    leaves the double size flag where it is; `ClearBufRows`, which is
+    ED, is the one that resets it.
+
+    vttest shows the difference. It writes "ESC # 3", then "CSI 2 K",
+    then the text of the top half of its second double-height line, and
+    a pane drew that line small while xterm drew it big. The row had
+    nothing in it at the moment of the erase, so the buffer dropped the
+    row and the attribute with it. Lillecarl/pymux#150.
+    """
+    assert _attribute(_screen("\x1b#3\x1b[2Kabc"), 0) == TOP_HALF
+
+
 def test_erasing_below_leaves_the_line_of_the_cursor():
     "ED 0 takes only a part of the row the cursor is on."
     screen = _screen("\x1b#6abc\r\n\x1b#6def\x1b[1;2H\x1b[0J")
