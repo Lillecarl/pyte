@@ -7,7 +7,8 @@ understand gets the answer that says so.
 """
 import pytest
 
-from pyte.screen import TERMINAL_VERSION, Screen
+from pyte.screen import Screen
+from pyte.terminfo import TERMINAL_VERSION
 from pyte.streams import Stream
 
 

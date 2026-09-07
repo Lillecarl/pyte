@@ -19,7 +19,8 @@ Lillecarl/pymux#94.
 """
 import pytest
 
-from pyte.screen import TERMINAL_VERSION, Screen
+from pyte.screen import Screen
+from pyte.terminfo import TERMINAL_VERSION
 from pyte.streams import Stream
 
 #: "ESC SP G", which turns eight bit controls on.

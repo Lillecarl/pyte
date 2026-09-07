@@ -89,7 +89,13 @@ from .osc import (
 )
 from .placeholders import PlaceholderRun, merge_runs, runs_in_line
 from .sixel import decode_sixel
-from .terminfo import CAPABILITIES
+from .terminfo import (
+    CAPABILITIES,
+    DEVICE_EXTENSIONS,
+    TERMINAL_VERSION,
+    XTERM_PATCH_LEVEL,
+    XTERM_TYPE,
+)
 
 __all__ = ("Screen",)
 
@@ -134,74 +140,6 @@ FORWARDED_OSC = frozenset([
     Osc.NOTIFICATION,
 ])
 
-#: What XTVERSION ("CSI > q") answers. ptterm draws the pane, so ptterm
-#: is what the program in it talks to.
-TERMINAL_VERSION = "ptterm(0.2)"
-
-
-class DeviceExtension(IntEnum):
-    """
-    An extension that DA ("CSI c") names, by the number it carries.
-
-    Nothing goes in `DEVICE_EXTENSIONS` that a pane does not really do.
-    A program reads this to decide what it may send, and a claim that
-    is not served leaves it drawing what the pane cannot draw.
-    """
-
-    #: DECCOLM, and the 132 column page it asks for.
-    COLUMNS_132 = 1
-    #: A printer port. There is no printer.
-    PRINTER = 2
-    #: Sixel graphics.
-    SIXEL = 4
-    #: DECSED, DECSEL and DECSERA: an erase that reads the marks.
-    SELECTIVE_ERASE = 6
-    #: The national replacement character sets.
-    NATIONAL_CHARSETS = 9
-    #: The technical character set.
-    TECHNICAL_CHARACTERS = 15
-    #: A locator, which ReGIS reads. There is none.
-    LOCATOR_PORT = 16
-    #: DECRQSS, DECRQM and the device status reports.
-    TERMINAL_STATE_REPORTS = 17
-    #: User windows. A pane is not a window and cannot make one.
-    USER_WINDOWS = 18
-    #: Left and right margins, which a horizontal scroll moves.
-    HORIZONTAL_SCROLLING = 21
-    #: Colour.
-    COLOR = 22
-    #: DECFRA, DECERA, DECSERA and DECCRA.
-    RECTANGULAR_EDITING = 28
-    #: The text locator of ANSI. There is none.
-    ANSI_TEXT_LOCATOR = 29
-
-
-#: What DA answers after the conformance level: the extensions that a
-#: pane really has. The four that xterm names and this leaves out are
-#: PRINTER, LOCATOR_PORT, USER_WINDOWS and ANSI_TEXT_LOCATOR, and a
-#: pane has none of them. `DEVIATIONS.md` says what that costs.
-DEVICE_EXTENSIONS = (
-    DeviceExtension.COLUMNS_132,
-    DeviceExtension.SIXEL,
-    DeviceExtension.SELECTIVE_ERASE,
-    DeviceExtension.NATIONAL_CHARSETS,
-    DeviceExtension.TECHNICAL_CHARACTERS,
-    DeviceExtension.TERMINAL_STATE_REPORTS,
-    DeviceExtension.HORIZONTAL_SCROLLING,
-    DeviceExtension.COLOR,
-    DeviceExtension.RECTANGULAR_EDITING,
-)
-
-#: The terminal that DA2 names. 64 is the VT520 family, which is the
-#: level that DA answers with.
-XTERM_TYPE = 64
-
-#: The firmware that DA2 names. A program reads it as the patch level
-#: of xterm, and decides from it what it may send. 383 is the release
-#: that split reverse wraparound into "?45" and "?1045"; ptterm follows
-#: the split, and `drive_with_esctest.py` tells the suite the same
-#: number.
-XTERM_PATCH_LEVEL = 383
 
 class CursorShape(IntEnum):
     """

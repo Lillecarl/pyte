@@ -1,36 +1,42 @@
 """
-The terminfo entry that describes this screen.
+Who this terminal says it is, in every form a program can ask.
 
-A program has two ways to learn what a terminal can do. It can ask,
-which `screen.report_capabilities` answers, or it can read the
-database of the machine it runs on, which is what every program built
-on ncurses does.
+A program has three ways to learn what a terminal can do. It can read
+the database of the machine it runs on, which is what every program
+built on ncurses does. It can ask over the wire, with XTGETTCAP, DA,
+DA2 or XTVERSION. Or it can read a name out of `TERM`.
 
-This holds the table for both ways, and writes the entry for the
-second one. One source, two readers: the database and the wire cannot
-say different things. `screen.report_capabilities` reads `CAPABILITIES`
-here, and so does `terminfo_source`.
+All three answers come from this module, so they cannot say different
+things. `CAPABILITIES` feeds both `screen.report_capabilities` and
+`terminfo_source`, and `TERMINAL_NAME` is what `environment.py` puts
+in `TERM`.
 
-Compile it with:
+Compile the entry with:
 
     python -m pyte.terminfo | tic -x -o <directory> -
 
-The entry names `xterm-256color` as its parent, because that is what a
-pane emulates apart from the capabilities below. `tic` copies the
-parent in, so what comes out stands on its own.
+It names `xterm-256color` as its parent, because that is what a pane
+emulates apart from the capabilities below. `tic` copies the parent
+in, so what comes out stands on its own.
 
 Lillecarl/pymux#129.
 """
 import sys
+from enum import IntEnum
 from typing import Dict
 
 from .colors import PALETTE
 
 __all__ = [
     "CAPABILITIES",
+    "DEVICE_EXTENSIONS",
     "PARENT",
     "TERMINAL_ALIAS",
     "TERMINAL_NAME",
+    "TERMINAL_VERSION",
+    "XTERM_PATCH_LEVEL",
+    "XTERM_TYPE",
+    "DeviceExtension",
     "terminfo_source",
 ]
 
@@ -123,6 +129,75 @@ CAPABILITIES: Dict[str, object] = {
     "Co": len(PALETTE),
     "pairs": 32767,
 }
+
+#: What XTVERSION ("CSI > q") answers. ptterm draws the pane, so ptterm
+#: is what the program in it talks to.
+TERMINAL_VERSION = "ptterm(0.2)"
+
+
+class DeviceExtension(IntEnum):
+    """
+    An extension that DA ("CSI c") names, by the number it carries.
+
+    Nothing goes in `DEVICE_EXTENSIONS` that a pane does not really do.
+    A program reads this to decide what it may send, and a claim that
+    is not served leaves it drawing what the pane cannot draw.
+    """
+
+    #: DECCOLM, and the 132 column page it asks for.
+    COLUMNS_132 = 1
+    #: A printer port. There is no printer.
+    PRINTER = 2
+    #: Sixel graphics.
+    SIXEL = 4
+    #: DECSED, DECSEL and DECSERA: an erase that reads the marks.
+    SELECTIVE_ERASE = 6
+    #: The national replacement character sets.
+    NATIONAL_CHARSETS = 9
+    #: The technical character set.
+    TECHNICAL_CHARACTERS = 15
+    #: A locator, which ReGIS reads. There is none.
+    LOCATOR_PORT = 16
+    #: DECRQSS, DECRQM and the device status reports.
+    TERMINAL_STATE_REPORTS = 17
+    #: User windows. A pane is not a window and cannot make one.
+    USER_WINDOWS = 18
+    #: Left and right margins, which a horizontal scroll moves.
+    HORIZONTAL_SCROLLING = 21
+    #: Colour.
+    COLOR = 22
+    #: DECFRA, DECERA, DECSERA and DECCRA.
+    RECTANGULAR_EDITING = 28
+    #: The text locator of ANSI. There is none.
+    ANSI_TEXT_LOCATOR = 29
+
+
+#: What DA answers after the conformance level: the extensions that a
+#: pane really has. The four that xterm names and this leaves out are
+#: PRINTER, LOCATOR_PORT, USER_WINDOWS and ANSI_TEXT_LOCATOR, and a
+#: pane has none of them. `DEVIATIONS.md` says what that costs.
+DEVICE_EXTENSIONS = (
+    DeviceExtension.COLUMNS_132,
+    DeviceExtension.SIXEL,
+    DeviceExtension.SELECTIVE_ERASE,
+    DeviceExtension.NATIONAL_CHARSETS,
+    DeviceExtension.TECHNICAL_CHARACTERS,
+    DeviceExtension.TERMINAL_STATE_REPORTS,
+    DeviceExtension.HORIZONTAL_SCROLLING,
+    DeviceExtension.COLOR,
+    DeviceExtension.RECTANGULAR_EDITING,
+)
+
+#: The terminal that DA2 names. 64 is the VT520 family, which is the
+#: level that DA answers with.
+XTERM_TYPE = 64
+
+#: The firmware that DA2 names. A program reads it as the patch level
+#: of xterm, and decides from it what it may send. 383 is the release
+#: that split reverse wraparound into "?45" and "?1045"; ptterm follows
+#: the split, and `drive_with_esctest.py` tells the suite the same
+#: number.
+XTERM_PATCH_LEVEL = 383
 
 #: The names of `CAPABILITIES` that describe the query and not the
 #: terminal. "TN" and "name" answer with the name of the entry, and

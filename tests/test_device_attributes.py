@@ -6,12 +6,11 @@ answers. A program tells them apart by the prefix of the reply.
 """
 import pytest
 
-from pyte.screen import (
+from pyte.screen import ConformanceLevel, Screen
+from pyte.terminfo import (
     DEVICE_EXTENSIONS,
     XTERM_PATCH_LEVEL,
     XTERM_TYPE,
-    Screen,
-    ConformanceLevel,
     DeviceExtension,
 )
 from pyte.streams import Stream
