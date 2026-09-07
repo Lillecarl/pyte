@@ -15,6 +15,7 @@ the code itself ("OSC 10" is the foreground, "OSC 11" the background,
 What a colour *is* lives in `colors.py`, and the arithmetic behind it
 in `xcms.py`. Nothing about a colour space belongs here.
 """
+from enum import StrEnum
 from typing import Dict, List, Tuple
 
 from .colors import PALETTE
@@ -23,16 +24,57 @@ __all__ = [
     "DYNAMIC_COLOR_CODES",
     "DYNAMIC_COLOR_RESET_OFFSET",
     "FIRST_SPECIAL_COLOR",
+    "FORWARDED_OSC",
     "MAX_HYPERLINK_ID_LENGTH",
     "MAX_HYPERLINK_LENGTH",
     "MAX_POINTER_SHAPES",
     "POINTER_SHAPES",
     "POINTER_SHAPE_ALIASES",
     "SPECIAL_COLOR_NAMES",
+    "Osc",
     "parse_hyperlink",
     "parse_kitty_color_query",
     "pointer_shape_name",
 ]
+
+
+class Osc(StrEnum):
+    """
+    The OSC codes that a pane reads.
+
+    An OSC names its code in text, not in a parameter, so the code is
+    a string here as well.
+    """
+
+    #: "OSC 8": the hyperlink that the cells after it carry.
+    HYPERLINK = "8"
+    #: "OSC 4": one entry of the palette, by index.
+    PALETTE_COLOR = "4"
+    #: "OSC 5": one colour that a rendition asks for by name.
+    SPECIAL_COLOR = "5"
+    #: "OSC 21": the colours, in the form that kitty reads.
+    KITTY_COLORS = "21"
+    #: "OSC 22": the shape of the pointer over the pane.
+    POINTER_SHAPE = "22"
+    #: "OSC 52": the clipboard of the user.
+    CLIPBOARD = "52"
+    #: "OSC 99": a desktop notification.
+    NOTIFICATION = "99"
+    #: "OSC 104": put palette entries back to their defaults.
+    RESET_PALETTE_COLOR = "104"
+    #: "OSC 105": put special colours back to their defaults.
+    RESET_SPECIAL_COLOR = "105"
+
+
+#: The OSC sequences that a pane cannot answer by itself. They ask the
+#: terminal of the user for the shape of the pointer (22), the
+#: clipboard (52) or a desktop notification (99). `Screen.osc_func`
+#: receives them, and a pane without such a function consumes them.
+FORWARDED_OSC = frozenset([
+    Osc.POINTER_SHAPE,
+    Osc.CLIPBOARD,
+    Osc.NOTIFICATION,
+])
 
 #: The codes of the dynamic colours, and the colour that each one
 #: names. "OSC 10" is the first of them, and a payload with several

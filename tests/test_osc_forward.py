@@ -7,7 +7,8 @@ therefore leave the pane through `osc_func`.
 """
 import pytest
 
-from pyte.screen import FORWARDED_OSC, Screen
+from pyte.osc import FORWARDED_OSC
+from pyte.screen import Screen
 from pyte.streams import Stream
 
 
