@@ -49,7 +49,18 @@ class PrivateMode(IntEnum):
     mode that carries no marker, and `Screen.mode` holds the shifted
     value. `flag` is that value, and the member itself is the number
     that a program writes.
+
+    **`flag` is a field and not a property.** The screen reads it for
+    every character it draws, to ask whether AUTOWRAP is set, and a
+    property costs a call each time. The shift happens once, when the
+    member is made.
     """
+
+    #: The value that `Screen.mode` holds while this mode is set.
+    flag: int
+
+    def __init__(self, number: int) -> None:
+        self.flag = flag_of(number)
 
     #: DECCKM: the cursor keys send application codes.
     APPLICATION_CURSOR_KEYS = 1
@@ -167,11 +178,6 @@ class PrivateMode(IntEnum):
     #: Report a resize in the input of the program, instead of only
     #: through SIGWINCH.
     INBAND_RESIZE = 2048
-
-    @property
-    def flag(self) -> int:
-        "The value that `Screen.mode` holds while this mode is set."
-        return flag_of(self.value)
 
 
 class AnsiMode(IntEnum):
