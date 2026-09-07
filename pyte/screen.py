@@ -264,6 +264,12 @@ class Screen:
 
         self.reset()
 
+    # ------------------------------------------------------------------
+    # What a program turned on, as somebody outside asks it.
+    #
+    # A widget draws the screen and sends it keys. These say what the
+    # program in it wants, so the widget does not read `self.mode`.
+
     @property
     def in_application_mode(self) -> bool:
         """
@@ -349,6 +355,12 @@ class Screen:
             return "\x1b[200~" + text + "\x1b[201~"
         return text
 
+    # ------------------------------------------------------------------
+    # Answering a program.
+    #
+    # Every reply goes out through one of these, so the choice between
+    # seven and eight bit controls is made in one place.
+
     def _control(self, final: str) -> str:
         """
         A C1 control, spelled the way the program asked for.
@@ -396,6 +408,12 @@ class Screen:
     def set_eight_bit_controls(self) -> None:
         'S8C1T ("ESC SP G"): answer with one C1 byte.'
         self.seven_bit_controls = False
+
+    # ------------------------------------------------------------------
+    # Starting over.
+    #
+    # RIS takes everything, DECSTR takes the settings and leaves the
+    # text, and `_reset_screen` takes the cells alone.
 
     def reset(self) -> None:
         """Resets the terminal to its initial state.
@@ -606,6 +624,12 @@ class Screen:
 
         self._reset_rendition()
 
+    # ------------------------------------------------------------------
+    # Protection: which cells an erase leaves alone.
+    #
+    # Two commands mark a cell and each one holds a different erase
+    # away from it. `cells.Protection` carries both marks.
+
     def start_protected_area(self) -> None:
         """
         SPA ("ESC V"): mark the cells that a program draws next.
@@ -685,6 +709,13 @@ class Screen:
     # keeps the count it last drew, per row, and a reader that attaches
     # late remembers nothing, so every row looks new and it draws the
     # whole screen once. Lillecarl/pymux#126.
+
+    # ------------------------------------------------------------------
+    # What a reader has to draw again.
+    #
+    # The screen counts writes per row and every reader keeps its own
+    # mark, because two widgets and several clients read one screen.
+    # Lillecarl/pymux#128.
 
     def touch(self, row: int) -> None:
         "Say that one row of `data_buffer` has changed."
@@ -770,6 +801,12 @@ class Screen:
         PrivateMode.LEFT_RIGHT_MARGIN: ConformanceLevel.VT400,
         PrivateMode.NO_CLEAR_ON_COLUMN_CHANGE: ConformanceLevel.VT500,
     }
+
+    # ------------------------------------------------------------------
+    # Which modes this terminal has at all.
+    #
+    # DECSCL can ask for an earlier terminal, and a mode a later one
+    # brought is then not there to set. The embedder gates a few more.
 
     def _level_carries(self, number: int) -> bool:
         """
@@ -866,6 +903,12 @@ class Screen:
             return False
         return PrivateMode.NO_CLEAR_ON_COLUMN_CHANGE.flag in self.mode
 
+    # ------------------------------------------------------------------
+    # The size of the screen.
+    #
+    # A resize lays the buffer out again at the new width; `_reflow` at
+    # the end of this file does that work.
+
     def resize(
         self, lines: int | None = None, columns: int | None = None
     ) -> None:
@@ -914,6 +957,13 @@ class Screen:
                 self.columns * ASSUMED_CELL_WIDTH,
             )
         )
+
+    # ------------------------------------------------------------------
+    # The rows of the buffer.
+    #
+    # The buffer holds the history above the screen, so a row number is
+    # not a row of the screen. `line_offset` is the first row shown.
+    # A note about a row lives on the `Row`. Lillecarl/pymux#134.
 
     @property
     def line_offset(self) -> int:
@@ -994,6 +1044,13 @@ class Screen:
             if row in data_buffer:
                 highest = row
         return highest
+
+    # ------------------------------------------------------------------
+    # The margins, and where the cursor says it is.
+    #
+    # DECSTBM names the first and the last row, DECSLRM the first and
+    # the last column. Origin mode counts the cursor from the margins,
+    # so what the cursor reports is not where it stands in the buffer.
 
     def set_margins(self, *params: int, **kwargs) -> None:
         """Selects top and bottom margins for the scrolling region.
@@ -1161,6 +1218,12 @@ class Screen:
         self.margins = None
         self.horizontal_margins = None
 
+    # ------------------------------------------------------------------
+    # The character sets.
+    #
+    # Two slots and a shift between them. `draw` translates through the
+    # one that is in, so `charsets.py` holds the tables.
+
     def define_charset(self, code: str, mode: str = "(") -> None:
         """Define the ``G0`` or the ``G1`` charset.
 
@@ -1180,6 +1243,13 @@ class Screen:
                 self.g0_charset = charset_map
             elif mode == ")":
                 self.g1_charset = charset_map
+
+    # ------------------------------------------------------------------
+    # Turning a mode on and off.
+    #
+    # `self.mode` holds both kinds, with a private one shifted; see
+    # `modes.py`. The alternate screen hangs off three of them, so the
+    # swap of the two pages is here as well.
 
     def set_mode(self, *modes, **kwargs) -> None:
         # Private mode codes are shifted, to be distingiushed from non
@@ -1439,6 +1509,12 @@ class Screen:
     def shift_out(self) -> None:
         "Activates ``G1`` character set."
         self.charset = 1
+
+    # ------------------------------------------------------------------
+    # Drawing.
+    #
+    # The one hot path of this file. Everything it needs is read as a
+    # field, and the wait to wrap is the state it keeps between calls.
 
     def repair_wide_char(self, row, column: int) -> None:
         """
@@ -1705,6 +1781,13 @@ class Screen:
         # A move of the cursor ends the wait to wrap.
         self.pending_wrap = False
 
+    # ------------------------------------------------------------------
+    # Moving the screen over the buffer.
+    #
+    # Outside a scrolling region the screen slides down and the rows it
+    # leaves become the history. Inside one the rows themselves move.
+    # The history is pruned from `history_floor` and never walked whole.
+
     def index(self) -> None:
         """Move the cursor down one line in the same column. If the
         cursor is at the last line, create a new line at the bottom.
@@ -1959,6 +2042,12 @@ class Screen:
         self.carriage_return()
         self.ensure_bounds()
 
+    # ------------------------------------------------------------------
+    # The tab stops.
+    #
+    # `set_tab_stop` and `clear_tab_stop` are further down, with the
+    # other settings a program picks with one number.
+
     def tab(self) -> None:
         """Move to the next tab stop, or to the last column when no stop
         is left on the line.
@@ -2048,6 +2137,12 @@ class Screen:
         if self.last_character:
             self.draw(self.last_character * (count or 1))
 
+    # ------------------------------------------------------------------
+    # Going back over what was typed.
+    #
+    # A backspace in the first column can reach the row above, and two
+    # modes say when. It undoes the typing, so it reads the wrap mark.
+
     def backspace(self) -> None:
         """
         Move the cursor one column left.
@@ -2133,6 +2228,12 @@ class Screen:
         cursor_position.x = right
         self.pending_wrap = False
         return True
+
+    # ------------------------------------------------------------------
+    # Saving the cursor and bringing it back.
+    #
+    # A savepoint holds more than a position: the rendition, the
+    # charsets, origin mode and the protection marks travel with it.
 
     def save_cursor(self) -> None:
         """
@@ -2237,6 +2338,12 @@ class Screen:
         for column in range(self.columns):
             line[column] = erased
         data_buffer[row] = line
+
+    # ------------------------------------------------------------------
+    # Inserting and deleting rows and columns.
+    #
+    # Each one moves what is there and leaves blanks behind. A margin
+    # bounds every one of them, and what falls outside is gone.
 
     def insert_lines(self, count: int | None = None) -> None:
         """Inserts the indicated # of lines at line with cursor. Lines
@@ -2361,6 +2468,12 @@ class Screen:
 
         self.repair_wide_char(line, cursor_x)
         self.repair_wide_char(line, max(cursor_x, edge - count))
+
+    # ------------------------------------------------------------------
+    # Placing the cursor.
+    #
+    # Origin mode decides what a number counts from, so every one of
+    # these ends at `ensure_bounds`.
 
     def cursor_position(
         self, line: int | None = None, column: int | None = None
@@ -2599,6 +2712,13 @@ class Screen:
 
         cursor_position.x = min(right, cursor_position.x + (count or 1))
         self.ensure_bounds()
+
+    # ------------------------------------------------------------------
+    # Erasing.
+    #
+    # An erased cell takes the background that is set now, and it is an
+    # `ErasedCell`: a combining mark falls off one and hangs on a space
+    # that a program wrote. Lillecarl/pymux#56.
 
     def erase_appearance(self) -> "Appearance | None":
         """
@@ -3010,6 +3130,12 @@ class Screen:
             else:
                 row[column] = erased
 
+    # ------------------------------------------------------------------
+    # The rectangles: DECFRA, DECERA, DECSERA and DECCRA.
+    #
+    # Two corners name an area, and DECSACE says whether that is a
+    # rectangle or the stream between them.
+
     def _rectangle(
         self, top: int, left: int, bottom: int, right: int
     ) -> Tuple[int, int, int, int] | None:
@@ -3225,6 +3351,12 @@ class Screen:
             self.repair_wide_char(line, target_left)
             self.repair_wide_char(line, target_left + width)
 
+    # ------------------------------------------------------------------
+    # The settings a program picks with one number.
+    #
+    # Each one reads a `parameters.py` enum, keeps the choice, and
+    # reports it back when DECRQSS asks.
+
     def set_attribute_extent(self, *params: int, **kwargs) -> None:
         """
         DECSACE ("CSI Ps * x"): what DECCARA and DECRARA reach.
@@ -3337,6 +3469,13 @@ class Screen:
         # never reaches this.
         self.pending_wrap = False
 
+    # ------------------------------------------------------------------
+    # The DEC line attributes, and the pattern that shows them.
+    #
+    # An attribute belongs to the line and rides on the `Row`. The
+    # screen holds it and draws nothing: how wide a line looks is the
+    # renderer's decision. Lillecarl/pymux#55.
+
     def alignment_display(self) -> None:
         """
         DECALN ("ESC # 8"): fill the screen with "E".
@@ -3414,6 +3553,12 @@ class Screen:
             if line is not None:
                 line.attribute = None
                 line.wrapped = False
+
+    # ------------------------------------------------------------------
+    # How the characters after this are drawn.
+    #
+    # SGR builds a `Rendition` and "OSC 8" opens a hyperlink. The two
+    # arrive apart and a cell holds both, as one interned `Appearance`.
 
     def select_graphic_rendition(self, *attrs_tuple: int, private: bool = False) -> None:
         """
@@ -3609,6 +3754,12 @@ class Screen:
         # terminal.
         85: "?83n",
     }
+
+    # ------------------------------------------------------------------
+    # Reports and queries: everything a program can ask, and the answer.
+    #
+    # Not one of these holds state of its own. Each reads the screen and
+    # writes bytes back through `reply_csi` and its neighbours.
 
     def report_device_status(
         self, data: int = 0, *args, private=False, **kwargs
@@ -4392,6 +4543,13 @@ class Screen:
             # the SCO console, and xterm reads it that way.
             self.restore_cursor()
 
+    # ------------------------------------------------------------------
+    # The OSC sequences.
+    #
+    # `osc.py` says what each payload holds and holds the state that
+    # goes with it. Three of them only the terminal of the user can
+    # serve, and those go out to `osc_func`.
+
     def osc(self, code: str, param: str) -> None:
         """
         An OSC sequence other than the title and the icon name.
@@ -4497,6 +4655,9 @@ class Screen:
         "\"OSC 0\" and \"OSC 2\": the title of the window."
         self.titles.set_window(param)
 
+    # ------------------------------------------------------------------
+    # APC, DCS, and what the parser hands over with nowhere else to go.
+
     def apc(self, data: str) -> None:
         """
         APC string sequence (``ESC _ ... ST``).
@@ -4548,6 +4709,13 @@ class Screen:
 
     def debug(self, *args, **kwargs):
         pass
+
+    # ------------------------------------------------------------------
+    # Laying the buffer out again at a new width.
+    #
+    # It unwraps every line of the whole buffer and wraps it again, so
+    # it costs the history and not the screen. Lillecarl/pymux#135 is
+    # the plan to bound that.
 
     def _reflow(self) -> None:
         """
