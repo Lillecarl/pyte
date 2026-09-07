@@ -14,7 +14,7 @@ import string
 import sys
 
 import pyte
-from pyte import modes as mo
+from pyte.modes import AnsiMode
 
 
 def print_screen(screen, text):
@@ -33,7 +33,7 @@ def random_string(n, alphabet=string.ascii_letters + " "):
 if __name__ == "__main__":
     # ``ratio=1`` means scroll the whole screen.
     screen = pyte.HistoryScreen(80, 12, ratio=1)
-    screen.set_mode(mo.LNM)
+    screen.set_mode(AnsiMode.LINE_FEED_NEW_LINE)
     stream = pyte.Stream(screen)
 
     pages = 3

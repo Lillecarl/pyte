@@ -41,7 +41,7 @@ import pyte
 class Terminal:
     def __init__(self, columns, lines, p_in):
         self.screen = pyte.HistoryScreen(columns, lines)
-        self.screen.set_mode(pyte.modes.LNM)
+        self.screen.set_mode(pyte.modes.AnsiMode.LINE_FEED_NEW_LINE)
         self.screen.write_process_input = \
             lambda data: p_in.write(data.encode())
         self.stream = pyte.ByteStream()

@@ -28,7 +28,6 @@ from typing import (
 )
 
 from . import charsets as cs
-from . import modes as mo
 from .images import (
     ASSUMED_CELL_HEIGHT,
     ASSUMED_CELL_WIDTH,
@@ -64,6 +63,7 @@ from .page import (
     Page,
     Row,
 )
+from .modes import AnsiMode, ModeReport, PrivateMode, flag_of
 from .colors import (
     COLOR_OF_A_BACKGROUND,
     COLOR_OF_A_FOREGROUND,
@@ -225,157 +225,6 @@ class CursorShape(IntEnum):
 DEFAULT_CURSOR_STYLE = CursorShape.BLINKING_BLOCK
 
 
-#: How far pyte shifts a private mode, to tell it from a mode that
-#: carries no marker. `self.mode` holds the shifted value.
-PRIVATE_MODE_SHIFT = 5
-
-
-def flag_of(number: int) -> int:
-    """
-    The value that `self.mode` holds for a private mode number.
-
-    `PrivateMode` names the modes a pane acts on, and this works on a
-    bare number as well: a program may save and read back a mode that
-    no terminal carries.
-    """
-    return number << PRIVATE_MODE_SHIFT
-
-
-class PrivateMode(IntEnum):
-    """
-    A private mode, by the number that "CSI ? Ps h" carries.
-
-    pyte shifts a private mode five bits to the left, to tell it from a
-    mode that carries no marker, and `self.mode` holds the shifted
-    value. `flag` is that value, and the member itself is the number
-    that a program writes. `pyte.modes` carries the modes that pyte
-    knows about, already shifted, under its own names; these are the
-    ones it does not carry.
-    """
-
-    #: DECCKM: the cursor keys send application codes.
-    APPLICATION_CURSOR_KEYS = 1
-
-    #: DECCOLM: 132 columns instead of 80.
-    COLUMNS_132 = 3
-
-    #: DECSCLM: scroll slowly. A pane draws as fast as it can, so this
-    #: one is kept and not acted on.
-    SLOW_SCROLL = 4
-
-    #: DECSCNM: reverse video over the whole screen.
-    REVERSE_VIDEO = 5
-
-    #: DECOM: the cursor is placed from the margins, not the screen.
-    ORIGIN = 6
-
-    #: DECAWM: a character past the last column wraps to the next line.
-    AUTOWRAP = 7
-
-    #: att610: does the cursor blink? DECSCUSR names the shape and the
-    #: blinking in one number, and this mode names only the blinking,
-    #: so both of them write `cursor_style`.
-    CURSOR_BLINK = 12
-
-    #: DECPFF: send a form feed after a print. There is no printer.
-    PRINT_FORM_FEED = 18
-
-    #: DECPEX: a print takes the page, not the scrolling region. There
-    #: is no printer.
-    PRINT_EXTENT = 19
-
-    #: DECTCEM: is the cursor drawn?
-    SHOW_CURSOR = 25
-
-    #: DECHEBM: the Hebrew keyboard.
-    HEBREW_KEYBOARD = 35
-
-    #: Does DECCOLM do anything? xterm keeps the 132 column page
-    #: behind this mode, because a program that sets DECCOLM by
-    #: accident would otherwise resize the terminal and clear it. It
-    #: is off until a program asks.
-    ALLOW_80_TO_132 = 40
-
-    #: xterm's fix for a fault in `more`. A cursor that filled the
-    #: last column waits to wrap, and a tab leaves that wait alone.
-    #: `more` drew to the end of a row and then wrote a tab, and the
-    #: tab went nowhere. With this mode set the tab wraps first.
-    MORE_FIX = 41
-
-    #: DECNRCM: the national replacement character sets.
-    NATIONAL_CHARSETS = 42
-
-    #: A backspace in the first column goes back to the line above,
-    #: but only when that line was reached by wrapping. It undoes what
-    #: the typing did, and no more.
-    REVERSE_WRAP = 45
-
-    #: The alternate screen, on its own. A program that predates
-    #: "?1049" sends this one.
-    ALTERNATE_SCREEN = 47
-
-    #: DECHCCM: the cursor is coupled to the horizontal scroll. No
-    #: terminal that anybody uses carries it.
-    HORIZONTAL_CURSOR_COUPLING = 60
-
-    #: DECNKM: the keypad sends application codes.
-    APPLICATION_KEYPAD = 66
-
-    #: DECBKM: the backarrow key sends a backspace, not a delete.
-    BACKARROW_IS_BACKSPACE = 67
-
-    #: DECLRMM: may DECSLRM set a left and a right margin? The mode
-    #: alone changes nothing. It says whether "CSI Pl ; Pr s" names the
-    #: margins, and resetting it takes the margins away.
-    LEFT_RIGHT_MARGIN = 69
-
-    #: DECNCSM: do not clear the screen when the page width changes.
-    #: DECCOLM clears the page it takes, and a VT510 lets a program
-    #: keep what was there.
-    NO_CLEAR_ON_COLUMN_CHANGE = 95
-
-    #: Report the position of the mouse.
-    MOUSE_REPORTING = 1000
-
-    #: Report the mouse the way SGR writes it.
-    SGR_MOUSE = 1006
-
-    #: Report the mouse the way urxvt writes it.
-    URXVT_MOUSE = 1015
-
-    #: A backspace in the first column goes back to the line above,
-    #: whether that line was wrapped or not, and from the first line
-    #: to the last. This is what "?45" did before xterm 383 split the
-    #: two apart.
-    REVERSE_WRAP_ANYWHERE = 1045
-
-    #: The alternate screen. The same screen as "?47", under the
-    #: number that came later.
-    ALTERNATE_SCREEN_AGAIN = 1047
-
-    #: Save the cursor on a set, and bring it back on a reset. It is
-    #: the pair of "ESC 7" and "ESC 8" written as one mode. "?1049"
-    #: holds this mode and the alternate screen together.
-    SAVE_CURSOR = 1048
-
-    #: The alternate screen, with the cursor and a clear. This is the
-    #: one a program sends today.
-    ALTERNATE_SCREEN_WITH_CURSOR = 1049
-
-    #: Wrap a paste in "ESC [ 200 ~" and "ESC [ 201 ~", so that a
-    #: program can tell a paste from typing.
-    BRACKETED_PASTE = 2004
-
-    #: Report a resize in the input of the program, instead of only
-    #: through SIGWINCH.
-    INBAND_RESIZE = 2048
-
-    @property
-    def flag(self) -> int:
-        "The value that `self.mode` holds while this mode is set."
-        return flag_of(self.value)
-
-
 class AttributeExtent(IntEnum):
     """
     What DECCARA and DECRARA reach, as DECSACE ("CSI Ps * x") sets it.
@@ -432,76 +281,6 @@ class ConformanceLevel(IntEnum):
 #: The level ptterm reports until a program names another one. It
 #: answers the sequences of a VT500, so it says so.
 DEFAULT_CONFORMANCE_LEVEL = ConformanceLevel.VT500
-
-
-class AnsiMode(IntEnum):
-    """
-    A mode that "CSI Ps h" carries, with no private marker.
-
-    These come from the ANSI standard. `pyte.modes` names the two that
-    pyte acts on, IRM and LNM, and holds them unshifted; these are the
-    rest. Nearly all of them come from a time of block mode terminals,
-    and no terminal that anybody uses today acts on one.
-    """
-
-    #: GATM: transfer the guarded areas as well.
-    GUARDED_AREA_TRANSFER = 1
-
-    #: KAM: lock the keyboard.
-    KEYBOARD_LOCKED = 2
-
-    #: SRTM: report a status change on its own.
-    STATUS_REPORT_TRANSFER = 5
-
-    #: VEM: an insert moves the lines up, not down.
-    VERTICAL_EDITING = 7
-
-    #: HEM: an insert moves the characters left, not right.
-    HORIZONTAL_EDITING = 10
-
-    #: PUM: the unit of a position is a millimetre, not a cell.
-    POSITIONING_UNIT = 11
-
-    #: SRM: echo what the keyboard sends.
-    LOCAL_ECHO = 12
-
-    #: FEAM: a format effector acts on the store, not the screen.
-    FORMAT_EFFECTOR_ACTION = 13
-
-    #: FETM: transfer the format effectors as well.
-    FORMAT_EFFECTOR_TRANSFER = 14
-
-    #: MATM: transfer every selected area, not only one.
-    MULTIPLE_AREA_TRANSFER = 15
-
-    #: TTM: a transfer stops at the end of the selected area.
-    TRANSFER_TERMINATION = 16
-
-    #: SATM: transfer the whole screen, not the selected area.
-    SELECTED_AREA_TRANSFER = 17
-
-    #: TSM: a tab stop belongs to one line, not to the screen.
-    TABULATION_STOP = 18
-
-    #: EBM: an edit stops at the end of the screen, not the area.
-    EDITING_BOUNDARY = 19
-
-
-class ModeReport(IntEnum):
-    """
-    What DECRQM ("CSI Ps $ p") answers about a mode.
-
-    Zero says that the terminal never heard of the mode, and a program
-    that reads it falls back to what it knows. Four says that the mode
-    exists and can never be on, which is what a program needs to stop
-    asking.
-    """
-
-    UNKNOWN = 0
-    SET = 1
-    RESET = 2
-    PERMANENTLY_SET = 3
-    PERMANENTLY_RESET = 4
 
 
 class WindowOp(IntEnum):
@@ -800,7 +579,7 @@ class Screen:
     @property
     def has_reverse_video(self) -> bool:
         "The whole screen is set to reverse video."
-        return mo.DECSCNM in self.mode
+        return PrivateMode.REVERSE_VIDEO.flag in self.mode
 
     def encode_key(self, data: str) -> str:
         """
@@ -912,7 +691,8 @@ class Screen:
         # exist yet is on no page.
         modes = getattr(self, "mode", frozenset())
         on_the_wide_page = (
-            PrivateMode.ALLOW_80_TO_132.flag in modes and mo.DECCOLM in modes
+            PrivateMode.ALLOW_80_TO_132.flag in modes
+            and PrivateMode.COLUMNS_132.flag in modes
         )
 
         self._reset_screen()
@@ -1006,8 +786,10 @@ class Screen:
 
         # Reset modes.
         self.mode = {
-            mo.DECAWM,  # Autowrap mode. (default: disabled).
-            mo.DECTCEM,  # Text cursor enable mode. (default enabled).
+            # Autowrap mode. (default: disabled).
+            PrivateMode.AUTOWRAP.flag,
+            # Text cursor enable mode. (default enabled).
+            PrivateMode.SHOW_CURSOR.flag,
         }
 
         # According to VT220 manual and ``linux/drivers/tty/vt.c``
@@ -1084,7 +866,7 @@ class Screen:
         self.horizontal_margins = None
 
         alternate = self.mode.intersection(self._ALTERNATE_SCREEN_MODES)
-        self.mode = {mo.DECAWM, mo.DECTCEM}
+        self.mode = {PrivateMode.AUTOWRAP.flag, PrivateMode.SHOW_CURSOR.flag}
         self.mode.update(alternate)
         self.page.show_cursor = True
 
@@ -1589,7 +1371,7 @@ class Screen:
         """
         row = self.pt_cursor_position.y - self.line_offset
         column = self.reported_column
-        if mo.DECOM in self.mode:
+        if PrivateMode.ORIGIN.flag in self.mode:
             top, _bottom = self.margins or Margins(0, self.lines - 1)
             left, _right = self.left_right
             row -= top
@@ -1707,16 +1489,19 @@ class Screen:
 
         # DECCOLM takes the page to 132 columns, clears it and puts the
         # cursor home.
-        if mo.DECCOLM in modes and self._may_change_the_page_width():
+        if (
+            PrivateMode.COLUMNS_132.flag in modes
+            and self._may_change_the_page_width()
+        ):
             self._ask_for_page_width(self.WIDE_PAGE)
 
         # According to `vttest`, DECOM should also home the cursor, see
         # vttest/main.c:303.
-        if mo.DECOM in modes:
+        if PrivateMode.ORIGIN.flag in modes:
             self.cursor_position()
 
         # Make the cursor visible.
-        if mo.DECTCEM in modes:
+        if PrivateMode.SHOW_CURSOR.flag in modes:
             self.page.show_cursor = True
 
         # On "\e[?1049h", enter alternate screen mode. Backup the current
@@ -1818,7 +1603,8 @@ class Screen:
         """Resets (disables) a given list of modes.
 
         :param list modes: modes to reset -- hopefully, each mode is a
-                           constant from :mod:`pyte.modes`.
+                           member of `AnsiMode` or the `flag` of a
+                           `PrivateMode`.
         """
         modes = list(modes_args)
 
@@ -1842,14 +1628,17 @@ class Screen:
             self.horizontal_margins = None
 
         # Lines below follow the logic in :meth:`set_mode`.
-        if mo.DECCOLM in modes and self._may_change_the_page_width():
+        if (
+            PrivateMode.COLUMNS_132.flag in modes
+            and self._may_change_the_page_width()
+        ):
             self._ask_for_page_width(self.NARROW_PAGE)
 
-        if mo.DECOM in modes:
+        if PrivateMode.ORIGIN.flag in modes:
             self.cursor_position()
 
         # Hide the cursor.
-        if mo.DECTCEM in modes:
+        if PrivateMode.SHOW_CURSOR.flag in modes:
             self.page.show_cursor = False
 
         # On "\e[?1049l", restore from alternate screen mode. "?47" and
@@ -1976,7 +1765,7 @@ class Screen:
         cursor_position_x = cursor_position.x
         cursor_position_y = cursor_position.y
 
-        in_irm = mo.IRM in self.mode
+        in_irm = AnsiMode.INSERT_REPLACE in self.mode
         char_cache = _CHAR_CACHE
         columns = self.columns
         wide_chars = self._wide_chars
@@ -2046,7 +1835,7 @@ class Screen:
                 edge = columns
 
             if char_width > 0 and cursor_position_x + char_width > edge:
-                if mo.DECAWM in self.mode:
+                if PrivateMode.AUTOWRAP.flag in self.mode:
                     # The moves below read the cursor from the screen,
                     # and this loop keeps it in a local. Write it back
                     # first, so that a carriage return finds the column
@@ -2433,12 +2222,12 @@ class Screen:
         # is, and nothing scrolls.
 
     def linefeed(self) -> None:
-        """Performs an index and, if :data:`~pyte.modes.LNM` is set, a
-        carriage return.
+        """Performs an index and, if `AnsiMode.LINE_FEED_NEW_LINE` is
+        set, a carriage return.
         """
         self.index()
 
-        if mo.LNM in self.mode:
+        if AnsiMode.LINE_FEED_NEW_LINE in self.mode:
             self.carriage_return()
 
     def next_line(self) -> None:
@@ -2579,7 +2368,7 @@ class Screen:
         Both need DECAWM: a terminal that does not wrap forward has
         nothing to unwrap. The wider mode wins when both are set.
         """
-        if mo.DECAWM not in self.mode:
+        if PrivateMode.AUTOWRAP.flag not in self.mode:
             return None
         if PrivateMode.REVERSE_WRAP_ANYWHERE.flag in self.mode:
             return PrivateMode.REVERSE_WRAP_ANYWHERE
@@ -2643,7 +2432,7 @@ class Screen:
                 self.g0_charset,
                 self.g1_charset,
                 self.charset,
-                mo.DECOM in self.mode,
+                PrivateMode.ORIGIN.flag in self.mode,
                 # DECAWM is not here. xterm does not bring the wrap
                 # back on a restore, and its own suite asks for that:
                 # a save with the wrap on, a reset, and a restore
@@ -2676,9 +2465,9 @@ class Screen:
             # way it was saved. Both ways: a save with the mode off
             # takes the mode off again.
             if savepoint.origin:
-                self.set_mode(mo.DECOM)
+                self.set_mode(PrivateMode.ORIGIN.flag)
             else:
-                self.reset_mode(mo.DECOM)
+                self.reset_mode(PrivateMode.ORIGIN.flag)
 
             # `line_offset` follows the cursor, so read it before the
             # cursor moves.
@@ -2697,7 +2486,7 @@ class Screen:
             # that a terminal starts with: the home position, no origin
             # mode and the character sets of the start. kitty does the
             # same. :todo: DECAWM?
-            self.reset_mode(mo.DECOM)
+            self.reset_mode(PrivateMode.ORIGIN.flag)
             self.g0_charset = cs.LAT1_MAP
             self.g1_charset = cs.LAT1_MAP
             self.charset = 0
@@ -2875,7 +2664,7 @@ class Screen:
         # the top scrolling margin.
         margins = self.margins
 
-        if margins is not None and mo.DECOM in self.mode:
+        if margins is not None and PrivateMode.ORIGIN.flag in self.mode:
             line = min(line + margins.top, margins.bottom)
 
         column = self._column_in_origin_mode(column)
@@ -2894,7 +2683,7 @@ class Screen:
         column is the column of the screen.
         """
         margins = self.horizontal_margins
-        if margins is None or mo.DECOM not in self.mode:
+        if margins is None or PrivateMode.ORIGIN.flag not in self.mode:
             return column
         return min(column + margins.left, margins.right)
 
@@ -2939,7 +2728,7 @@ class Screen:
         # the top scrolling margin.
         margins = self.margins
 
-        if mo.DECOM in self.mode and margins is not None:
+        if PrivateMode.ORIGIN.flag in self.mode and margins is not None:
             self.pt_cursor_position.y += margins.top
 
             # FIXME: should we also restrict the cursor to the scrolling
@@ -3514,7 +3303,7 @@ class Screen:
         ends before it starts is no rectangle, and the answer is None.
         """
         lines, columns = self.lines, self.columns
-        in_origin_mode = mo.DECOM in self.mode
+        in_origin_mode = PrivateMode.ORIGIN.flag in self.mode
 
         vertical = self.margins
         if in_origin_mode and vertical is not None:
@@ -3553,7 +3342,7 @@ class Screen:
         row = (top or 1) - 1
         column = (left or 1) - 1
 
-        if mo.DECOM in self.mode:
+        if PrivateMode.ORIGIN.flag in self.mode:
             vertical = self.margins
             if vertical is not None:
                 row += vertical.top
@@ -3802,12 +3591,12 @@ class Screen:
         """Ensure that current cursor position is within screen bounds.
 
         :param bool use_margins: when ``True`` or when
-                                 :data:`~pyte.modes.DECOM` is set,
+                                 `PrivateMode.ORIGIN` is set,
                                  cursor is bounded by top and and bottom
                                  margins, instead of ``[0; lines - 1]``.
         """
         margins = self.margins
-        if margins and (use_margins or mo.DECOM in self.mode):
+        if margins and (use_margins or PrivateMode.ORIGIN.flag in self.mode):
             top, bottom = margins
         else:
             top, bottom = 0, self.lines - 1
@@ -4257,7 +4046,9 @@ class Screen:
     )
 
     #: The same for the modes without a private marker.
-    _known_ansi_modes = frozenset([mo.IRM, mo.LNM])
+    _known_ansi_modes = frozenset(
+        [AnsiMode.INSERT_REPLACE, AnsiMode.LINE_FEED_NEW_LINE]
+    )
 
     #: The modes that a terminal knows about and never implements.
     #: DECRQM answers 4 for these, which reads as "permanently reset".
@@ -4772,7 +4563,7 @@ class Screen:
         # not named is a margin.
         first_row, last_row = 0, self.lines - 1
         first_column, last_column = 0, self.columns - 1
-        if mo.DECOM in self.mode:
+        if PrivateMode.ORIGIN.flag in self.mode:
             if self.margins is not None:
                 first_row, last_row = self.margins.top, self.margins.bottom
             if self.horizontal_margins is not None:

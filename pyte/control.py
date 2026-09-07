@@ -29,8 +29,8 @@ BS = "\x08"
 #: of the line if there is no earlier tab stop.
 HT = "\x09"
 
-#: *Linefeed*: Give a line feed, and, if :data:`pyte.modes.LNM` (new
-#: line mode) is set also a carriage return.
+#: *Linefeed*: Give a line feed, and, if `AnsiMode.LINE_FEED_NEW_LINE`
+#: is set, also a carriage return.
 LF = "\n"
 #: *Vertical tab*: Same as :data:`LF`.
 VT = "\x0b"

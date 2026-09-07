@@ -5,8 +5,7 @@ It keeps the text and the cursor, and puts the settings back. A program
 sends it when it starts and when it ends, so that the terminal that the
 next program finds is the one it knows.
 """
-from pyte import modes as mo
-
+from pyte.modes import AnsiMode, PrivateMode
 from pyte.screen import Screen
 from pyte.streams import Stream
 
@@ -49,20 +48,20 @@ LEFT_RIGHT_MODE = 69
 def test_origin_mode_goes_off():
     screen, stream, _answers = _screen()
     stream.feed("\x1b[2;4r\x1b[?6h\x1b[!p")
-    assert mo.DECOM not in screen.mode
+    assert PrivateMode.ORIGIN.flag not in screen.mode
 
 
 def test_insert_mode_goes_off():
     screen, stream, _answers = _screen()
     stream.feed("\x1b[4h\x1b[!p")
-    assert mo.IRM not in screen.mode
+    assert AnsiMode.INSERT_REPLACE not in screen.mode
 
 
 def test_autowrap_stays_on():
     "The DEC manuals turn it off. xterm keeps it on, and so do we."
     screen, stream, _answers = _screen()
     stream.feed("\x1b[?7l\x1b[!p")
-    assert mo.DECAWM in screen.mode
+    assert PrivateMode.AUTOWRAP.flag in screen.mode
 
 
 def test_the_cursor_stays_visible():

@@ -7,7 +7,8 @@ DECSLRM and DECSTBM, and the private marker says which is meant.
 """
 import pytest
 
-from pyte.screen import Screen, flag_of
+from pyte.modes import flag_of
+from pyte.screen import Screen
 from pyte.streams import Stream
 
 
