@@ -230,10 +230,13 @@ class Page:
         Nothing here writes. A row the buffer does not hold contributes
         no cells and ends the line before it, which is the same thing a
         row of blanks does.
+
+        The answer holds one line for every line the range starts, and
+        nothing after them.
         """
-        line = LogicalLine()
-        lines = [line]
-        cells = line.cells
+        lines: List[LogicalLine] = []
+        line: "LogicalLine | None" = None
+        cells: List[Cell] = []
         found = None
 
         # The cursor as two numbers, because the loop below runs once
@@ -243,6 +246,15 @@ class Page:
 
         data_buffer = self.data_buffer
         for number in range(first, last + 1):
+            if line is None:
+                # A row starts the line, and the end of a line does not.
+                # Making the next one at the end of this one leaves an
+                # empty line after the last row, which `_reflow` lays
+                # out as nothing but a reader prints as a blank line.
+                line = LogicalLine()
+                lines.append(line)
+                cells = line.cells
+
             row = data_buffer.get(number)
 
             if row is not None:
@@ -256,8 +268,6 @@ class Page:
                     cells.append(row[column])
 
             if not self.wrapped(number + 1):
-                line = LogicalLine()
-                lines.append(line)
-                cells = line.cells
+                line = None
 
         return lines, found
