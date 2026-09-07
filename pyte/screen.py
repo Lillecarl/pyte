@@ -4703,6 +4703,46 @@ class Screen:
     # rows, so the width those rows were laid out at never reaches it.
     # Lillecarl/pymux#135.
 
+    def _highest_row_the_buffer_holds(self) -> int:
+        """
+        The highest row number the buffer holds. It holds one.
+
+        **Not `highest_row`.** That one answers `max_y` at the least,
+        because a front end draws every row of the screen. This one
+        answers the buffer, which can stop below `max_y`: the cursor
+        moves down without writing, and an erase drops the rows it
+        clears. A reflow that starts above the buffer counts the absent
+        rows as blank lines, stops higher up than it should, and leaves
+        real rows at the old width. `tests/test_reflow_bounds.py`
+        catches it.
+
+        **It looks down instead of reading every key.** No row of the
+        buffer sits above the last row of the screen, and
+        `tests/test_the_top_of_the_buffer.py` is the proof of that
+        bound. So the search starts there and walks down the screen.
+
+        **The last row of the screen, and not `max_y`.** `max_y` is the
+        highest row that was ever written, and a screen that has not
+        filled up yet reaches further down than that: DECALN writes
+        every row of a fresh screen and leaves `max_y` at 0.
+
+        The search gives up under the screen, and `max` answers what is
+        left. A screen a program cleared holds no row at all, and the
+        gap down to the last row of the history is as deep as the
+        history. That fall back costs what this method cost before:
+        `max` walks every key, which at fifty thousand rows is 392
+        microseconds of a resize that takes 1,200.
+        Lillecarl/pymux#145.
+        """
+        data_buffer = self.page.data_buffer
+        floor = self.line_offset
+
+        for number in range(floor + self.lines - 1, floor - 1, -1):
+            if number in data_buffer:
+                return number
+
+        return max(data_buffer)
+
     def _first_row_to_lay_out(self, last: int) -> int:
         """
         The first row a reflow has to lay out again.
@@ -4801,14 +4841,7 @@ class Screen:
         # a program wrote. That is the screen and the lines that reach
         # it, and never the whole history: the cost of a reflow is the
         # size of the screen and not the depth of the scrollback.
-        # `highest_row` and not `max(data_buffer)`. The highest row of
-        # the buffer is inside the screen, so the answer is `max_y` and
-        # a look at the rows of a screen that has not filled up yet.
-        # Reading the buffer for it walks every key of the history,
-        # which this method exists to leave alone.
-        # `tests/test_the_top_of_the_buffer.py` is the proof of the
-        # bound it rests on. Lillecarl/pymux#145.
-        last = max(data_buffer)
+        last = self._highest_row_the_buffer_holds()
 
         # The cursor stands inside the range whether it stands on a
         # character or not. A cursor on a row nobody wrote is a cursor

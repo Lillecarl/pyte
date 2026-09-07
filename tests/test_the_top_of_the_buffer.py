@@ -64,6 +64,17 @@ def say_nothing_sits_above_the_screen(screen) -> None:
         % (screen.highest_row(), max(whole, screen.max_y), where)
     )
 
+    # The other answer that rests on the same bound. A reflow asks for
+    # the highest row the *buffer* holds, which can sit below `max_y`,
+    # and it also has to be what reading the whole buffer says.
+    # Lillecarl/pymux#145.
+    if buffer:
+        found = screen._highest_row_the_buffer_holds()
+        assert found == max(buffer), (
+            "the buffer top was read as %d and the whole buffer says %d (%s)"
+            % (found, max(buffer), where)
+        )
+
 
 @given(st.lists(a_chunk(), min_size=1, max_size=40))
 @settings(
