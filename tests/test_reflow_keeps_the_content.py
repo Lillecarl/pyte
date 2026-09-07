@@ -19,19 +19,12 @@ What it is not: a round trip. `_reflow` trims the erased cells off the
 end of a line on purpose (Lillecarl/pymux#56), so a buffer is not equal
 to itself across a resize. The content is.
 
-**The first resize is a warm-up, and that is a defect and not a
-choice.** A reflow reads the cell the cursor stands on, which makes it,
-so a cursor parked past the end of a line gives that line blanks
-nobody wrote. It happens once: the second reflow finds the cells
-already there and changes nothing. So these read the lines after one
-resize and hold every resize after that to them, which is idempotence,
-and idempotence is what a deferred reflow has to satisfy as well. The
-one-off is Lillecarl/pymux#143.
-
-`warm_up` moves the width and puts it back, because **a resize to the
-size the screen already has does nothing at all**: `Screen.resize`
-returns early when neither number changed, so it lays nothing out and
-warms nothing.
+**The very first resize counts.** These held the lines from after one
+resize for a while, because a reflow read the cell the cursor stood on
+and the read made it, so a cursor parked past the end of a line gave
+that line a blank nobody wrote. The cursor travels as an offset now
+and no read makes a cell, so the lines after the first resize are the
+lines before it. Lillecarl/pymux#143.
 """
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
@@ -118,22 +111,31 @@ def logical_lines(screen):
     )
 
 
-def warm_up(screen):
-    """
-    Lay the buffer out once, so that the blank a parked cursor makes
-    is already there. Lillecarl/pymux#143.
-
-    It moves the width and puts it back. A resize to the size the
-    screen already has returns early and lays out nothing.
-    """
-    width = screen.columns
-    screen.resize(screen.lines, width + 1)
-    screen.resize(screen.lines, width)
-
-
 #: The widths to resize through. Narrower than the screen so a line
 #: wraps, and wider so the rows a wrap made join up again.
 WIDTHS = st.lists(st.integers(4, 24), min_size=1, max_size=4)
+
+
+def test_a_cursor_waiting_to_wrap_invents_no_blank():
+    """
+    The example that said a reflow was making cells.
+
+    Four "text"s fill a row and start a second, a reverse index takes
+    the cursor back to the first, and a fifth "text" fills it. The
+    cursor waits to wrap: it stands at column ten of a ten column row,
+    on no character at all.
+
+    `_reflow` read that place to know what the cursor stood on, the
+    buffer made the cell, and the line came out of the resize one
+    space longer. Lillecarl/pymux#143.
+    """
+    screen = a_screen(columns=10, lines=6)
+    Stream(screen).feed("text" * 4 + "\x1bM" + "text")
+
+    before = logical_lines(screen)
+    screen.resize(6, 4)
+
+    assert logical_lines(screen) == before
 
 
 @given(st.lists(a_chunk(), min_size=1, max_size=40), WIDTHS)
@@ -150,7 +152,6 @@ def test_a_column_change_keeps_every_line(chunks, widths):
     screen = a_screen(columns=10, lines=6)
     Stream(screen).feed("".join(chunks))
 
-    warm_up(screen)
     before = logical_lines(screen)
     for width in widths:
         screen.resize(screen.lines, width)
@@ -171,7 +172,6 @@ def test_a_column_change_keeps_every_line_with_a_short_history(chunks, widths):
     screen = a_screen(columns=10, lines=6, history=5)
     Stream(screen).feed("".join(chunks))
 
-    warm_up(screen)
     before = logical_lines(screen)
     for width in widths:
         screen.resize(screen.lines, width)

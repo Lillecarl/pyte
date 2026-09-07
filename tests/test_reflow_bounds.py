@@ -27,7 +27,6 @@ from a_screen import a_screen
 from pyte.screen import Screen
 from pyte.streams import Stream
 
-from test_reflow_keeps_the_content import warm_up
 from test_row_versions import a_chunk
 
 
@@ -102,9 +101,6 @@ def test_the_screen_is_what_laying_out_everything_gives(chunks, widths):
 
     for screen in (bounded, eager):
         Stream(screen).feed(data)
-        # A reflow makes the cell the cursor stands on, so the first
-        # one is a warm-up. Lillecarl/pymux#143.
-        warm_up(screen)
 
     for width in widths:
         bounded.resize(bounded.lines, width)
@@ -133,7 +129,6 @@ def test_no_row_of_the_screen_is_wider_than_the_screen(chunks, widths):
     """
     screen = a_screen(columns=10, lines=6)
     Stream(screen).feed("".join(chunks))
-    warm_up(screen)
 
     for width in widths:
         screen.resize(screen.lines, width)
