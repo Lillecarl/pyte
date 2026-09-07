@@ -27,6 +27,11 @@ already there and changes nothing. So these read the lines after one
 resize and hold every resize after that to them, which is idempotence,
 and idempotence is what a deferred reflow has to satisfy as well. The
 one-off is Lillecarl/pymux#143.
+
+`warm_up` moves the width and puts it back, because **a resize to the
+size the screen already has does nothing at all**: `Screen.resize`
+returns early when neither number changed, so it lays nothing out and
+warms nothing.
 """
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
@@ -113,6 +118,19 @@ def logical_lines(screen):
     )
 
 
+def warm_up(screen):
+    """
+    Lay the buffer out once, so that the blank a parked cursor makes
+    is already there. Lillecarl/pymux#143.
+
+    It moves the width and puts it back. A resize to the size the
+    screen already has returns early and lays out nothing.
+    """
+    width = screen.columns
+    screen.resize(screen.lines, width + 1)
+    screen.resize(screen.lines, width)
+
+
 #: The widths to resize through. Narrower than the screen so a line
 #: wraps, and wider so the rows a wrap made join up again.
 WIDTHS = st.lists(st.integers(4, 24), min_size=1, max_size=4)
@@ -132,7 +150,7 @@ def test_a_column_change_keeps_every_line(chunks, widths):
     screen = a_screen(columns=10, lines=6)
     Stream(screen).feed("".join(chunks))
 
-    screen.resize(screen.lines, screen.columns)
+    warm_up(screen)
     before = logical_lines(screen)
     for width in widths:
         screen.resize(screen.lines, width)
@@ -153,7 +171,7 @@ def test_a_column_change_keeps_every_line_with_a_short_history(chunks, widths):
     screen = a_screen(columns=10, lines=6, history=5)
     Stream(screen).feed("".join(chunks))
 
-    screen.resize(screen.lines, screen.columns)
+    warm_up(screen)
     before = logical_lines(screen)
     for width in widths:
         screen.resize(screen.lines, width)
