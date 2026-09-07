@@ -63,16 +63,13 @@ def say_the_floor_holds(screen) -> None:
 
     assert not buffer or min(buffer) >= screen.history_floor
 
-    # A row that left the history takes with it every note the screen
-    # kept about it, or the notes grow with the session instead of with
-    # the history.
-    for what, rows in (
-        ("counts", screen.written_at),
-        ("wrap marks", screen.wrapped_lines),
-        ("line attributes", screen.line_attributes),
-    ):
-        left = sorted(row for row in rows if row < remove_above)
-        assert not left, "these %s should have gone: %s" % (what, left)
+    # A row that left the history takes its count with it, or
+    # `written_at` grows with the session instead of with the history.
+    # The wrap mark and the DEC line attribute need no check of their
+    # own: they ride on the row, so dropping the row drops them.
+    # Lillecarl/pymux#134.
+    counts = sorted(row for row in screen.written_at if row < remove_above)
+    assert not counts, "these counts should have gone: %s" % counts
 
 
 @given(st.lists(a_chunk(), min_size=1, max_size=40))
@@ -100,9 +97,14 @@ def test_the_buffer_stops_growing_at_the_limit():
 
 def test_the_notes_about_a_row_go_when_the_row_does():
     """
-    A wrap mark and a line attribute are kept by row number, and the
-    row numbers of a session never come back around. So a note that
-    outlives its row grows with the session and not with the history.
+    A wrap mark and a line attribute ride on the row, so a prune that
+    drops the row drops them with it.
+
+    They were two dictionaries keyed by row number once, and the row
+    numbers of a session never come back around, so a note outlived its
+    row and both grew with the session. Lillecarl/pymux#134 put them
+    where they cannot. This says the buffer really is written on, so the
+    test would have failed before that change.
     """
     screen = a_short_history()
     stream = Stream(screen)
@@ -116,8 +118,10 @@ def test_the_notes_about_a_row_go_when_the_row_does():
     )
     screen._remove_old_lines_from_history()
 
-    assert len(screen.wrapped_lines) <= LIMIT + LINES + 1
-    assert len(screen.line_attributes) <= LIMIT + LINES + 1
+    rows = screen.page.data_buffer.values()
+    assert any(line.wrapped for line in rows)
+    assert any(line.attribute is not None for line in rows)
+    assert len(screen.page.data_buffer) <= LIMIT + LINES + 1
     assert len(screen.written_at) <= LIMIT + LINES + 1
 
 

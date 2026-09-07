@@ -41,6 +41,11 @@ def at(screen):
     return screen.reported_column, screen.pt_cursor_position.y
 
 
+def _any_row_is_wrapped(screen) -> bool:
+    "Whether any row of the buffer says a wrap brought it into being."
+    return any(line.wrapped for line in screen.page.data_buffer.values())
+
+
 def test_a_backspace_in_the_first_column_stays_there(pane):
     screen, stream = pane
     stream.feed(AUTOWRAP + "\x1b[3;1H" + BACKSPACE)
@@ -112,9 +117,9 @@ def test_erasing_the_screen_forgets_that_a_line_wrapped(pane):
     # walks back over a line the typing never reached.
     screen, stream = pane
     stream.feed(AUTOWRAP + INLINE + "\x1b[1;1H" + "a" * (COLUMNS * 2))
-    assert screen.wrapped_lines
+    assert _any_row_is_wrapped(screen)
     stream.feed("\x1b[2J")
-    assert screen.wrapped_lines == set()
+    assert not _any_row_is_wrapped(screen)
     stream.feed("\x1b[3;3H" + BACKSPACE * 4)
     assert at(screen) == (0, 2)
 

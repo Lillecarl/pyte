@@ -829,7 +829,7 @@ class LineAttribute(NamedTuple):
 
     A VT100 draws a line at twice the width, at twice the height, or
     both. The attribute belongs to the line and not to a cell, so it
-    lives next to `wrapped_lines` and not in a `Cell`.
+    lives on the `Row` and not in a `Cell`.
 
     ptterm holds it and draws nothing: how wide a line looks is the
     renderer's decision, and a pane is not a whole line of the terminal
@@ -1021,6 +1021,44 @@ appearance_of: FastDictCache[
 PLAIN_APPEARANCE = appearance_of[PLAIN, "", ""]
 
 
+class Row(DefaultDict[int, Cell]):
+    """
+    One row of the buffer: its cells, and what is true of the row
+    itself rather than of any cell in it.
+
+    **A note about a row lives on the row.** Both of these used to be
+    dictionaries of their own, keyed by the row number. Two containers
+    that have to be kept in step by hand are two containers that go out
+    of step: a row that left the history took its cells and left both
+    notes behind, so they grew with the session; `_reflow` had to
+    rebuild both to match the new numbering; and `_move_rows` moved the
+    cells and left the wrap mark where it was. None of that can happen
+    to something the row carries. Lillecarl/pymux#134.
+
+    Every terminal that was read for Lillecarl/pymux#135 does the same:
+    Alacritty and kitty put the wrap mark on the last cell of the row,
+    WezTerm and Ghostty on the row.
+
+    A cell that nobody wrote is absent, so an untouched row costs one
+    dictionary and the default answers for every column.
+    """
+
+    __slots__ = ("wrapped", "attribute")
+
+    def __init__(self, default_char: Cell) -> None:
+        super().__init__(lambda: default_char)
+
+        #: Did a wrap bring this row into being? Then it holds the rest
+        #: of the row above and is not a line of its own, and a reflow
+        #: joins the two back together before it lays them out again.
+        self.wrapped: bool = False
+
+        #: The DEC line attribute of this row: twice as wide, or the
+        #: top or the bottom half of twice as high. `None` is a plain
+        #: row, which is nearly all of them.
+        self.attribute: LineAttribute | None = None
+
+
 class Page:
     """
     One screen of cells, and whether the cursor shows on it.
@@ -1044,8 +1082,8 @@ class Page:
         #: The cells, by row and then by column. A row that nobody
         #: wrote to is absent, and so is a column, so the cost of an
         #: empty screen is one dictionary.
-        self.data_buffer: DefaultDict[int, DefaultDict[int, Cell]] = defaultdict(
-            lambda: defaultdict(lambda: default_char)
+        self.data_buffer: DefaultDict[int, Row] = defaultdict(
+            lambda: Row(default_char)
         )
 
         #: Does the cursor show? DECTCEM ("?25") sets it, and it belongs
@@ -1106,17 +1144,11 @@ class Screen:
         # The wait to wrap belongs to the cursor, so it travels with it.
         "pending_wrap",
         "max_y",
-        # The continuation marks belong to the lines of one screen, so
-        # they travel with the buffer as well. Without this, a visit to
-        # the alternate screen joins two lines of the first screen on
-        # the next resize, because nothing says any more that a wrap
-        # started the second one.
-        "wrapped_lines",
-        # The DEC line attributes belong to the lines of one screen, so
-        # they travel with the buffer. libvterm holds one `lineinfos`
-        # per buffer for the same reason. Without this, a visit to the
-        # alternate screen leaves the first screen flat.
-        "line_attributes",
+        # The continuation mark and the DEC line attribute are not here.
+        # They belong to the lines of one screen, and they now ride on
+        # the rows themselves, so the buffer carries them across a
+        # switch on its own. Lillecarl/pymux#134.
+        #
         # The kitty keyboard protocol keeps separate flag stacks for the
         # main and the alternate screen. (Immutable tuple: safe to swap.)
         "kitty_flags_stack",
@@ -1682,23 +1714,6 @@ class Screen:
 
         self.data_buffer = self.page.data_buffer
         self.pt_cursor_position = CursorPosition(0, 0)
-        #: The rows that a wrap brought into being: a row that holds the
-        #: rest of the line above it, and not a line of its own. A
-        #: reflow joins each of these back onto the row above before it
-        #: lays the text out again.
-        #:
-        #: **A set, and not a list.** `_reflow` asks whether a row is in
-        #: here twice for every row of the buffer, and a draw asks once
-        #: for the row the cursor stands on. A list answers in a walk,
-        #: so a resize on a history of wrapped lines took eleven seconds
-        #: at fifty thousand rows. A list also grew: the same row can
-        #: wrap again and again, and each wrap wrote another entry.
-        #: Lillecarl/pymux#8.
-        self.wrapped_lines: Set[int] = set()
-
-        # The DEC line attributes, by line index, the same way
-        # `wrapped_lines` counts. A line that carries none is absent.
-        self.line_attributes: Dict[int, LineAttribute] = {}
 
         self._reset_rendition()
 
@@ -1890,6 +1905,39 @@ class Screen:
         #       from 0..14 have been used. This means 15 lines are used, and
         #       the first index should be 0.
         return max(0, self.max_y - self.lines + 1)
+
+    def is_wrapped(self, row: int) -> bool:
+        """
+        Whether a wrap brought this row into being, so that it holds
+        the rest of the row above it.
+
+        **It does not make the row.** The buffer answers a missing row
+        with a new one, and a question must not write: a row under
+        `history_floor` would come back from the dead, and a row above
+        the screen would move the top of the buffer.
+        """
+        line = self.page.data_buffer.get(row)
+        return line is not None and line.wrapped
+
+    def set_wrapped(self, row: int, wrapped: bool = True) -> None:
+        """
+        Say that a wrap did or did not bring this row into being.
+
+        Saying that one did makes the row, because the text that
+        wrapped onto it is about to be written there. Saying that one
+        did not leaves a row that is not there alone.
+        """
+        if wrapped:
+            self.page.data_buffer[row].wrapped = True
+            return
+        line = self.page.data_buffer.get(row)
+        if line is not None:
+            line.wrapped = False
+
+    def attribute_of(self, row: int) -> "LineAttribute | None":
+        "The DEC line attribute of a row, without making the row."
+        line = self.page.data_buffer.get(row)
+        return None if line is None else line.attribute
 
     def highest_row(self) -> int:
         """
@@ -2135,7 +2183,8 @@ class Screen:
         # line is not a thing a terminal can draw. libvterm clears them
         # here too, in the DECVSSM branch of its `src/state.c`.
         if PrivateMode.LEFT_RIGHT_MARGIN.flag in modes:
-            self.line_attributes = {}
+            for line in self.page.data_buffer.values():
+                line.attribute = None
 
         # DECCOLM takes the page to 132 columns, clears it and puts the
         # cursor home.
@@ -2490,7 +2539,7 @@ class Screen:
                     cursor_position_x = cursor_position.x
                     cursor_position_y = cursor_position.y
 
-                    self.wrapped_lines.add(cursor_position_y)
+                    self.set_wrapped(cursor_position_y)
                 else:
                     cursor_position_x = edge - char_width
 
@@ -2778,29 +2827,11 @@ class Screen:
             # whole lines, so it moves only when whole lines move.
             self.graphics.scroll(top + line_offset, bottom + line_offset, amount)
 
-            # A DEC line attribute belongs to the line, so it moves with
-            # the line. A rectangle carries cells and not lines, so a
-            # left or a right margin leaves the attributes alone.
-            self._move_line_attributes(top + line_offset, bottom + line_offset, amount)
-
-    def _move_line_attributes(self, top: int, bottom: int, amount: int) -> None:
-        """
-        Move the DEC line attributes of a region by `amount` rows.
-
-        The rows are counted from the top of the buffer, the way
-        `line_attributes` counts. A row that moves out of the region
-        loses its attribute, and a row that comes in has none.
-        """
-        moved = {
-            row: attribute
-            for row, attribute in self.line_attributes.items()
-            if not top <= row <= bottom
-        }
-        for row in range(top, bottom + 1):
-            origin = row + amount
-            if top <= origin <= bottom and origin in self.line_attributes:
-                moved[row] = self.line_attributes[origin]
-        self.line_attributes = moved
+            # The DEC line attribute and the continuation mark move with
+            # the line, because the line carries them. A rectangle
+            # carries cells and not lines, so a left or a right margin
+            # leaves them alone: the loop above copies columns then, and
+            # the rows themselves stay where they are.
 
     def _copy_columns(self, source, target, horizontal: HorizontalMargins) -> None:
         "Copy the cells between the margins from one row to another."
@@ -2844,26 +2875,23 @@ class Screen:
 
     def _forget(self, row: int) -> None:
         """
-        Drop everything this screen remembers about a row that has left
-        the history for good.
+        Drop the count of a row that has left the history for good.
 
-        Three things are kept per row beside its cells: the count at
-        which it last changed, whether a wrap brought it into being, and
-        the DEC line attribute it carries. **All three grew with the
-        session and not with the history**, because the row went and its
-        note stayed. A day at a shell leaves one for every row it ever
-        wrote. Lillecarl/pymux#8.
+        This is the one thing about a row that the row does not carry,
+        and it is outside on purpose: the *reader* owns it, and a pure
+        screen may not track its readers. Lillecarl/pymux#126. Whether a
+        wrap brought the row into being and what DEC line attribute it
+        has both ride on the row, so dropping the row drops them.
 
-        The count is taken away rather than moved on. **Nothing draws a
-        row that left the history**, so it needs no count to say that it
-        went: it is under `history_floor`, and a reader asks for the
-        rows the buffer holds. A pane draws the rows of the screen, and
-        copy mode draws from the lowest row of the buffer to the
-        highest.
+        The count is taken away rather than moved on, so `written_at`
+        stays as big as the history and not as big as the session.
+        **Nothing draws a row that left the history**, so it needs no
+        count to say that it went: it is under `history_floor`, and a
+        reader asks for the rows the buffer holds. A pane draws the rows
+        of the screen, and copy mode draws from the lowest row of the
+        buffer to the highest.
         """
         self.written_at.pop(row, None)
-        self.wrapped_lines.discard(row)
-        self.line_attributes.pop(row, None)
 
     def clear_history(self) -> None:
         """
@@ -2928,7 +2956,7 @@ class Screen:
             cursor_position = self.pt_cursor_position
             # The line above was full and the cursor moved on because
             # of it, which is what the wrap flag records.
-            self.wrapped_lines.add(cursor_position.y)
+            self.set_wrapped(cursor_position.y)
 
         # With a right margin the tab stops there, and not at the last
         # column. That holds even for a cursor that starts left of the
@@ -3063,7 +3091,7 @@ class Screen:
         top, bottom = self.margins or Margins(0, self.lines - 1)
         row = cursor_position.y - self.line_offset
         if row > top:
-            if not anywhere and cursor_position.y not in self.wrapped_lines:
+            if not anywhere and not self.is_wrapped(cursor_position.y):
                 return False  # The typing did not reach this line by wrapping.
             cursor_position.y -= 1
         elif anywhere:
@@ -3172,9 +3200,9 @@ class Screen:
             data_buffer.pop(row, None)
             return
 
-        line: DefaultDict[int, Cell] = defaultdict(
-            lambda: Cell(" ", PLAIN_APPEARANCE)
-        )
+        # A fresh row, so the continuation mark and the DEC line
+        # attribute of whatever stood here go with the cells.
+        line = Row(Cell(" ", PLAIN_APPEARANCE))
         erased = ErasedCell(" ", appearance)
         for column in range(self.columns):
             line[column] = erased
@@ -3825,7 +3853,7 @@ class Screen:
         if columns.stop < self.columns:
             return
         below = self.pt_cursor_position.y + 1
-        self.wrapped_lines.discard(below)
+        self.set_wrapped(below, False)
 
     def _repair_erased_line(self, line, columns: range) -> None:
         "Repair the two ends of a range of cells that an erase took away."
@@ -3911,16 +3939,13 @@ class Screen:
             # describes. A reflow then joins two lines that were never
             # one, and a reverse wrap walks back over a line the
             # typing never reached.
-            erased_rows = set(interval)
-            self.wrapped_lines -= erased_rows
-
             # A DEC line attribute goes with the line, so an erase that
             # takes the whole line takes the attribute too. libvterm
             # clears it over the same rows: `set_lineinfo` with FORCE in
             # each of the three ED branches of its `src/state.c`. The
             # row the cursor stands on keeps its attribute, because ED 0
             # and ED 1 only take a part of that row.
-            self._forget_line_attributes(erased_rows)
+            self._forget_line_notes(interval)
 
             self.touch_rows(interval)
 
@@ -3933,9 +3958,7 @@ class Screen:
                     )
                     continue
 
-                data_buffer[line] = defaultdict(
-                    lambda: Cell(" ", PLAIN_APPEARANCE)
-                )
+                data_buffer[line] = Row(Cell(" ", PLAIN_APPEARANCE))
                 if erased is not None:
                     # A background is set, so the erased cells take it.
                     row = data_buffer[line]
@@ -4307,12 +4330,19 @@ class Screen:
         self.cursor_position()
 
     def _set_line_attribute(self, attribute: LineAttribute) -> None:
-        "Give the line the cursor stands on a DEC line attribute."
+        """
+        Give the line the cursor stands on a DEC line attribute.
+
+        A plain line carries none, and a row the program never wrote to
+        is plain already, so taking one off does not make the row.
+        """
         row = self.pt_cursor_position.y
         if attribute == PLAIN_LINE:
-            self.line_attributes.pop(row, None)
-        else:
-            self.line_attributes[row] = attribute
+            line = self.page.data_buffer.get(row)
+            if line is not None:
+                line.attribute = None
+            return
+        self.page.data_buffer[row].attribute = attribute
 
     def single_width(self) -> None:
         """
@@ -4343,10 +4373,17 @@ class Screen:
         "DECDHL (\"ESC # 4\"): the bottom half of one."
         self._set_line_attribute(LineAttribute(True, DoubleHeight.BOTTOM))
 
-    def _forget_line_attributes(self, rows) -> None:
-        "Take the DEC line attributes off these lines."
+    def _forget_line_notes(self, rows) -> None:
+        """
+        Take the DEC line attribute and the continuation mark off these
+        lines, without making a line that is not there.
+        """
+        data_buffer = self.page.data_buffer
         for row in rows:
-            self.line_attributes.pop(row, None)
+            line = data_buffer.get(row)
+            if line is not None:
+                line.attribute = None
+                line.wrapped = False
 
     def select_graphic_rendition(self, *attrs_tuple: int, private: bool = False) -> None:
         """
@@ -5779,8 +5816,8 @@ class Screen:
         for row_index in range(min(data_buffer), max(data_buffer) + 1):
             row = data_buffer[row_index]
 
-            if row_index not in self.wrapped_lines:
-                attributes[-1] = self.line_attributes.get(row_index)
+            if not row.wrapped:
+                attributes[-1] = row.attribute
 
             row[0]  # Avoid calling max() on empty collection.
             for column_index in range(0, max(row) + 1):
@@ -5791,7 +5828,7 @@ class Screen:
                 line.append(row[column_index])
 
             # Create new line if the next line was not a wrapped line.
-            if row_index + 1 not in self.wrapped_lines:
+            if not self.is_wrapped(row_index + 1):
                 line = []
                 all_lines.append(line)
                 attributes.append(None)
@@ -5822,8 +5859,6 @@ class Screen:
         # Wrap lines again according to the screen width.
         new_row_index = offset
         new_column_index = 0
-        new_wrapped_lines = set()
-        new_line_attributes: Dict[int, LineAttribute] = {}
 
         for row_index, line in enumerate(all_lines):
             first_new_row = new_row_index
@@ -5832,7 +5867,7 @@ class Screen:
                 if new_column_index + char.width > width:
                     new_row_index += 1
                     new_column_index = 0
-                    new_wrapped_lines.add(new_row_index)
+                    new_data_buffer[new_row_index].wrapped = True
 
                 if cy == row_index and cx == column_index:
                     cy = new_row_index
@@ -5847,7 +5882,7 @@ class Screen:
             attribute = attributes[row_index]
             if attribute is not None:
                 for new_row in range(first_new_row, new_row_index + 1):
-                    new_line_attributes[new_row] = attribute
+                    new_data_buffer[new_row].attribute = attribute
 
             new_row_index += 1
             new_column_index = 0
@@ -5864,8 +5899,6 @@ class Screen:
         # A reflow numbers the rows again from zero, so the floor of the
         # old numbering says nothing about the new one.
         self.history_floor = 0
-        self.wrapped_lines = new_wrapped_lines
-        self.line_attributes = new_line_attributes
         self.touch_everything()
 
         cursor_position.y, cursor_position.x = cy, cx

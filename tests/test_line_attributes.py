@@ -28,7 +28,16 @@ def _screen(data, lines=LINES, columns=COLUMNS):
 
 def _attribute(screen, row: int):
     "The attribute of one row of the visible screen, or None."
-    return screen.line_attributes.get(screen.line_offset + row)
+    return screen.attribute_of(screen.line_offset + row)
+
+
+def _attributes(screen):
+    "Every row of the buffer that carries an attribute, by row number."
+    return {
+        row: line.attribute
+        for row, line in screen.page.data_buffer.items()
+        if line.attribute is not None
+    }
 
 
 def test_a_plain_line_carries_nothing():
@@ -71,7 +80,7 @@ def test_a_double_width_line_still_holds_every_column():
     screen = _screen("\x1b#6" + "a" * 8)
     assert screen.pt_cursor_position.y == screen.line_offset
     assert screen.reported_column == 8
-    assert screen.wrapped_lines == set()
+    assert not any(line.wrapped for line in screen.page.data_buffer.values())
 
 
 def test_the_attribute_does_not_spill_over_on_a_scroll():
@@ -96,7 +105,7 @@ def test_a_scrolling_region_carries_the_attribute():
 
 def test_a_scroll_drops_the_attribute_that_leaves_the_region():
     screen = _screen("\x1b[1;3r\x1b[1H\x1b#6aaa\x1b[S")
-    assert screen.line_attributes == {}
+    assert _attributes(screen) == {}
 
 
 def test_inserting_a_line_pushes_the_attribute_down():
@@ -120,11 +129,11 @@ def test_the_alternate_screen_gives_the_attribute_back():
 
 def test_the_alternate_screen_starts_with_no_attribute():
     screen = _screen("\x1b#6abc\x1b[?1049h")
-    assert screen.line_attributes == {}
+    assert _attributes(screen) == {}
 
 
 def test_erasing_the_screen_takes_every_attribute_off():
-    assert _screen("\x1b#6abcde\x1b[2J").line_attributes == {}
+    assert _attributes(_screen("\x1b#6abcde\x1b[2J")) == {}
 
 
 def test_erasing_below_leaves_the_line_of_the_cursor():
@@ -145,7 +154,7 @@ def test_left_and_right_margins_take_every_attribute_off():
     A margin cuts a line in two, and half a double width line is not a
     thing a terminal can draw. libvterm clears them on DECLRMM too.
     """
-    assert _screen("\x1b#6abcde\x1b[?69h").line_attributes == {}
+    assert _attributes(_screen("\x1b#6abcde\x1b[?69h")) == {}
 
 
 def test_a_resize_carries_the_attribute():
@@ -163,4 +172,4 @@ def test_a_resize_carries_the_attribute_onto_every_row_it_wraps_to():
 
 
 def test_a_reset_takes_every_attribute_off():
-    assert _screen("\x1b#6abcde\x1bc").line_attributes == {}
+    assert _attributes(_screen("\x1b#6abcde\x1bc")) == {}

@@ -26,7 +26,12 @@ def _screen(data, lines=4, columns=COLUMNS):
 
 def _continues(screen, row: int) -> bool:
     "Whether this row of the screen continues the one above it."
-    return screen.line_offset + row in screen.wrapped_lines
+    return screen.is_wrapped(screen.line_offset + row)
+
+
+def _any_row_is_wrapped(screen) -> bool:
+    "Whether any row of the buffer carries the mark."
+    return any(line.wrapped for line in screen.page.data_buffer.values())
 
 
 def test_text_that_spills_over_marks_the_line_below():
@@ -75,4 +80,4 @@ def test_the_alternate_screen_gives_the_mark_back():
 
 def test_the_alternate_screen_starts_with_no_mark():
     screen = _screen("a" * 12 + "\x1b[?1049h")
-    assert screen.wrapped_lines == set()
+    assert not _any_row_is_wrapped(screen)
