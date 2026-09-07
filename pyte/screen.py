@@ -100,6 +100,7 @@ from .osc import (
     MAX_POINTER_SHAPES,
     SPECIAL_COLOR_NAMES,
     Osc,
+    asks_for_the_clipboard,
     parse_hyperlink,
     parse_kitty_color_query,
     pointer_shape_name,
@@ -115,16 +116,6 @@ from .terminfo import (
 )
 
 __all__ = ("Screen",)
-
-
-def _reads_the_clipboard(param: str) -> bool:
-    """
-    True for a clipboard query, e.g. "OSC 52 ; c ; ?". The payload of
-    OSC 52 names a selection and then the data; a question mark asks
-    for the content instead of setting it.
-    """
-    _selection, _semicolon, data = param.partition(";")
-    return data.strip() == "?"
 
 
 def _four(params: Tuple[int, ...], first: int) -> Tuple[int, int, int, int]:
@@ -4598,7 +4589,7 @@ class Screen:
         copied somewhere else, and a program in a pane has no claim on
         that. Writing the clipboard is handed on; reading it is not.
         """
-        if code == "52" and _reads_the_clipboard(param):
+        if code == "52" and asks_for_the_clipboard(param):
             return
         self.osc_func(code, param)
 

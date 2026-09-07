@@ -32,6 +32,7 @@ __all__ = [
     "POINTER_SHAPE_ALIASES",
     "SPECIAL_COLOR_NAMES",
     "Osc",
+    "asks_for_the_clipboard",
     "parse_hyperlink",
     "parse_kitty_color_query",
     "pointer_shape_name",
@@ -75,6 +76,17 @@ FORWARDED_OSC = frozenset([
     Osc.CLIPBOARD,
     Osc.NOTIFICATION,
 ])
+
+
+def asks_for_the_clipboard(payload: str) -> bool:
+    """
+    True for a clipboard query, e.g. "OSC 52 ; c ; ?".
+
+    The payload of OSC 52 names a selection and then the data. A
+    question mark asks for the content instead of setting it.
+    """
+    _selection, _semicolon, data = payload.partition(";")
+    return data.strip() == "?"
 
 #: The codes of the dynamic colours, and the colour that each one
 #: names. "OSC 10" is the first of them, and a payload with several
