@@ -5,7 +5,7 @@ A program inside a pane draws a sixel image with a DCS string
 sequence: ``ESC P P1;P2;P3 q <body> ST``. The body carries the pixels
 in bands of six rows, one character per column per band.
 
-The decoder turns such a body into RGBA pixels. `BetterScreen.dcs`
+The decoder turns such a body into RGBA pixels. `Screen.dcs`
 stores the result in the graphics state of the pane, next to the images
 of the kitty graphics protocol, so that one renderer can draw both.
 

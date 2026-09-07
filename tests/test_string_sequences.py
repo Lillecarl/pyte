@@ -1,11 +1,14 @@
 """Tests for APC, DCS, SOS and PM string sequences."""
 import pyte
+from pyte.screen import Screen
+
+from a_screen import a_screen, display
 
 
 def display_for(data, columns=20, lines=5):
-    screen = pyte.Screen(columns, lines)
+    screen = a_screen(columns, lines)
     pyte.ByteStream(screen).feed(data)
-    return "\n".join(screen.display)
+    return "\n".join(display(screen))
 
 
 def test_apc_is_not_drawn():
@@ -17,10 +20,17 @@ def test_apc_is_not_drawn():
 
 
 def test_dcs_is_not_drawn():
-    # Sixel style DCS: must not corrupt the text.
+    # Sixel style DCS: the payload must never reach the cells as text.
+    #
+    # "before" and "after" are on two rows and not one, because this
+    # screen really draws a sixel: the image takes the cells it covers
+    # and leaves the cursor on the row below. Upstream's screen threw
+    # the sequence away, so the two ran together there.
     out = display_for(b"before\x1bP0;1;0q#0;2;0;0;0#0~~;;~~\x1b\\after")
-    assert "beforeafter" in out
+    assert "before" in out
+    assert "after" in out
     assert "0;1;0q" not in out
+    assert "#0;2;0;0;0" not in out
 
 
 def test_sos_and_pm_are_not_drawn():
@@ -29,9 +39,9 @@ def test_sos_and_pm_are_not_drawn():
 
 
 def test_apc_is_dispatched():
-    class Recorder(pyte.Screen):
-        def __init__(self, *args):
-            super().__init__(*args)
+    class Recorder(Screen):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
             self.sequences = []
 
         def apc(self, data):
@@ -40,7 +50,7 @@ def test_apc_is_dispatched():
         def dcs(self, data):
             self.sequences.append(("dcs", data))
 
-    screen = Recorder(20, 5)
+    screen = a_screen(20, 5, Recorder)
     pyte.ByteStream(screen).feed(b"\x1b_Ghello\x1b\\\x1bP1;2qworld\x1b\\")
     # The first payload byte is part of the data: for the kitty
     # graphics protocol it is the 'G' that starts the grammar.
@@ -48,53 +58,53 @@ def test_apc_is_dispatched():
 
 
 def test_fragmented_across_feeds():
-    class Recorder(pyte.Screen):
-        def __init__(self, *args):
-            super().__init__(*args)
+    class Recorder(Screen):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
             self.chunks = []
 
         def apc(self, data):
             self.chunks.append(data)
 
-    screen = Recorder(20, 5)
+    screen = a_screen(20, 5, Recorder)
     stream = pyte.ByteStream(screen)
     for part in (b"ab\x1b", b"_Gpay", b"load\x1b", b"\\cd"):
         stream.feed(part)
     assert screen.chunks == ["Gpayload"]
-    assert "abcd" in "\n".join(screen.display)
+    assert "abcd" in "\n".join(display(screen))
 
 
 def test_can_aborts_without_dispatch():
     received = []
 
-    class Recorder(pyte.Screen):
+    class Recorder(Screen):
         def apc(self, data):
             received.append(data)
 
-    screen = Recorder(20, 5)
+    screen = a_screen(20, 5, Recorder)
     pyte.ByteStream(screen).feed(b"\x1b_Gab\x18cd\x1b\\ef")
     assert received == []
-    assert "cdef" in "\n".join(screen.display)
+    assert "cdef" in "\n".join(display(screen))
 
 
 def test_esc_inside_payload_does_not_terminate():
     received = []
 
-    class Recorder(pyte.Screen):
+    class Recorder(Screen):
         def apc(self, data):
             received.append(data)
 
-    screen = Recorder(20, 5)
+    screen = a_screen(20, 5, Recorder)
     pyte.ByteStream(screen).feed(b"\x1b_Gab\x1bXcd\x1b\\after")
     assert received == ["Gab\x1bXcd"]
-    assert "after" in "\n".join(screen.display)
+    assert "after" in "\n".join(display(screen))
 
 
 def test_osc_still_works():
-    screen = pyte.Screen(20, 5)
+    screen = a_screen(20, 5)
     pyte.ByteStream(screen).feed(b"\x1b]2;my title\x07rest")
     assert screen.title == "my title"
-    assert "rest" in "\n".join(screen.display)
+    assert "rest" in "\n".join(display(screen))
 
 
 def test_legacy_sequences_untouched():
@@ -108,11 +118,11 @@ def test_escape_map_takes_precedence():
     # applies to finals that the escape table does not claim.
     received = []
 
-    class Recorder(pyte.Screen):
+    class Recorder(Screen):
         def prev_page(self):
             received.append("prev")
 
-    screen = Recorder(20, 5)
+    screen = a_screen(20, 5, Recorder)
     stream = pyte.Stream(screen)
     stream.escape["P"] = "prev_page"
     # The parser snapshots the escape table at construction time; force

@@ -3,6 +3,9 @@ import io
 import pytest
 
 import pyte
+from pyte.screen import Screen
+
+from a_screen import a_screen, display
 from pyte import charsets as cs, control as ctrl, escape as esc
 
 
@@ -35,7 +38,7 @@ class IntentionalException(Exception):
 
 def test_basic_sequences():
     for cmd, event in pyte.Stream.escape.items():
-        screen = pyte.Screen(80, 24)
+        screen = a_screen(80, 24)
         handler = counter()
         setattr(screen, event, handler)
 
@@ -51,7 +54,7 @@ def test_linefeed():
     # ``linefeed`` is somewhat an exception, there's three ways to
     # trigger it.
     handler = counter()
-    screen = pyte.Screen(80, 24)
+    screen = a_screen(80, 24)
     screen.linefeed = handler
 
     stream = pyte.Stream(screen)
@@ -61,11 +64,12 @@ def test_linefeed():
 
 def test_unknown_sequences():
     handler = argcheck()
-    screen = pyte.Screen(80, 24)
+    screen = a_screen(80, 24)
     screen.debug = handler
 
     stream = pyte.Stream(screen)
-    stream.feed(ctrl.CSI + "6;Z")
+    # "Y" names no sequence. "Z" did until the parser learned CBT.
+    stream.feed(ctrl.CSI + "6;Y")
     assert handler.count == 1
     assert handler.args == (6, 0)
     assert handler.kwargs == {}
@@ -75,7 +79,7 @@ def test_non_csi_sequences():
     for cmd, event in pyte.Stream.csi.items():
         # a) single param
         handler = argcheck()
-        screen = pyte.Screen(80, 24)
+        screen = a_screen(80, 24)
         setattr(screen, event, handler)
 
         stream = pyte.Stream(screen)
@@ -85,7 +89,7 @@ def test_non_csi_sequences():
 
         # b) multiple params, and starts with CSI, not ESC [
         handler = argcheck()
-        screen = pyte.Screen(80, 24)
+        screen = a_screen(80, 24)
         setattr(screen, event, handler)
 
         stream = pyte.Stream(screen)
@@ -96,7 +100,7 @@ def test_non_csi_sequences():
 
 def test_set_mode():
     bugger = counter()
-    screen = pyte.Screen(80, 24)
+    screen = a_screen(80, 24)
     handler = argcheck()
     screen.debug = bugger
     screen.set_mode = handler
@@ -111,7 +115,7 @@ def test_set_mode():
 
 def test_reset_mode():
     bugger = counter()
-    screen = pyte.Screen(80, 24)
+    screen = a_screen(80, 24)
     handler = argcheck()
     screen.debug = bugger
     screen.reset_mode = handler
@@ -125,7 +129,7 @@ def test_reset_mode():
 
 def test_missing_params():
     handler = argcheck()
-    screen = pyte.Screen(80, 24)
+    screen = a_screen(80, 24)
     screen.cursor_position = handler
 
     stream = pyte.Stream(screen)
@@ -139,7 +143,7 @@ def test_overflow():
     # functional key codes above 9999. (The screen clamps positions
     # itself where needed.)
     handler = argcheck()
-    screen = pyte.Screen(80, 24)
+    screen = a_screen(80, 24)
     screen.cursor_position = handler
 
     stream = pyte.Stream(screen)
@@ -152,7 +156,7 @@ def test_interrupt():
     bugger = argstore()
     handler = argcheck()
 
-    screen = pyte.Screen(80, 24)
+    screen = a_screen(80, 24)
     screen.draw = bugger
     screen.cursor_position = handler
 
@@ -167,7 +171,7 @@ def test_interrupt():
 
 def test_control_characters():
     handler = argcheck()
-    screen = pyte.Screen(80, 24)
+    screen = a_screen(80, 24)
     screen.cursor_position = handler
 
     stream = pyte.Stream(screen)
@@ -184,7 +188,7 @@ def test_control_characters():
     (ctrl.OSC_C1, ctrl.ST_C1)
 ])
 def test_set_title_icon_name(osc, st):
-    screen = pyte.Screen(80, 24)
+    screen = a_screen(80, 24)
     stream = pyte.Stream(screen)
 
     # a) set only icon name
@@ -205,17 +209,17 @@ def test_set_title_icon_name(osc, st):
 
     # e) test ➜ ('\xe2\x9e\x9c') symbol, that contains string terminator \x9c
     stream.feed("➜")
-    assert screen.buffer[0][0].data == "➜"
+    assert screen.page.data_buffer[0][0].char == "➜"
 
 
 def test_compatibility_api():
-    screen = pyte.Screen(80, 24)
+    screen = a_screen(80, 24)
     stream = pyte.Stream()
     stream.attach(screen)
 
     # All of the following shouldn't raise errors.
     # a) adding more than one listener
-    stream.attach(pyte.Screen(80, 24))
+    stream.attach(a_screen(80, 24))
 
     # b) feeding text
     stream.feed("привет")
@@ -226,14 +230,14 @@ def test_compatibility_api():
 
 def test_define_charset():
     # Should be a noop. All input is UTF8.
-    screen = pyte.Screen(3, 3)
+    screen = a_screen(3, 3)
     stream = pyte.Stream(screen)
     stream.feed(ctrl.ESC + "(B")
-    assert screen.display[0] == " " * 3
+    assert display(screen)[0] == " " * 3
 
 
 def test_non_utf8_shifts():
-    screen = pyte.Screen(3, 3)
+    screen = a_screen(3, 3)
     handler = screen.shift_in = screen.shift_out = argcheck()
     stream = pyte.Stream(screen)
     stream.use_utf8 = False
@@ -243,7 +247,7 @@ def test_non_utf8_shifts():
 
 
 def test_dollar_skip():
-    screen = pyte.Screen(3, 3)
+    screen = a_screen(3, 3)
     handler = screen.draw = argcheck()
     stream = pyte.Stream(screen)
     stream.feed(ctrl.CSI + "12$p")
@@ -259,13 +263,13 @@ def test_dollar_is_an_intermediate_byte():
     """
     calls = []
 
-    class Screen(pyte.Screen):
+    class Watching(Screen):
         def request_mode(self, *args, **kwargs):
             calls.append((args, kwargs))
 
     stream = pyte.Stream()
     stream.csi = dict(stream.csi, **{"$p": "request_mode"})
-    stream.attach(Screen(3, 3))
+    stream.attach(a_screen(3, 3, Watching))
 
     stream.feed(ctrl.CSI + "?2004$p")
     assert calls == [((2004,), {"private": True})]
@@ -277,7 +281,7 @@ def test_dollar_is_an_intermediate_byte():
 
 def test_an_unknown_dollar_sequence_is_not_drawn():
     "It reaches `debug`, like every other sequence without a handler."
-    screen = pyte.Screen(3, 3)
+    screen = a_screen(3, 3)
     handler = screen.draw = argcheck()
     stream = pyte.Stream(screen)
     stream.feed(ctrl.CSI + "1;2$z" + "ok")
@@ -289,7 +293,7 @@ def test_the_space_of_an_announcer_is_an_intermediate_byte():
     "ESC SP G" is S8C1T, and the space names it. A stream that does not
     read the space stops at it, and the "G" lands on the screen as text.
     """
-    screen = pyte.Screen(3, 3)
+    screen = a_screen(3, 3)
     handler = screen.draw = argcheck()
     stream = pyte.Stream(screen)
     stream.feed("\x1b G")
@@ -306,7 +310,7 @@ def test_an_unknown_announcer_is_eaten_as_well():
     "ESC SP L" names an ANSI conformance level. pyte does nothing with
     it, and the "L" still must not be drawn.
     """
-    screen = pyte.Screen(3, 3)
+    screen = a_screen(3, 3)
     handler = screen.draw = argcheck()
     stream = pyte.Stream(screen)
     stream.feed("\x1b L" + "ok")
@@ -337,7 +341,7 @@ def test_handler_exception():
         raise IntentionalException()
 
     handler = argcheck()
-    screen = pyte.Screen(80, 24)
+    screen = a_screen(80, 24)
     screen.set_mode = failing_handler
     screen.reset_mode = handler
 
@@ -350,7 +354,7 @@ def test_handler_exception():
 
 
 def test_byte_stream_feed():
-    screen = pyte.Screen(20, 1)
+    screen = a_screen(20, 1)
     screen.draw = handler = argcheck()
 
     stream = pyte.ByteStream(screen)
@@ -360,29 +364,29 @@ def test_byte_stream_feed():
 
 
 def test_byte_stream_define_charset_unknown():
-    screen = pyte.Screen(3, 3)
+    screen = a_screen(3, 3)
     stream = pyte.ByteStream(screen)
     stream.select_other_charset("@")
     default_g0_charset = screen.g0_charset
     # ``"Z"`` is not supported by Linux terminal, so expect a noop.
     assert "Z" not in cs.MAPS
     stream.feed((ctrl.ESC + "(Z").encode())
-    assert screen.display[0] == " " * 3
+    assert display(screen)[0] == " " * 3
     assert screen.g0_charset == default_g0_charset
 
 
 @pytest.mark.parametrize("charset,mapping", cs.MAPS.items())
 def test_byte_stream_define_charset(charset, mapping):
-    screen = pyte.Screen(3, 3)
+    screen = a_screen(3, 3)
     stream = pyte.ByteStream(screen)
     stream.select_other_charset("@")
     stream.feed((ctrl.ESC + "(" + charset).encode())
-    assert screen.display[0] == " " * 3
+    assert display(screen)[0] == " " * 3
     assert screen.g0_charset == mapping
 
 
 def test_byte_stream_select_other_charset():
-    stream = pyte.ByteStream(pyte.Screen(3, 3))
+    stream = pyte.ByteStream(a_screen(3, 3))
     assert stream.use_utf8  # on by default.
 
     # a) disable utf-8
@@ -403,29 +407,29 @@ def test_too_many_params():
     # not an error. xterm reads the ones it needs and drops the rest.
     # Before this, the extra parameter raised a TypeError and stopped
     # the whole stream.
-    screen = pyte.Screen(80, 24)
+    screen = a_screen(80, 24)
     stream = pyte.Stream(screen)
     stream.feed(ctrl.CSI + "3;9;9" + esc.CHA)  # CHA takes one parameter.
-    assert screen.cursor.x == 2
+    assert screen.pt_cursor_position.x == 2
 
     stream.feed("ok")
-    assert screen.display[0].strip() == "ok"
+    assert display(screen)[0].strip() == "ok"
 
 
 def test_a_private_marker_on_a_command_that_does_not_take_one():
     # "CSI ? 5 G" names no private command. The marker is dropped and
     # the command runs, rather than raising a TypeError.
-    screen = pyte.Screen(80, 24)
+    screen = a_screen(80, 24)
     stream = pyte.Stream(screen)
     stream.feed(ctrl.CSI + "?5" + esc.CHA)
-    assert screen.cursor.x == 4
+    assert screen.pt_cursor_position.x == 4
 
 
 def test_define_charset_in_utf8_mode():
     # "ESC ( 0" names the line drawing set of the DEC terminals, which
     # is how ncurses draws a box. xterm and kitty both read it in UTF-8
     # mode, and pyte dropped it there, so a box showed letters.
-    screen = pyte.Screen(3, 3)
+    screen = a_screen(3, 3)
     handler = screen.define_charset = argcheck()
     stream = pyte.Stream(screen)
     stream.feed(ctrl.ESC + "(0")
@@ -436,7 +440,7 @@ def test_define_charset_in_utf8_mode():
 
 def test_shifts_in_utf8_mode():
     # The same holds for shift in and shift out, which pick G0 and G1.
-    screen = pyte.Screen(3, 3)
+    screen = a_screen(3, 3)
     handler = screen.shift_in = screen.shift_out = argcheck()
     stream = pyte.Stream(screen)
     stream.feed(ctrl.SI)
@@ -449,16 +453,16 @@ def test_every_intermediate_byte_belongs_to_the_sequence():
     # 0x2f. Reading one of them as the final byte ends the sequence
     # there, and the real final byte lands on the screen as text.
     # "CSI Ps ' }" is DECIC, which pyte does not act on.
-    screen = pyte.Screen(3, 3)
+    screen = a_screen(3, 3)
     stream = pyte.Stream(screen)
     stream.feed(ctrl.CSI + "2'}hi")
-    assert screen.display[0] == "hi "
+    assert display(screen)[0] == "hi "
 
 
 def test_hpa_reads_the_backquote():
     # The final byte of HPA is the backquote. The apostrophe is an
     # intermediate byte and names no command of its own.
-    screen = pyte.Screen(80, 24)
+    screen = a_screen(80, 24)
     stream = pyte.Stream(screen)
     stream.feed(ctrl.CSI + "5`")
-    assert screen.cursor.x == 4
+    assert screen.pt_cursor_position.x == 4

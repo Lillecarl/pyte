@@ -1,5 +1,5 @@
 """
-The terminfo entry that describes a pane.
+The terminfo entry that describes this screen.
 
 A program has two ways to learn what a terminal can do. It can ask,
 which `screen.report_capabilities` answers, or it can read the
@@ -20,7 +20,7 @@ parent in, so what comes out stands on its own.
 """
 import sys
 
-from .screen import CAPABILITIES, TERMINAL_NAME
+from .screen import CAPABILITIES, TERMINAL_ALIAS, TERMINAL_NAME
 
 __all__ = ["PARENT", "terminfo_source"]
 
@@ -55,7 +55,10 @@ def terminfo_source(name: str = TERMINAL_NAME, parent: str = PARENT) -> str:
         else:
             strings.append("%s=%s," % (capability, value))
 
-    lines = ["%s|%s terminal multiplexer," % (name, name)]
+    # The first field is the name, the ones after it are aliases that
+    # `tic` links to the same entry, and the last is the description a
+    # person reads. So `TERM=pyte` finds this as well.
+    lines = ["%s|%s|the pyte terminal emulator," % (name, TERMINAL_ALIAS)]
     lines.extend("\t" + line for line in booleans + numbers + strings)
     lines.append("\tuse=%s," % parent)
     return "\n".join(lines) + "\n"

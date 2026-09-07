@@ -2,7 +2,7 @@
 Key data translation for the kitty keyboard protocol.
 
 The process running inside a pane can request the kitty keyboard
-protocol (pushing flags with "CSI > flags u", tracked by BetterScreen).
+protocol (pushing flags with "CSI > flags u", tracked by Screen).
 The terminal that feeds us key data (the multiplexer client of pymux,
 or any other prompt_toolkit application) can send keys in the legacy
 encoding, in the kitty CSI u encoding, or a mix of both. This module
@@ -59,7 +59,7 @@ _SHIFT = 1
 _ALT = 2
 _CTRL = 4
 
-# Keyboard protocol flags. (BetterScreen.kitty_keyboard_flags.)
+# Keyboard protocol flags. (Screen.kitty_keyboard_flags.)
 _DISAMBIGUATE = 0b1
 _REPORT_EVENT_TYPES = 0b10
 _REPORT_ALTERNATE_KEYS = 0b100
@@ -478,7 +478,7 @@ def translate_key_data(
     down and came up, and only the time between the two is lost. That
     is what a pane asked for, and no terminal can do better than the
     keyboard it has. Without it, the pane hears that it has no event
-    types (see `BetterScreen.deliverable_kitty_keyboard_flags`) and
+    types (see `Screen.deliverable_kitty_keyboard_flags`) and
     reads presses only.
     """
     # The release of a key that the terminal never reports coming up.

@@ -15,10 +15,8 @@ neither one may appear here.
 back where it started, with nothing to say so. The import that breaks a
 layer fails here instead.
 
-The modules that came from ptterm are the ones the rules apply to.
-`screens.py`, `streams.py`, `__init__.py` and `__main__.py` are what
-upstream pyte left: the parser is still used, and the rest is on its way
-out.
+Everything that parses or holds is held to the rules. The disassembler
+is not: it is a program, it writes to a file, and `TOOLS` names it.
 """
 import ast
 from pathlib import Path
@@ -38,7 +36,6 @@ PURE = {
     "colors",
     "control",
     "escape",
-    "graphics",
     "images",
     "kitty_keys",
     "modes",
@@ -46,20 +43,19 @@ PURE = {
     "placeholders",
     "png",
     "screen",
+    "sequences",
     "sixel",
-    "stream",
     "streams",
     "terminfo",
     "xcms",
 }
 
-#: What upstream pyte left that is not held to the rules yet.
+#: The disassembler, which is a program and not a layer.
 #:
-#: `screens.py` still carries the `Screen` that nothing in this
-#: collection runs, and the `DebugScreen` that writes a disassembly to a
-#: file. `__main__.py` is the command line around that disassembler, so
-#: it reads standard input. Both go, and neither is a layer.
-UPSTREAM = {"__init__", "__main__", "screens"}
+#: `debug.py` writes a JSON line per parsed event, so it holds a file
+#: and imports `os`. `__main__.py` is the command line around it, so it
+#: reads standard input. `__init__.py` wires the two together.
+TOOLS = {"__init__", "__main__", "debug"}
 
 #: What the pure layer may take from outside: data, arithmetic and
 #: tables.
@@ -152,9 +148,9 @@ def test_every_module_has_a_layer():
     A new module has to say which side it is on, here, before anything
     else can hold it to a rule.
     """
-    unplaced = sorted(name for name in MODULES if name not in PURE | UPSTREAM)
+    unplaced = sorted(name for name in MODULES if name not in PURE | TOOLS)
     assert unplaced == [], (
-        "these modules are in no layer: add each one to PURE or UPSTREAM "
+        "these modules are in no layer: add each one to PURE or TOOLS "
         "in this file"
     )
 
@@ -200,16 +196,14 @@ def test_the_pure_layer_does_no_input_or_output(name):
 
 
 @pytest.mark.parametrize("name", sorted(PURE))
-def test_the_pure_layer_reaches_nothing_upstream_left(name):
+def test_the_pure_layer_reaches_no_tool(name):
     """
-    `screens.py` holds a `Screen` that nothing runs and a `DebugScreen`
-    that writes to a file. The one thing the new screen still takes from
-    it is `Margins`, a pair of numbers.
+    The disassembler holds a file. A module that parses or holds may not
+    reach one, which is the same rule as the one about `os`, said from
+    the inside.
     """
     _outside, inside = _imports(MODULES[name])
-    assert inside <= PURE | {"screens"}, (
-        "%s imports %s" % (name, sorted(inside - PURE - {"screens"}))
-    )
+    assert inside <= PURE, "%s imports %s" % (name, sorted(inside - PURE))
 
 
 def test_the_reading_sees_an_import_where_there_is_one():

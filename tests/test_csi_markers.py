@@ -31,37 +31,47 @@ def feed(sequence):
 
 
 def test_kitty_push():
-    assert feed("\x1b[>1u") == [("debug", (1,), {"private": ">"})]
+    assert feed("\x1b[>1u") == [
+        ("report_kitty_keyboard", (1,), {"private": ">"})]
 
 
 def test_kitty_push_without_flags():
-    assert feed("\x1b[>u") == [("debug", (0,), {"private": ">"})]
+    assert feed("\x1b[>u") == [
+        ("report_kitty_keyboard", (0,), {"private": ">"})]
 
 
 def test_kitty_pop():
-    assert feed("\x1b[<u") == [("debug", (0,), {"private": "<"})]
-    assert feed("\x1b[<2u") == [("debug", (2,), {"private": "<"})]
+    assert feed("\x1b[<u") == [
+        ("report_kitty_keyboard", (0,), {"private": "<"})]
+    assert feed("\x1b[<2u") == [
+        ("report_kitty_keyboard", (2,), {"private": "<"})]
 
 
 def test_kitty_set_flags():
-    assert feed("\x1b[=1;1u") == [("debug", (1, 1), {"private": "="})]
-    assert feed("\x1b[=1;2u") == [("debug", (1, 2), {"private": "="})]
+    assert feed("\x1b[=1;1u") == [
+        ("report_kitty_keyboard", (1, 1), {"private": "="})]
+    assert feed("\x1b[=1;2u") == [
+        ("report_kitty_keyboard", (1, 2), {"private": "="})]
 
 
 def test_kitty_query():
-    assert feed("\x1b[?u") == [("debug", (0,), {"private": True})]
+    assert feed("\x1b[?u") == [
+        ("report_kitty_keyboard", (0,), {"private": True})]
 
 
 def test_subparameters():
     # Alternate key codes.
-    assert feed("\x1b[97:65;2u") == [("debug", ((97, 65), 2), {})]
+    assert feed("\x1b[97:65;2u") == [
+        ("report_kitty_keyboard", ((97, 65), 2), {})]
     # Event types.
-    assert feed("\x1b[97;1:3u") == [("debug", (97, (1, 3)), {})]
+    assert feed("\x1b[97;1:3u") == [
+        ("report_kitty_keyboard", (97, (1, 3)), {})]
 
 
 def test_large_parameters():
     # Functional key codes of the kitty keyboard protocol are above 9999.
-    assert feed("\x1b[57443u") == [("debug", (57443,), {})]
+    assert feed("\x1b[57443u") == [
+        ("report_kitty_keyboard", (57443,), {})]
 
 
 def test_private_device_status_report():
@@ -88,12 +98,12 @@ def test_a_plain_final_byte_keeps_its_handler():
 def test_an_intermediate_byte_names_another_sequence():
     # "CSI Ps SP D" is kitty's unscroll, not CUB. The intermediate byte
     # used to be dropped, so the two ran the same handler.
-    assert feed("\x1b[3 D") == [("debug", (3,), {})]
+    assert feed("\x1b[3 D") == [("unscroll", (3,), {})]
 
 
 def test_the_cursor_style_sequence_is_not_a_plain_one():
     # "CSI Ps SP q" is DECSCUSR.
-    assert feed("\x1b[2 q") == [("debug", (2,), {})]
+    assert feed("\x1b[2 q") == [("set_cursor_style", (2,), {})]
 
 
 def test_a_custom_map_can_take_an_intermediate_sequence():
@@ -106,4 +116,4 @@ def test_a_custom_map_can_take_an_intermediate_sequence():
 
 
 def test_an_intermediate_byte_keeps_the_private_marker():
-    assert feed("\x1b[?3 D") == [("debug", (3,), {"private": True})]
+    assert feed("\x1b[?3 D") == [("unscroll", (3,), {"private": True})]

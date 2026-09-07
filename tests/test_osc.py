@@ -6,6 +6,9 @@ character turned "OSC 11" into "OSC 1", so every code above nine ran
 the wrong handler.
 """
 import pyte
+from pyte.screen import Screen
+
+from a_screen import a_screen, display
 
 
 class Recorder:
@@ -96,6 +99,6 @@ def test_the_legacy_palette_codes_are_skipped():
 
 
 def test_a_plain_screen_ignores_an_unknown_sequence():
-    screen = pyte.Screen(20, 2)
+    screen = a_screen(20, 2)
     pyte.Stream(screen).feed("\x1b]11;?\x07hi")
-    assert screen.display[0].strip() == "hi"
+    assert display(screen)[0].strip() == "hi"

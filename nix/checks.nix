@@ -23,6 +23,15 @@ let
     pytest
   ]);
 
+  # Narrow a run to one file or one test while hunting:
+  #
+  #     PYTE_TESTS=tests/test_stream.py nix build --file . checks.pyte-unit
+  selection =
+    let
+      value = builtins.getEnv "PYTE_TESTS";
+    in
+    if value == "" then "tests" else value;
+
   prepare = ''
     cp -r ${testSources}/tests .
     chmod -R +w .
@@ -35,6 +44,7 @@ in
   unit = suite {
     name = "pyte-unit";
     inputs = [ pythonWithTests ];
+    env = { inherit selection; };
     setup = prepare;
-  } "python -m pytest tests -q -p no:cacheprovider";
+  } "python -m pytest $selection -q -p no:cacheprovider";
 }

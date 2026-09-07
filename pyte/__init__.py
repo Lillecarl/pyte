@@ -2,14 +2,28 @@
     pyte
     ~~~~
 
-    `pyte` implements a mix of VT100, VT220 and VT520 specification,
-    and aims to support most of the `TERM=linux` functionality.
+    A terminal emulator, without a terminal. Two halves:
+    :class:`~pyte.streams.Stream` parses what a program wrote and
+    dispatches an event for each command, and
+    :class:`~pyte.screen.Screen` keeps the cells that those
+    events draw.
 
-    Two classes: :class:`~pyte.streams.Stream`, which parses the
-    command stream and dispatches events for commands, and
-    :class:`~pyte.screens.Screen` which, when used with a stream
-    maintains a buffer of strings representing the screen of a
-    terminal.
+    **It answers as a VT520 and honours DECSCL down to a VT100.**
+    `ConformanceLevel` in `screen.py` names the five, and the private
+    modes a later terminal brought go away when a program asks for an
+    earlier one: the left and right margin arrived on the VT400, and
+    DECNCSM on the VT500. DA2 names the VT520 family. Nothing between
+    VT100 and VT520 is skipped, and esctest2's `DECSCLTests` is what
+    says so.
+
+    On top of that are the things no DEC terminal had: 256 colours,
+    truecolour, the kitty keyboard and graphics protocols, sixels,
+    hyperlinks, and the underline shapes.
+
+    **It opens nothing and draws nothing.** A cell holds an
+    `Appearance`, which is a model and not a spelling, so a renderer
+    decides how to draw one: `ptterm` does it with prompt_toolkit and
+    `txterm` with Rich. `tests/test_the_layers.py` holds the line.
 
     .. warning:: From ``xterm/main.c`` "If you think you know what all
                  of this code is doing, you are probably very mistaken.
@@ -23,11 +37,11 @@
 """
 __version__ = "0.8.3.dev"
 
-__all__ = ("Screen", "DiffScreen", "HistoryScreen", "DebugScreen",
-           "Stream", "ByteStream")
+__all__ = ("Screen", "Stream", "ByteStream", "DebugScreen")
 
-from .screens import Screen, DiffScreen, HistoryScreen, DebugScreen
-from .streams import Stream, ByteStream
+from .debug import DebugScreen
+from .screen import Screen
+from .streams import ByteStream, Stream
 
 
 if __debug__:

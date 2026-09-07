@@ -146,7 +146,7 @@ class GraphicsState:
     """
     The images and placements of one screen. (The main and the
     alternate screen each have their own instance; see
-    `BetterScreen.swap_variables`.)
+    `Screen.swap_variables`.)
     """
 
     def __init__(self) -> None:
@@ -710,8 +710,8 @@ class GraphicsState:
         self._pending = None
 
     # Cell helpers. These touch the data buffer of the surrounding
-    # BetterScreen. Deleting a cell key makes the cell blank, the same
-    # way that BetterScreen erases text.
+    # Screen. Deleting a cell key makes the cell blank, the same
+    # way that Screen erases text.
 
     def _clear_cells(self, screen, x: int, y: int, columns: int, rows: int) -> None:
         data_buffer = screen.page.data_buffer

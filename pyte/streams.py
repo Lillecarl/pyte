@@ -6,11 +6,12 @@
     features; for starters, here's a quick example of how streams are
     typically used:
 
-    >>> import pyte
-    >>> screen = pyte.Screen(80, 24)
-    >>> stream = pyte.Stream(screen)
+    >>> from pyte.screen import Screen
+    >>> from pyte.streams import Stream
+    >>> screen = Screen(24, 80, write_process_input=lambda data: None)
+    >>> stream = Stream(screen)
     >>> stream.feed("\x1b[5B")  # Move the cursor down 5 rows.
-    >>> screen.cursor.y
+    >>> screen.pt_cursor_position.y
     5
 
     :copyright: (c) 2011-2012 by Selectel.
@@ -29,11 +30,12 @@ from collections import defaultdict
 from typing import TYPE_CHECKING
 
 from . import control as ctrl, escape as esc
+from .sequences import Csi, Escape, Sharp
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Mapping
     from typing import Any
-    from .screens import Screen
+    from .screen import Screen as Screen
 
     ParserGenerator = Generator[bool | None, str, None]
 
@@ -84,7 +86,7 @@ class Stream:
     """A stream is a state machine that parses a stream of bytes and
     dispatches events based on what it sees.
 
-    :param pyte.screens.Screen screen: a screen to dispatch events to.
+    :param pyte.screen.Screen screen: a screen to dispatch events to.
     :param bool strict: check if a given screen implements all required
                         events.
 
@@ -130,11 +132,24 @@ class Stream:
         esc.HTS: "set_tab_stop",
         esc.DECSC: "save_cursor",
         esc.DECRC: "restore_cursor",
+        # The ones after the VT220. `sequences.py` names them.
+        Escape.NEL: "next_line",
+        Escape.DECBI: "back_index",
+        Escape.DECFI: "forward_index",
+        Escape.SPA: "start_protected_area",
+        Escape.EPA: "end_protected_area",
+        Escape.DECID: "report_device_attributes",
     }
 
     #: "sharp" escape sequences -- ``ESC # <N>``.
     sharp = {
         esc.DECALN: "alignment_display",
+        # The DEC line attributes of a VT100, which belong to a line
+        # and not to a cell.
+        Sharp.DECDHL_TOP: "double_height_top",
+        Sharp.DECDHL_BOTTOM: "double_height_bottom",
+        Sharp.DECSWL: "single_width",
+        Sharp.DECDWL: "double_width",
     }
 
     #: "space" escape sequences -- ``ESC SP <N>``.
@@ -177,7 +192,42 @@ class Stream:
         esc.SGR: "select_graphic_rendition",
         esc.DSR: "report_device_status",
         esc.DECSTBM: "set_margins",
-        esc.HPA: "cursor_to_column"
+        esc.HPA: "cursor_to_column",
+        # The rest of what a VT400, a VT500, xterm and kitty send.
+        # `sequences.py` names them, and a key here can carry the
+        # intermediate bytes as well as the final one.
+        Csi.CBT: "cursor_to_previous_tab",
+        Csi.CHT: "cursor_to_next_tab",
+        Csi.DECCRA: "copy_rectangle",
+        Csi.DECDC: "delete_columns",
+        Csi.DECERA: "erase_rectangle",
+        Csi.DECFRA: "fill_rectangle",
+        Csi.DECIC: "insert_columns",
+        Csi.DECRQCRA: "report_checksum",
+        Csi.DECRQM: "report_mode",
+        Csi.DECSCA: "set_character_protection",
+        Csi.DECSACE: "set_attribute_extent",
+        Csi.DECSASD: "set_active_display",
+        Csi.DECSCL: "set_conformance_level",
+        Csi.DECSCUSR: "set_cursor_style",
+        Csi.DECSERA: "selective_erase_rectangle",
+        Csi.DECSNLS: "set_lines_per_screen",
+        Csi.DECSSDT: "set_status_line_type",
+        Csi.DECSLRM: "set_left_right_margins",
+        Csi.DECSTR: "soft_reset",
+        Csi.HPA: "cursor_to_absolute_column",
+        # HPB and VPB move the way CUB and CUU move, so they go to the
+        # same handlers. libvterm serves them from the same two lines
+        # of arithmetic as well.
+        Csi.HPB: "cursor_back",
+        Csi.VPB: "cursor_up",
+        Csi.REP: "repeat_last_character",
+        Csi.SD: "scroll_down",
+        Csi.SU: "scroll_up",
+        Csi.KITTY_KEYBOARD: "report_kitty_keyboard",
+        Csi.KITTY_UNSCROLL: "unscroll",
+        Csi.XTVERSION: "report_version",
+        Csi.XTWINOPS: "report_window",
     }
 
     #: A set of all events dispatched by the stream.
@@ -209,7 +259,7 @@ class Stream:
     def attach(self, screen: Screen) -> None:
         """Adds a given screen to the listener queue.
 
-        :param pyte.screens.Screen screen: a screen to attach to.
+        :param pyte.screen.Screen screen: a screen to attach to.
         """
         if self.listener is not None:
             warnings.warn("As of version 0.6.0 the listener queue is "
@@ -230,7 +280,7 @@ class Stream:
         """Remove a given screen from the listener queue and fails
         silently if it's not attached.
 
-        :param pyte.screens.Screen screen: a screen to detach.
+        :param pyte.screen.Screen screen: a screen to detach.
         """
         if screen is self.listener:
             self.listener = None

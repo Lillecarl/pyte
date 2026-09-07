@@ -9,9 +9,8 @@ the same object, and neither reads a word the other wrote.
 
 That is why this file is here and not in a widget. Lillecarl/pymux#11.
 
-It replaces the `Screen` of upstream pyte, which is still in
-`screens.py` and which nothing in this collection runs. What is
-different:
+It replaces the `Screen` of upstream pyte, which is gone. What was
+different, and is now simply what this package does:
     - The cells live in a `Page`, one per screen, so a swap to the
       alternate screen carries the cells and the cursor together.
     - 256 colours, true colour, and colours a program names itself.
@@ -31,7 +30,6 @@ from .images import (
     ASSUMED_CELL_WIDTH,
     GraphicsState,
 )
-from .screens import Margins
 from . import kitty_keys
 from .cache import FastDictCache
 from .colors import (
@@ -60,12 +58,12 @@ from .osc import (
 from .placeholders import PlaceholderRun, merge_runs, runs_in_line
 from .sixel import decode_sixel
 
-__all__ = ("BetterScreen",)
+__all__ = ("Screen",)
 
 
 #: OSC sequences that a pane cannot answer by itself. They ask the
 #: terminal of the user for the clipboard (52), a desktop notification
-#: (99) or the shape of the pointer (22). `BetterScreen.osc_func`
+#: (99) or the shape of the pointer (22). `Screen.osc_func`
 #: receives them; a ptterm without such a function consumes them.
 class Osc(StrEnum):
     """
@@ -556,9 +554,47 @@ class TitlePart(IntEnum):
     ICON = 1
     WINDOW = 2
 
-#: The name of the terminfo entry that describes a pane. A program
-#: reads it with the "TN" capability.
-TERMINAL_NAME = "pymux"
+#: The name of the terminfo entry that describes this screen. A program
+#: reads it with the "TN" capability, and it is what belongs in `TERM`.
+#:
+#: **It names the screen and not an embedder.** It was "pymux" while
+#: this code lived inside the multiplexer, and that was already wrong:
+#: what the entry describes is what the screen below draws, which is the
+#: same whether pymux arranged the pane, a prompt_toolkit widget holds
+#: it, or a Textual one does.
+#:
+#: **"256color" is deliberately not in this name**, and the pictures of
+#: a real terminal are what says so.
+#:
+#: tmux and screen both put it in theirs, and the habit comes from when
+#: 8, 16, 88 and 256 were the axis a terminal varied on. A lot of
+#: software still reads the substring out of `TERM` rather than opening
+#: the database. That cuts both ways, and in a pane it cuts the wrong
+#: way: **a screen takes 24 bit colour**, and a program that reads
+#: "256color" picks the nearest index of the palette itself and writes
+#: that index. The colour a program meant is then lost before the pane
+#: ever sees it. `pymux/main.py` sets `COLORTERM=truecolor` for exactly
+#: that reason, and a name that says 256 argues with it.
+#:
+#: Measured: with "pyte-256color" in `TERM`, `checks.pymux-pictures`
+#: found about 5700 pixels of difference on the colour fixture in both
+#: foot and kitty, and on two recordings of real programs. With "pyte"
+#: there is none. xterm shows nothing either way, because it cannot
+#: draw a colour of its own anyway.
+#:
+#: The name that does mean direct colour is `xterm-direct`, and it is
+#: not one to take: it sets `colors#0x1000000` and **redefines `setaf`
+#: and `setab` so the argument is a packed colour and not a place in
+#: the palette**. Every program that uses the palette draws the wrong
+#: thing under it.
+#:
+#: So the palette is claimed where a claim belongs, in the entry: the
+#: parent is `xterm-256color`, and `RGB` and `Tc` in `CAPABILITIES` say
+#: the rest. `TERMINAL_ALIAS` is the spelling with the suffix, which
+#: `tic` links to the same entry, so a program that looks the long name
+#: up still finds it.
+TERMINAL_NAME = "pyte"
+TERMINAL_ALIAS = "pyte-256color"
 
 #: What a pane can do, in the form that XTGETTCAP answers.
 #:
@@ -644,9 +680,22 @@ def _reads_the_clipboard(param: str) -> bool:
     return data.strip() == "?"
 
 
+class Margins(NamedTuple):
+    """
+    The first and the last row of the scrolling region, counted from
+    zero. DECSTBM ("CSI Pt ; Pb r") names them.
+
+    It was `pyte.screens.Margins`, and it is the one thing the old
+    screen left behind that this one still needs.
+    """
+
+    top: int
+    bottom: int
+
+
 #: The first and the last column of the scrolling region, counted from
-#: zero. DECSLRM ("CSI Pl ; Pr s") names them. `pyte.screens.Margins`
-#: names the first and the last row, and this is the other pair.
+#: zero. DECSLRM ("CSI Pl ; Pr s") names them. `Margins` names the first
+#: and the last row, and this is the other pair.
 HorizontalMargins = namedtuple("HorizontalMargins", "left right")
 
 
@@ -1014,7 +1063,7 @@ _Savepoint = namedtuple(
 )
 
 
-class BetterScreen:
+class Screen:
     """
     Custom screen class. Most of the methods are called from a vt100 Pyte
     stream.

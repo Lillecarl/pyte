@@ -1,24 +1,27 @@
 """
-The sequences that `streams.Stream` does not know.
+The bytes that name a sequence, for the ones `escape.py` does not hold.
 
-`Stream` is the parser this package has always had. `BetterStream`
-extends it with the escapes and the modes that a terminal of today
-sends, and hands them to `screen.BetterScreen`.
+`escape.py` and `control.py` came from upstream and name what a VT100
+and a VT220 send. These are the rest: what a VT400 and a VT500 added,
+what xterm added after them, and what kitty added after that.
+
+`streams.Stream` reads them all from one table, so nothing here decides
+anything. A name and a byte, and that is all.
 """
 from enum import StrEnum
 
 from .escape import NEL as _NEL
-from .streams import Stream
 
-__all__ = ("BetterStream",)
+__all__ = ("Escape", "Sharp", "Csi")
 
 
 class Escape(StrEnum):
     """
-    The byte that follows ESC, for the sequences ptterm adds.
+    The byte that follows ESC, for the sequences `escape.py` does not
+    name.
 
-    A member is a string, so pyte can look one up with the raw byte it
-    read.
+    A member is a string, so the parser can look one up with the raw
+    byte it read.
     """
 
     #: Next line. pyte gives it to the handler of LF, and the two
@@ -48,11 +51,12 @@ class Escape(StrEnum):
 
 class Sharp(StrEnum):
     """
-    The byte that follows "ESC #", for the sequences ptterm adds.
+    The byte that follows "ESC #", for the sequences `escape.py` does
+    not name.
 
     These are the DEC line attributes of a VT100. They belong to the
-    line the cursor stands on, and not to a cell. pyte names only
-    DECALN, "ESC # 8".
+    line the cursor stands on, and not to a cell. `escape.py` names
+    only DECALN, "ESC # 8".
     """
 
     #: Double height line, top half.
@@ -76,12 +80,11 @@ class Csi(StrEnum):
     front of it.
 
     A CSI sequence ends with one final byte and can carry intermediate
-    bytes before it. pyte joins the two into one key, so " q" is
-    DECSCUSR and "q" on its own is something else. The matching pyte
-    patch is what keeps the intermediate bytes.
+    bytes before it. The parser joins the two into one key, so " q" is
+    DECSCUSR and "q" on its own is something else.
 
-    `ptterm/screen.py` holds the parameters of each sequence, in the
-    docstring of the handler.
+    `screen.py` holds the parameters of each sequence, in the docstring
+    of the handler.
     """
 
     #: Cursor backward tabulation: move back over tab stops. pyte has
@@ -193,89 +196,3 @@ class Csi(StrEnum):
     #: answered.
     XTWINOPS = "t"
 
-
-class BetterStream(Stream):
-    """
-    Extension to the Pyte `Stream` class that also handles "Esc]<num>...BEL"
-    sequences. This is used by xterm to set the terminal title.
-    """
-
-    escape = Stream.escape.copy()
-    escape.update(
-        {
-            Escape.NEL: "next_line",
-            Escape.DECBI: "back_index",
-            Escape.DECFI: "forward_index",
-            Escape.SPA: "start_protected_area",
-            Escape.EPA: "end_protected_area",
-            Escape.DECID: "report_device_attributes",
-        }
-    )
-
-    sharp = Stream.sharp.copy()
-    sharp.update(
-        {
-            Sharp.DECDHL_TOP: "double_height_top",
-            Sharp.DECDHL_BOTTOM: "double_height_bottom",
-            Sharp.DECSWL: "single_width",
-            Sharp.DECDWL: "double_width",
-        }
-    )
-
-    csi = Stream.csi.copy()
-    csi.update(
-        {
-            Csi.CBT: "cursor_to_previous_tab",
-            Csi.CHT: "cursor_to_next_tab",
-            Csi.DECCRA: "copy_rectangle",
-            Csi.DECDC: "delete_columns",
-            Csi.DECERA: "erase_rectangle",
-            Csi.DECFRA: "fill_rectangle",
-            Csi.DECIC: "insert_columns",
-            Csi.DECRQCRA: "report_checksum",
-            Csi.DECRQM: "report_mode",
-            Csi.DECSCA: "set_character_protection",
-            Csi.DECSACE: "set_attribute_extent",
-            Csi.DECSASD: "set_active_display",
-            Csi.DECSCL: "set_conformance_level",
-            Csi.DECSCUSR: "set_cursor_style",
-            Csi.DECSERA: "selective_erase_rectangle",
-            Csi.DECSNLS: "set_lines_per_screen",
-            Csi.DECSSDT: "set_status_line_type",
-            Csi.DECSLRM: "set_left_right_margins",
-            Csi.DECSTR: "soft_reset",
-            Csi.HPA: "cursor_to_absolute_column",
-            # HPB and VPB move the way CUB and CUU move, so they go to
-            # the same handlers. libvterm serves them from the same two
-            # lines of arithmetic as well.
-            Csi.HPB: "cursor_back",
-            Csi.VPB: "cursor_up",
-            Csi.REP: "repeat_last_character",
-            Csi.SD: "scroll_down",
-            Csi.SU: "scroll_up",
-            Csi.KITTY_KEYBOARD: "report_kitty_keyboard",
-            Csi.KITTY_UNSCROLL: "unscroll",
-            Csi.XTVERSION: "report_version",
-            Csi.XTWINOPS: "report_window",
-        }
-    )
-
-    def __init__(self, screen) -> None:
-        # `attach` is what builds the parser, so the screen goes to it
-        # and not to `self.listener`. Setting the listener by hand
-        # leaves a stream that raises on the first byte it reads.
-        super().__init__(screen)
-        self._validate_screen()
-
-    def _validate_screen(self) -> None:
-        """
-        Check whether our Screen class has all the required callbacks.
-        (We want to verify this statically, before feeding content to the
-        screen.)
-        """
-        for d in [self.basic, self.escape, self.sharp, self.csi]:
-            for name in d.values():
-                assert hasattr(self.listener, name), "Screen is missing %r" % name
-
-        for name in ("define_charset", "set_icon_name", "set_title", "draw", "debug"):
-            assert hasattr(self.listener, name), "Screen is missing %r" % name
