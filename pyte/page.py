@@ -12,19 +12,15 @@ in txterm — and copy mode, which walks the whole buffer.
 Lillecarl/pymux#129.
 """
 from collections import defaultdict, namedtuple
-from enum import IntEnum
 from typing import DefaultDict, List, NamedTuple, Tuple
 
 from .cells import Cell
 
 __all__ = (
     "CursorPosition",
-    "DoubleHeight",
     "HorizontalMargins",
-    "LineAttribute",
     "LogicalLine",
     "Margins",
-    "PLAIN_LINE",
     "Page",
     "Row",
     "TextLine",
@@ -61,39 +57,6 @@ class CursorPosition:
         return f"pymux.CursorPosition(x={self.x!r}, y={self.y!r})"
 
 
-class DoubleHeight(IntEnum):
-    "Which half of a double height line a line is."
-
-    NONE = 0
-    TOP = 1
-    BOTTOM = 2
-
-
-class LineAttribute(NamedTuple):
-    """
-    The DEC line attributes of one line.
-
-    A VT100 draws a line at twice the width, at twice the height, or
-    both. The attribute belongs to the line and not to a cell, so it
-    lives on the `Row` and not in a `Cell`.
-
-    ptterm holds it and draws nothing: how wide a line looks is the
-    renderer's decision, and a pane is not a whole line of the terminal
-    the user runs. The line still holds every column it held, which is
-    what kitty, WezTerm, Alacritty, Ghostty and xterm.js all do.
-    libvterm alone halves the line, and `test_the_panel.py` holds that
-    vote. Lillecarl/pymux#55.
-    """
-
-    double_width: bool
-    double_height: DoubleHeight
-
-
-#: A line that carries no attribute. It is never stored: a row that
-#: holds it is absent from the map.
-PLAIN_LINE = LineAttribute(False, DoubleHeight.NONE)
-
-
 class Row(DefaultDict[int, Cell]):
     """
     One row of the buffer: its cells, and what is true of the row
@@ -116,7 +79,7 @@ class Row(DefaultDict[int, Cell]):
     dictionary and the default answers for every column.
     """
 
-    __slots__ = ("wrapped", "attribute")
+    __slots__ = ("wrapped",)
 
     def __init__(self, default_char: Cell) -> None:
         super().__init__(lambda: default_char)
@@ -125,11 +88,6 @@ class Row(DefaultDict[int, Cell]):
         #: of the row above and is not a line of its own, and a reflow
         #: joins the two back together before it lays them out again.
         self.wrapped: bool = False
-
-        #: The DEC line attribute of this row: twice as wide, or the
-        #: top or the bottom half of twice as high. `None` is a plain
-        #: row, which is nearly all of them.
-        self.attribute: LineAttribute | None = None
 
 
 class LogicalLine:
@@ -146,25 +104,15 @@ class LogicalLine:
     lays them out at the new width, and throws them away. Keeping them
     instead is Lillecarl/pymux#135, and this is the type that would be
     kept.
-
-    The attribute comes from the row the line starts on, because that
-    is the row the program addressed when it sent "ESC # 6".
     """
 
-    __slots__ = ("cells", "attribute")
+    __slots__ = ("cells",)
 
-    def __init__(self, attribute: "LineAttribute | None" = None) -> None:
+    def __init__(self) -> None:
         self.cells: List[Cell] = []
 
-        #: The DEC line attribute of this line, or `None` for a plain
-        #: one, which is nearly all of them.
-        self.attribute = attribute
-
     def __repr__(self) -> str:
-        return "LogicalLine(%r, %r)" % (
-            "".join(cell.char for cell in self.cells),
-            self.attribute,
-        )
+        return "LogicalLine(%r)" % "".join(cell.char for cell in self.cells)
 
 
 class TextLine(NamedTuple):
@@ -361,9 +309,6 @@ class Page:
             row = data_buffer.get(number)
 
             if row is not None:
-                if not row.wrapped:
-                    line.attribute = row.attribute
-
                 # `default` answers an empty row without writing to it.
                 held = max(row, default=-1) + 1
                 for column in range(0, held):

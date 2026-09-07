@@ -12,7 +12,7 @@ from enum import StrEnum
 
 from .escape import NEL as _NEL
 
-__all__ = ("Escape", "Sharp", "Csi")
+__all__ = ("Escape", "Csi")
 
 
 class Escape(StrEnum):
@@ -47,31 +47,6 @@ class Escape(StrEnum):
     #: a terminal answers it the same way. A VT100 had it; xterm keeps
     #: it, so a program written for one still gets an answer.
     DECID = "Z"
-
-
-class Sharp(StrEnum):
-    """
-    The byte that follows "ESC #", for the sequences `escape.py` does
-    not name.
-
-    These are the DEC line attributes of a VT100. They belong to the
-    line the cursor stands on, and not to a cell. `escape.py` names
-    only DECALN, "ESC # 8".
-    """
-
-    #: Double height line, top half.
-    DECDHL_TOP = "3"
-
-    #: Double height line, bottom half. A program writes the same text
-    #: on both halves, and the terminal draws each half of it.
-    DECDHL_BOTTOM = "4"
-
-    #: Single width, single height. The plain line, and what a reset
-    #: leaves.
-    DECSWL = "5"
-
-    #: Double width, single height.
-    DECDWL = "6"
 
 
 class Csi(StrEnum):

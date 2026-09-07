@@ -57,7 +57,7 @@ def what_a_person_sees(screen):
     for number in range(screen.line_offset, screen.max_y + 1):
         row = data_buffer.get(number)
         if row is None:
-            rows.append(((), None, False))
+            rows.append(((), False))
             continue
         rows.append(
             (
@@ -65,7 +65,6 @@ def what_a_person_sees(screen):
                     (row[column].char, row[column].appearance)
                     for column in range(max(row, default=-1) + 1)
                 ),
-                row.attribute,
                 row.wrapped,
             )
         )

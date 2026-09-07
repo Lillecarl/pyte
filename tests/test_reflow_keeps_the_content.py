@@ -79,7 +79,6 @@ def logical_lines(screen):
 
     lines = []
     cells = []
-    attribute = None
 
     for number in range(min(data_buffer), max(data_buffer) + 1):
         row = data_buffer.get(number)
@@ -87,27 +86,26 @@ def logical_lines(screen):
         # An absent row is a row of blanks, and a row of blanks is not
         # a wrap, so it ends the line before it.
         if row is None or not row.wrapped:
-            lines.append((_trimmed(cells), attribute))
+            lines.append(_trimmed(cells))
             cells = []
-            attribute = None if row is None else row.attribute
 
         if row:
             for column in range(max(row) + 1):
                 cells.append(row[column])
 
-    lines.append((_trimmed(cells), attribute))
+    lines.append(_trimmed(cells))
 
     # The first entry is the line before the first row, which is
     # nothing, and a line at the end that trimmed to nothing cannot be
     # told from a row the buffer never held.
-    while lines and not lines[0][0] and lines[0][1] is None:
+    while lines and not lines[0]:
         lines.pop(0)
-    while lines and not lines[-1][0] and lines[-1][1] is None:
+    while lines and not lines[-1]:
         lines.pop()
 
     return tuple(
-        (tuple((cell.char, cell.appearance) for cell in cells), attribute)
-        for cells, attribute in lines
+        tuple((cell.char, cell.appearance) for cell in cells)
+        for cells in lines
     )
 
 

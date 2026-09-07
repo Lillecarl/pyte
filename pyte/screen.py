@@ -54,11 +54,8 @@ from .cells import (
     protection_of,
 )
 from .page import (
-    PLAIN_LINE,
     CursorPosition,
-    DoubleHeight,
     HorizontalMargins,
-    LineAttribute,
     LogicalLine,
     Margins,
     Page,
@@ -179,10 +176,10 @@ class Screen:
         # The wait to wrap belongs to the cursor, so it travels with it.
         "pending_wrap",
         "max_y",
-        # The continuation mark and the DEC line attribute are not here.
-        # They belong to the lines of one screen, and they now ride on
-        # the rows themselves, so the buffer carries them across a
-        # switch on its own. Lillecarl/pymux#134.
+        # The continuation mark is not here. It belongs to the lines of
+        # one screen, and it now rides on the rows themselves, so the
+        # buffer carries it across a switch on its own.
+        # Lillecarl/pymux#134.
         #
         # The kitty keyboard protocol keeps separate flag stacks for the
         # main and the alternate screen. (Immutable tuple: safe to swap.)
@@ -1021,11 +1018,6 @@ class Screen:
         if line is not None:
             line.wrapped = False
 
-    def attribute_of(self, row: int) -> "LineAttribute | None":
-        "The DEC line attribute of a row, without making the row."
-        line = self.page.data_buffer.get(row)
-        return None if line is None else line.attribute
-
     def highest_row(self) -> int:
         """
         The highest row a front end has to draw.
@@ -1284,14 +1276,6 @@ class Screen:
         # set the same way.)
         if PrivateMode.INBAND_RESIZE.flag in modes:
             self.notify_of_resize()
-
-        # DECLRMM takes the DEC line attributes off every line. A left
-        # or a right margin cuts a line in two, and half a double width
-        # line is not a thing a terminal can draw. libvterm clears them
-        # here too, in the DECVSSM branch of its `src/state.c`.
-        if PrivateMode.LEFT_RIGHT_MARGIN.flag in modes:
-            for line in self.page.data_buffer.values():
-                line.attribute = None
 
         # DECCOLM takes the page to 132 columns, clears it and puts the
         # cursor home.
@@ -1968,11 +1952,11 @@ class Screen:
             # whole lines, so it moves only when whole lines move.
             self.graphics.scroll(top + line_offset, bottom + line_offset, amount)
 
-            # The DEC line attribute and the continuation mark move with
-            # the line, because the line carries them. A rectangle
-            # carries cells and not lines, so a left or a right margin
-            # leaves them alone: the loop above copies columns then, and
-            # the rows themselves stay where they are.
+            # The continuation mark moves with the line, because the
+            # line carries it. A rectangle carries cells and not lines,
+            # so a left or a right margin leaves it alone: the loop
+            # above copies columns then, and the rows themselves stay
+            # where they are.
 
     def _copy_columns(self, source, target, horizontal: HorizontalMargins) -> None:
         "Copy the cells between the margins from one row to another."
@@ -2038,8 +2022,8 @@ class Screen:
         This is the one thing about a row that the row does not carry,
         and it is outside on purpose: the *reader* owns it, and a pure
         screen may not track its readers. Lillecarl/pymux#126. Whether a
-        wrap brought the row into being and what DEC line attribute it
-        has both ride on the row, so dropping the row drops them.
+        wrap brought the row into being rides on the row itself, so
+        dropping the row drops that.
 
         The count is taken away rather than moved on, so `written_at`
         stays as big as the history and not as big as the session.
@@ -2376,8 +2360,8 @@ class Screen:
             data_buffer.pop(row, None)
             return
 
-        # A fresh row, so the continuation mark and the DEC line
-        # attribute of whatever stood here go with the cells.
+        # A fresh row, so the continuation mark of whatever stood here
+        # goes with the cells.
         line = Row(Cell(" ", PLAIN_APPEARANCE))
         erased = ErasedCell(" ", appearance)
         for column in range(self.columns):
@@ -3021,23 +3005,9 @@ class Screen:
 
         self._end_the_wrap_out_of_this_line(columns)
 
-        if erased is None and not line and line.attribute is None:
+        if erased is None and not line:
             # The line holds nothing, so it can go away and keep the
             # screen sparse.
-            #
-            # **A row with a DEC line attribute stays.** An erase
-            # empties the cells and says nothing about the size of the
-            # row: xterm's `ClearInLine` writes the cells and leaves
-            # the double size flag where it is, and `ClearBufRows`,
-            # which is ED, is the one that resets it. Dropping the row
-            # here dropped the attribute with it, so vttest drew the
-            # top half of its second double-height line small.
-            # Lillecarl/pymux#150.
-            #
-            # The continuation mark is the other thing a row carries,
-            # and it is not read here on purpose. Whether an erase ends
-            # a wrap is Lillecarl/pymux#142, which is open and asks for
-            # an answer from libvterm rather than a guess.
             data_buffer.pop(pt_cursor_position.y, None)
             return
 
@@ -3148,13 +3118,7 @@ class Screen:
             # describes. A reflow then joins two lines that were never
             # one, and a reverse wrap walks back over a line the
             # typing never reached.
-            # A DEC line attribute goes with the line, so an erase that
-            # takes the whole line takes the attribute too. libvterm
-            # clears it over the same rows: `set_lineinfo` with FORCE in
-            # each of the three ED branches of its `src/state.c`. The
-            # row the cursor stands on keeps its attribute, because ED 0
-            # and ED 1 only take a part of that row.
-            self._forget_line_notes(interval)
+            self._forget_the_wrap_marks(interval)
 
             self.touch_rows(interval)
 
@@ -3529,11 +3493,10 @@ class Screen:
         self.pending_wrap = False
 
     # ------------------------------------------------------------------
-    # The DEC line attributes, and the pattern that shows them.
+    # The pattern that shows the shape of a screen.
     #
-    # An attribute belongs to the line and rides on the `Row`. The
-    # screen holds it and draws nothing: how wide a line looks is the
-    # renderer's decision. Lillecarl/pymux#55.
+    # DECALN is the one "ESC #" sequence this screen acts on. The four
+    # DEC line attributes are read and dropped; `streams.py` says why.
 
     def alignment_display(self) -> None:
         """
@@ -3557,60 +3520,15 @@ class Screen:
         self.horizontal_margins = None
         self.cursor_position()
 
-    def _set_line_attribute(self, attribute: LineAttribute) -> None:
+    def _forget_the_wrap_marks(self, rows) -> None:
         """
-        Give the line the cursor stands on a DEC line attribute.
-
-        A plain line carries none, and a row the program never wrote to
-        is plain already, so taking one off does not make the row.
-        """
-        row = self.pt_cursor_position.y
-        if attribute == PLAIN_LINE:
-            line = self.page.data_buffer.get(row)
-            if line is not None:
-                line.attribute = None
-            return
-        self.page.data_buffer[row].attribute = attribute
-
-    def single_width(self) -> None:
-        """
-        DECSWL ("ESC # 5"): draw this line the plain way.
-
-        It takes both attributes off, which is what libvterm does:
-        `set_lineinfo` in its `src/state.c` gets DWL_OFF and DHL_OFF
-        from the same call.
-        """
-        self._set_line_attribute(PLAIN_LINE)
-
-    def double_width(self) -> None:
-        "DECDWL (\"ESC # 6\"): draw this line at twice the width."
-        self._set_line_attribute(LineAttribute(True, DoubleHeight.NONE))
-
-    def double_height_top(self) -> None:
-        """
-        DECDHL ("ESC # 3"): the top half of a double height line.
-
-        A double height line is a double width line as well. A program
-        writes the same text twice, once on each half, and the terminal
-        draws the top of the glyphs on one line and the bottom on the
-        other.
-        """
-        self._set_line_attribute(LineAttribute(True, DoubleHeight.TOP))
-
-    def double_height_bottom(self) -> None:
-        "DECDHL (\"ESC # 4\"): the bottom half of one."
-        self._set_line_attribute(LineAttribute(True, DoubleHeight.BOTTOM))
-
-    def _forget_line_notes(self, rows) -> None:
-        """
-        Take the DEC line attribute and the continuation mark off these
-        lines, without making a line that is not there.
+        Take the continuation mark off these lines, without making a
+        line that is not there.
         """
         data_buffer = self.page.data_buffer
         for row in rows:
             line = data_buffer.get(row)
             if line is not None:
-                line.attribute = None
                 line.wrapped = False
 
     # ------------------------------------------------------------------
@@ -4961,7 +4879,6 @@ class Screen:
         new_cursor_position = None
 
         for line_index, line in enumerate(all_lines):
-            first_new_row = new_row_index
             for column_index, char in enumerate(line.cells):
                 # Check for space on the current line.
                 if new_column_index + char.width > width:
@@ -4988,14 +4905,6 @@ class Screen:
                     cursor_column -= width
                     cursor_row += 1
                 new_cursor_position = (cursor_row, cursor_column)
-
-            # A DEC line attribute belongs to the whole line, so every
-            # row the line now takes carries it.
-            if line.attribute is not None:
-                for new_row in range(first_new_row, new_row_index + 1):
-                    data_buffer[new_row].attribute = line.attribute
-                if new_row_index > highest:
-                    highest = new_row_index
 
             new_row_index += 1
             new_column_index = 0

@@ -95,19 +95,6 @@ def test_a_cursor_outside_the_range_is_not_found():
     assert page.unwrap(0, 1, cursor=(5, 0))[1] is None
 
 
-def test_the_attribute_comes_from_the_row_the_line_starts_on():
-    """
-    "ESC # 6" addresses a row, and the row a program addressed is the
-    one the line starts on. A row a wrap made carries the attribute
-    for drawing and does not decide it.
-    """
-    page = _a_page("one", "|two")
-    page.data_buffer[0].attribute = "double"
-    page.data_buffer[1].attribute = "plain"
-    lines, _ = page.unwrap(0, 1)
-    assert [line.attribute for line in lines] == ["double"]
-
-
 def test_the_text_of_a_line_joins_the_rows_it_took():
     "The cheap half: the text, and no cell of it."
     page = _a_page("one", "|two", "three", "|four", "|five")

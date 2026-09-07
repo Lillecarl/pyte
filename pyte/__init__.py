@@ -16,6 +16,12 @@
     VT100 and VT520 is skipped, and esctest2's `DECSCLTests` is what
     says so.
 
+    **The DEC line attributes are the one exception.** "ESC # 3",
+    "ESC # 4", "ESC # 5" and "ESC # 6" draw a line at twice the width or
+    twice the height on a VT100. This screen reads each of them and
+    draws the line the plain way, the way kitty, Ghostty and Alacritty
+    do. Lillecarl/pymux#141 holds the reasons and the vote.
+
     On top of that are the things no DEC terminal had: 256 colours,
     truecolour, the kitty keyboard and graphics protocols, sixels,
     hyperlinks, and the underline shapes.

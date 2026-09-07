@@ -1,24 +1,26 @@
 """
-The DEC line attributes: double width and double height lines.
+The DEC line attributes, which this screen reads and drops.
 
-"ESC # 3", "ESC # 4", "ESC # 5" and "ESC # 6" belong to the line the
-cursor stands on, not to a cell. pyte holds the attribute and draws
-nothing with it: how wide a line looks is the renderer's decision, and a
-pane is not a whole line of the terminal the user runs.
+"ESC # 3", "ESC # 4", "ESC # 5" and "ESC # 6" draw a line at twice the
+width or twice the height on a VT100. kitty, Ghostty and Alacritty
+implement none of them, esctest has no test for them, and no recorded
+program in this repository sends one. xterm and libvterm are the two
+that do. So a line here is one line high and one cell wide, whatever a
+program asks for. Lillecarl/pymux#141.
 
-The line keeps every column it had. libvterm alone halves it, and the
-other five judges keep it whole; `test_the_panel.py` holds that vote.
-Lillecarl/pymux#55.
+What still has to be true is that the bytes go away. An escape sequence
+nobody reads ends at the "#", and the digit after it lands on the screen
+as text.
 """
-from pyte.page import DoubleHeight, LineAttribute
+import pytest
+
 from pyte.screen import Screen
 from pyte.streams import Stream
 
 LINES, COLUMNS = 5, 10
 
-DOUBLE_WIDTH = LineAttribute(True, DoubleHeight.NONE)
-TOP_HALF = LineAttribute(True, DoubleHeight.TOP)
-BOTTOM_HALF = LineAttribute(True, DoubleHeight.BOTTOM)
+#: The four of them, and DECALN, which this screen does act on.
+ATTRIBUTES = ["\x1b#3", "\x1b#4", "\x1b#5", "\x1b#6"]
 
 
 def _screen(data, lines=LINES, columns=COLUMNS):
@@ -27,167 +29,32 @@ def _screen(data, lines=LINES, columns=COLUMNS):
     return screen
 
 
-def _attribute(screen, row: int):
-    "The attribute of one row of the visible screen, or None."
-    return screen.attribute_of(screen.line_offset + row)
+def _text(screen, row: int) -> str:
+    "One row of the visible screen, as characters."
+    line = screen.page.data_buffer.get(screen.line_offset + row)
+    if line is None:
+        return " " * COLUMNS
+    return "".join((line[column].char or " ") for column in range(COLUMNS))
 
 
-def _attributes(screen):
-    "Every row of the buffer that carries an attribute, by row number."
-    return {
-        row: line.attribute
-        for row, line in screen.page.data_buffer.items()
-        if line.attribute is not None
-    }
+@pytest.mark.parametrize("sequence", ATTRIBUTES)
+def test_the_sequence_writes_nothing_on_the_screen(sequence):
+    "The digit is part of the sequence, so no part of it is text."
+    assert _text(_screen(sequence + "abc"), 0) == "abc" + " " * 7
 
 
-def test_a_plain_line_carries_nothing():
-    assert _attribute(_screen("abcde"), 0) is None
+@pytest.mark.parametrize("sequence", ATTRIBUTES)
+def test_the_sequence_makes_no_row(sequence):
+    "A line that is drawn the plain way holds nothing of its own."
+    assert _screen(sequence).page.data_buffer == {}
 
 
-def test_double_width_marks_the_line():
-    assert _attribute(_screen("\x1b#6abcde"), 0) == DOUBLE_WIDTH
-
-
-def test_double_height_marks_both_halves():
-    screen = _screen("\x1b#3abcde\r\n\x1b#4abcde")
-    assert _attribute(screen, 0) == TOP_HALF
-    assert _attribute(screen, 1) == BOTTOM_HALF
-
-
-def test_single_width_takes_the_attribute_off():
-    assert _attribute(_screen("\x1b#6abcde\x1b#5"), 0) is None
-
-
-def test_the_attribute_can_come_after_the_text():
-    "A program can mark a line it has already written."
-    assert _attribute(_screen("abcde\x1b#6"), 0) == DOUBLE_WIDTH
-
-
-def test_the_attribute_reaches_only_its_own_line():
-    screen = _screen("\x1b#6abcde\r\nfghij")
-    assert _attribute(screen, 0) == DOUBLE_WIDTH
-    assert _attribute(screen, 1) is None
-
-
-def test_a_double_width_line_still_holds_every_column():
+@pytest.mark.parametrize("sequence", ATTRIBUTES)
+def test_the_line_holds_every_column_it_was_given(sequence):
     """
-    The attribute does not narrow the line.
-
-    libvterm gives a double width line `cols / 2` columns, so text
-    wraps at half the width. Five judges keep the line whole and leave
-    the width to the renderer, and pyte is with the five.
+    A line drawn twice as wide holds half as many columns on a VT100.
+    This one holds them all, which is what a terminal that ignores the
+    attribute does.
     """
-    screen = _screen("\x1b#6" + "a" * 8)
-    assert screen.pt_cursor_position.y == screen.line_offset
-    assert screen.reported_column == 8
-    assert not any(line.wrapped for line in screen.page.data_buffer.values())
-
-
-def test_the_attribute_does_not_spill_over_on_a_scroll():
-    """
-    The text moves up and the attribute moves with it.
-
-    libvterm's `67screen_dbl_wh.test` asks for this: the line that
-    scrolls up keeps the mark, and the empty line that comes in below
-    has none.
-    """
-    screen = _screen("\x1b[5H\x1b#6Final\r\n")
-    assert _attribute(screen, 3) == DOUBLE_WIDTH
-    assert _attribute(screen, 4) is None
-
-
-def test_a_scrolling_region_carries_the_attribute():
-    "SU inside a region moves the mark the way it moves the text."
-    screen = _screen("\x1b[1;3r\x1b[2H\x1b#6bbb\x1b[S")
-    assert _attribute(screen, 0) == DOUBLE_WIDTH
-    assert _attribute(screen, 1) is None
-
-
-def test_a_scroll_drops_the_attribute_that_leaves_the_region():
-    screen = _screen("\x1b[1;3r\x1b[1H\x1b#6aaa\x1b[S")
-    assert _attributes(screen) == {}
-
-
-def test_inserting_a_line_pushes_the_attribute_down():
-    "IL moves whole lines, so the mark goes with the text."
-    screen = _screen("\x1b#6abc\x1b[1H\x1b[L")
-    assert _attribute(screen, 0) is None
-    assert _attribute(screen, 1) == DOUBLE_WIDTH
-
-
-def test_deleting_a_line_pulls_the_attribute_up():
-    screen = _screen("\r\n\x1b#6abc\x1b[1H\x1b[M")
-    assert _attribute(screen, 0) == DOUBLE_WIDTH
-    assert _attribute(screen, 1) is None
-
-
-def test_the_alternate_screen_gives_the_attribute_back():
-    "A visit to the other screen leaves the first one as it was."
-    screen = _screen("\x1b#6abc\x1b[?1049h\x1b[?1049l")
-    assert _attribute(screen, 0) == DOUBLE_WIDTH
-
-
-def test_the_alternate_screen_starts_with_no_attribute():
-    screen = _screen("\x1b#6abc\x1b[?1049h")
-    assert _attributes(screen) == {}
-
-
-def test_erasing_the_screen_takes_every_attribute_off():
-    assert _attributes(_screen("\x1b#6abcde\x1b[2J")) == {}
-
-
-def test_erasing_the_line_keeps_its_attribute():
-    """
-    "CSI 2 K" empties the row, and the row is still twice as high.
-
-    xterm keeps it. `ClearInLine` writes the cells of the row and
-    leaves the double size flag where it is; `ClearBufRows`, which is
-    ED, is the one that resets it.
-
-    vttest shows the difference. It writes "ESC # 3", then "CSI 2 K",
-    then the text of the top half of its second double-height line, and
-    a pane drew that line small while xterm drew it big. The row had
-    nothing in it at the moment of the erase, so the buffer dropped the
-    row and the attribute with it. Lillecarl/pymux#150.
-    """
-    assert _attribute(_screen("\x1b#3\x1b[2Kabc"), 0) == TOP_HALF
-
-
-def test_erasing_below_leaves_the_line_of_the_cursor():
-    "ED 0 takes only a part of the row the cursor is on."
-    screen = _screen("\x1b#6abc\r\n\x1b#6def\x1b[1;2H\x1b[0J")
-    assert _attribute(screen, 0) == DOUBLE_WIDTH
-    assert _attribute(screen, 1) is None
-
-
-def test_erasing_above_leaves_the_line_of_the_cursor():
-    screen = _screen("\x1b#6abc\r\n\x1b#6def\x1b[2;2H\x1b[1J")
-    assert _attribute(screen, 0) is None
-    assert _attribute(screen, 1) == DOUBLE_WIDTH
-
-
-def test_left_and_right_margins_take_every_attribute_off():
-    """
-    A margin cuts a line in two, and half a double width line is not a
-    thing a terminal can draw. libvterm clears them on DECLRMM too.
-    """
-    assert _attributes(_screen("\x1b#6abcde\x1b[?69h")) == {}
-
-
-def test_a_resize_carries_the_attribute():
-    screen = _screen("\x1b#6abcde")
-    screen.resize(LINES, 20)
-    assert _attribute(screen, 0) == DOUBLE_WIDTH
-
-
-def test_a_resize_carries_the_attribute_onto_every_row_it_wraps_to():
-    "The attribute belongs to the line, so it follows all of it."
-    screen = _screen("\x1b#6" + "a" * 10)
-    screen.resize(LINES, 5)
-    assert _attribute(screen, 0) == DOUBLE_WIDTH
-    assert _attribute(screen, 1) == DOUBLE_WIDTH
-
-
-def test_a_reset_takes_every_attribute_off():
-    assert _attributes(_screen("\x1b#6abcde\x1bc")) == {}
+    screen = _screen(sequence + "a" * COLUMNS)
+    assert _text(screen, 0) == "a" * COLUMNS

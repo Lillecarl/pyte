@@ -65,9 +65,8 @@ def say_the_floor_holds(screen) -> None:
 
     # A row that left the history takes its count with it, or
     # `written_at` grows with the session instead of with the history.
-    # The wrap mark and the DEC line attribute need no check of their
-    # own: they ride on the row, so dropping the row drops them.
-    # Lillecarl/pymux#134.
+    # The wrap mark needs no check of its own: it rides on the row, so
+    # dropping the row drops it. Lillecarl/pymux#134.
     counts = sorted(row for row in screen.written_at if row < remove_above)
     assert not counts, "these counts should have gone: %s" % counts
 
@@ -97,22 +96,21 @@ def test_the_buffer_stops_growing_at_the_limit():
 
 def test_the_notes_about_a_row_go_when_the_row_does():
     """
-    A wrap mark and a line attribute ride on the row, so a prune that
-    drops the row drops them with it.
+    A wrap mark rides on the row, so a prune that drops the row drops
+    it with it.
 
-    They were two dictionaries keyed by row number once, and the row
-    numbers of a session never come back around, so a note outlived its
-    row and both grew with the session. Lillecarl/pymux#134 put them
-    where they cannot. This says the buffer really is written on, so the
-    test would have failed before that change.
+    It was a dictionary keyed by row number once, and the row numbers of
+    a session never come back around, so a note outlived its row and
+    both grew with the session. Lillecarl/pymux#134 put it where it
+    cannot. This says the buffer really is written on, so the test would
+    have failed before that change.
     """
     screen = a_short_history()
     stream = Stream(screen)
-    # Every line wraps, and every line carries a DEC line attribute, so
-    # a note is written on nearly every row.
+    # Every line wraps, so a mark is written on nearly every row.
     stream.feed(
         "".join(
-            "\x1b#6" + "row %d " % number + "x" * COLUMNS + "\r\n"
+            "row %d " % number + "x" * COLUMNS + "\r\n"
             for number in range(300)
         )
     )
@@ -120,7 +118,6 @@ def test_the_notes_about_a_row_go_when_the_row_does():
 
     rows = screen.page.data_buffer.values()
     assert any(line.wrapped for line in rows)
-    assert any(line.attribute is not None for line in rows)
     assert len(screen.page.data_buffer) <= LIMIT + LINES + 1
     assert len(screen.written_at) <= LIMIT + LINES + 1
 
