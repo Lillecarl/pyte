@@ -4589,7 +4589,7 @@ class Screen:
         copied somewhere else, and a program in a pane has no claim on
         that. Writing the clipboard is handed on; reading it is not.
         """
-        if code == "52" and asks_for_the_clipboard(param):
+        if code == Osc.CLIPBOARD and asks_for_the_clipboard(param):
             return
         self.osc_func(code, param)
 
