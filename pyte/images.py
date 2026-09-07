@@ -15,6 +15,7 @@ transmission media, and z-index handling beyond storing the value.
 """
 import base64
 import zlib
+from enum import IntEnum
 from typing import Dict, List, Optional, Tuple
 
 __all__ = [
@@ -24,8 +25,31 @@ __all__ = [
     "GraphicsImage",
     "GraphicsPlacement",
     "GraphicsState",
+    "PixelFormat",
     "parse_control_data",
 ]
+
+
+class PixelFormat(IntEnum):
+    """
+    What the "f" key of a graphics command says the payload holds.
+
+    kitty's `docs/graphics-protocol.rst` names three: "``f=32`` (the
+    default) indicates 32-bit RGBA data and ``f=24`` indicates 24-bit
+    RGB data and ``f=100`` indicates PNG data".
+
+    The number is the bits a pixel takes, which is why PNG, whose
+    pixels are not laid out at all, is the odd one at a hundred.
+    """
+
+    #: Three bytes a pixel, no alpha.
+    RGB = 24
+
+    #: Four bytes a pixel. The default when a command names no format.
+    RGBA = 32
+
+    #: A whole PNG file, which carries its own size and depth.
+    PNG = 100
 
 
 # Cell size in pixels assumed when a placement does not specify its
@@ -67,7 +91,7 @@ class GraphicsImage:
     def __init__(
         self, format: int, width: int, height: int, data: bytes, number: int = 0
     ) -> None:
-        self.format = format  # 24 (RGB), 32 (RGBA) or 100 (PNG)
+        self.format = format  # A `PixelFormat`.
         self.width = width  # in pixels
         self.height = height  # in pixels
         self.data = data
@@ -297,13 +321,13 @@ class GraphicsState:
             except Exception:
                 raise GraphicsError("EINVAL", "invalid base64 data")
 
-            fmt = self._int(keys, "f", 32)
+            fmt = self._int(keys, "f", PixelFormat.RGBA)
             compression = keys.get("o", "")
-            if fmt == 100:
+            if fmt == PixelFormat.PNG:
                 if compression:
                     raise GraphicsError("EINVAL", "PNG data cannot be compressed")
                 width, height = _png_size(data)
-            elif fmt in (24, 32):
+            elif fmt in (PixelFormat.RGB, PixelFormat.RGBA):
                 if compression == "z":
                     try:
                         data = zlib.decompress(data)
@@ -317,7 +341,9 @@ class GraphicsState:
                 height = self._int(keys, "v")
                 if width <= 0 or height <= 0:
                     raise GraphicsError("EINVAL", "width and height required")
-                expected = width * height * (3 if fmt == 24 else 4)
+                expected = (
+                    width * height * (3 if fmt == PixelFormat.RGB else 4)
+                )
                 if len(data) != expected:
                     raise GraphicsError(
                         "EINVAL", "data size does not match width and height"
