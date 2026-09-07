@@ -4782,6 +4782,18 @@ class Screen:
         new_row_index = offset
         new_column_index = 0
 
+        # Where the cursor lands, kept apart from where it stood.
+        #
+        # The loop wrote the answer back into `cy` and `cx`, so the
+        # line and the offset the cursor came from and the row and the
+        # column it went to were the same two numbers. A later line
+        # then matched the answer and moved the cursor again. Four
+        # characters, one "CSI T" and a narrowing was enough: the
+        # cursor landed a row low, on the "t" of "text" instead of on
+        # the blank it stood on, and the check at the end of this
+        # method raised. Lillecarl/pymux#110.
+        new_cursor_position = None
+
         for line_index, line in enumerate(all_lines):
             first_new_row = new_row_index
             for column_index, char in enumerate(line.cells):
@@ -4792,8 +4804,7 @@ class Screen:
                     new_data_buffer[new_row_index].wrapped = True
 
                 if cy == line_index and cx == column_index:
-                    cy = new_row_index
-                    cx = new_column_index
+                    new_cursor_position = (new_row_index, new_column_index)
 
                 # Add character to new buffer.
                 new_data_buffer[new_row_index][new_column_index] = char
@@ -4807,6 +4818,9 @@ class Screen:
 
             new_row_index += 1
             new_column_index = 0
+
+        if new_cursor_position is not None:
+            cy, cx = new_cursor_position
 
         # A reflow puts every character somewhere else, so the rows a
         # reader holds and the rows that take their numbers are both

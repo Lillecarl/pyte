@@ -105,3 +105,23 @@ def test_narrowing_keeps_the_cursor_on_the_bottom_row():
     screen.resize(5, 8)
     assert _row(screen, 4) == "> "
     assert _cursor(screen) == (4, 2)
+
+
+def test_the_cursor_lands_once():
+    """
+    A reflow moved the cursor twice and then said it had failed.
+
+    `_reflow` held the line and the offset the cursor came from, and
+    wrote the row and the column it went to into the same two numbers.
+    A later line matched the answer and moved the cursor again.
+
+    Four characters, one "CSI T" and a narrowing is enough. The cursor
+    stands on the blank at column four of an empty row, and it landed
+    a row low, on the "t" of "text". Lillecarl/pymux#110.
+    """
+    screen = Screen(6, 10, write_process_input=lambda answer: None)
+    Stream(screen).feed("text\x1b[0T")
+    screen.resize(6, 4)
+
+    row, column = screen.pt_cursor_position.y, screen.pt_cursor_position.x
+    assert screen.page.data_buffer[row][column].char == " "
