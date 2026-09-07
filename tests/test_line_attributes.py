@@ -71,7 +71,7 @@ def test_a_double_width_line_still_holds_every_column():
     screen = _screen("\x1b#6" + "a" * 8)
     assert screen.pt_cursor_position.y == screen.line_offset
     assert screen.reported_column == 8
-    assert screen.wrapped_lines == []
+    assert screen.wrapped_lines == set()
 
 
 def test_the_attribute_does_not_spill_over_on_a_scroll():

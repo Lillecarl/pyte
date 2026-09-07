@@ -75,4 +75,4 @@ def test_the_alternate_screen_gives_the_mark_back():
 
 def test_the_alternate_screen_starts_with_no_mark():
     screen = _screen("a" * 12 + "\x1b[?1049h")
-    assert screen.wrapped_lines == []
+    assert screen.wrapped_lines == set()

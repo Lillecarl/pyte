@@ -1682,7 +1682,19 @@ class Screen:
 
         self.data_buffer = self.page.data_buffer
         self.pt_cursor_position = CursorPosition(0, 0)
-        self.wrapped_lines: List[int] = []  # List of line indexes that were wrapped.
+        #: The rows that a wrap brought into being: a row that holds the
+        #: rest of the line above it, and not a line of its own. A
+        #: reflow joins each of these back onto the row above before it
+        #: lays the text out again.
+        #:
+        #: **A set, and not a list.** `_reflow` asks whether a row is in
+        #: here twice for every row of the buffer, and a draw asks once
+        #: for the row the cursor stands on. A list answers in a walk,
+        #: so a resize on a history of wrapped lines took eleven seconds
+        #: at fifty thousand rows. A list also grew: the same row can
+        #: wrap again and again, and each wrap wrote another entry.
+        #: Lillecarl/pymux#8.
+        self.wrapped_lines: Set[int] = set()
 
         # The DEC line attributes, by line index, the same way
         # `wrapped_lines` counts. A line that carries none is absent.
@@ -2478,7 +2490,7 @@ class Screen:
                     cursor_position_x = cursor_position.x
                     cursor_position_y = cursor_position.y
 
-                    self.wrapped_lines.append(cursor_position_y)
+                    self.wrapped_lines.add(cursor_position_y)
                 else:
                     cursor_position_x = edge - char_width
 
@@ -2908,7 +2920,7 @@ class Screen:
             cursor_position = self.pt_cursor_position
             # The line above was full and the cursor moved on because
             # of it, which is what the wrap flag records.
-            self.wrapped_lines.append(cursor_position.y)
+            self.wrapped_lines.add(cursor_position.y)
 
         # With a right margin the tab stops there, and not at the last
         # column. That holds even for a cursor that starts left of the
@@ -3805,8 +3817,7 @@ class Screen:
         if columns.stop < self.columns:
             return
         below = self.pt_cursor_position.y + 1
-        if below in self.wrapped_lines:
-            self.wrapped_lines = [row for row in self.wrapped_lines if row != below]
+        self.wrapped_lines.discard(below)
 
     def _repair_erased_line(self, line, columns: range) -> None:
         "Repair the two ends of a range of cells that an erase took away."
@@ -3893,9 +3904,7 @@ class Screen:
             # one, and a reverse wrap walks back over a line the
             # typing never reached.
             erased_rows = set(interval)
-            self.wrapped_lines = [
-                row for row in self.wrapped_lines if row not in erased_rows
-            ]
+            self.wrapped_lines -= erased_rows
 
             # A DEC line attribute goes with the line, so an erase that
             # takes the whole line takes the attribute too. libvterm
@@ -5794,7 +5803,7 @@ class Screen:
         # Wrap lines again according to the screen width.
         new_row_index = offset
         new_column_index = 0
-        new_wrapped_lines = []
+        new_wrapped_lines = set()
         new_line_attributes: Dict[int, LineAttribute] = {}
 
         for row_index, line in enumerate(all_lines):
@@ -5804,7 +5813,7 @@ class Screen:
                 if new_column_index + char.width > width:
                     new_row_index += 1
                     new_column_index = 0
-                    new_wrapped_lines.append(new_row_index)
+                    new_wrapped_lines.add(new_row_index)
 
                 if cy == row_index and cx == column_index:
                     cy = new_row_index

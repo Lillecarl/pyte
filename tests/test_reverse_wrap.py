@@ -114,7 +114,7 @@ def test_erasing_the_screen_forgets_that_a_line_wrapped(pane):
     stream.feed(AUTOWRAP + INLINE + "\x1b[1;1H" + "a" * (COLUMNS * 2))
     assert screen.wrapped_lines
     stream.feed("\x1b[2J")
-    assert screen.wrapped_lines == []
+    assert screen.wrapped_lines == set()
     stream.feed("\x1b[3;3H" + BACKSPACE * 4)
     assert at(screen) == (0, 2)
 
