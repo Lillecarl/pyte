@@ -98,12 +98,14 @@ def everything(screen, reader) -> range:
     return range(min(numbers), max(numbers) + 1)
 
 
-def check(chunks, lines: int = 24, columns: int = 80) -> None:
+def check(
+    chunks, lines: int = 24, columns: int = 80, history=None
+) -> None:
     """
     Feed the chunks one at a time, and after each one say that the
     believing reader holds what the screen really holds.
     """
-    screen = a_screen(columns=columns, lines=lines)
+    screen = a_screen(columns=columns, lines=lines, history=history)
     stream = Stream(screen)
     stream.attach(screen)
     reader = Believing(screen)
@@ -114,6 +116,11 @@ def check(chunks, lines: int = 24, columns: int = 80) -> None:
 
     for number, chunk in enumerate(chunks):
         stream.feed(chunk)
+        if history is not None:
+            # A screen prunes once per hundred linefeeds, which a run of
+            # forty chunks never reaches. This is the prune, put where a
+            # reader is watching.
+            screen._remove_old_lines_from_history()
         rows = everything(screen, reader)
         believed = reader.read(rows)
         truth = {row: cells_of(screen, row) for row in rows}
@@ -199,6 +206,24 @@ def test_a_sequence_nobody_recorded(chunks):
     # A small screen, so that a scroll and a rectangle reach the edges
     # rather than land in the middle of a wide empty page.
     check(chunks, lines=6, columns=10)
+
+
+@given(st.lists(a_chunk(), min_size=1, max_size=40))
+@settings(
+    max_examples=500,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow],
+)
+def test_a_sequence_that_scrolls_out_of_the_history(chunks):
+    """
+    The same hunt, on a pane that keeps almost no scrollback.
+
+    The default keeps two thousand rows, which a run of forty chunks
+    never fills, so nothing above leaves the history and `_forget` is
+    never reached with a reader watching. Five rows means a row leaves
+    on nearly every chunk.
+    """
+    check(chunks, lines=6, columns=10, history=5)
 
 
 # ----------------------------------------------------------------------

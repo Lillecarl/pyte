@@ -11,7 +11,7 @@ from pyte.screen import Screen
 __all__ = ("a_screen", "display")
 
 
-def a_screen(columns: int = 80, lines: int = 24, kind=Screen):
+def a_screen(columns: int = 80, lines: int = 24, kind=Screen, history=None):
     """
     A screen of the given size, answering nobody.
 
@@ -20,8 +20,17 @@ def a_screen(columns: int = 80, lines: int = 24, kind=Screen):
     reports a size in.
 
     `kind` is for a test that subclasses the screen to watch one method.
+
+    `history` is how many rows of scrollback to keep. The default keeps
+    two thousand, which a short test never fills, so a test that wants
+    to see a row leave the history names a small number here.
     """
-    return kind(lines, columns, write_process_input=lambda data: None)
+    return kind(
+        lines,
+        columns,
+        write_process_input=lambda data: None,
+        get_history_limit=None if history is None else (lambda: history),
+    )
 
 
 def display(screen: Screen):
