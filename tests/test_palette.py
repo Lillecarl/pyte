@@ -196,22 +196,22 @@ def test_a_reset_names_the_entry_to_put_back(pane):
     stream.feed("\x1b]104;3\x1b\\")
     stream.feed("\x1b]4;3;?\x1b\\")
     assert responses == ["\x1b]4;3;%s\x1b\\" % PALETTE[3].spec]
-    assert screen.palette_colors == {}
+    assert screen.colors.by_index == {}
 
 
 def test_a_reset_with_no_payload_puts_the_whole_palette_back(pane):
     screen, stream, _responses = pane
     stream.feed("\x1b]4;3;#aabbcc;9;#ddeeff\x1b\\")
-    assert len(screen.palette_colors) == 2
+    assert len(screen.colors.by_index) == 2
     stream.feed("\x1b]104\x1b\\")
-    assert screen.palette_colors == {}
+    assert screen.colors.by_index == {}
 
 
 def test_a_reset_of_the_palette_leaves_the_special_colours(pane):
     screen, stream, _responses = pane
     stream.feed("\x1b]5;0;#aabbcc\x1b\\")
     stream.feed("\x1b]104\x1b\\")
-    assert screen.palette_colors == {FIRST_SPECIAL_COLOR: Color(0xAA, 0xBB, 0xCC)}
+    assert screen.colors.by_index == {FIRST_SPECIAL_COLOR: Color(0xAA, 0xBB, 0xCC)}
 
 
 # ----------------------------------------------------------------------
@@ -267,7 +267,7 @@ def test_a_special_reset_puts_one_colour_back(pane):
     screen, stream, _responses = pane
     stream.feed("\x1b]5;0;#aabbcc;1;#ddeeff\x1b\\")
     stream.feed("\x1b]105;0\x1b\\")
-    assert screen.palette_colors == {
+    assert screen.colors.by_index == {
         FIRST_SPECIAL_COLOR + 1: Color(0xDD, 0xEE, 0xFF)
     }
 
@@ -278,7 +278,7 @@ def test_a_special_reset_with_no_payload_puts_them_all_back(pane):
     stream.feed("\x1b]5;0;#ddeeff\x1b\\")
     stream.feed("\x1b]105\x1b\\")
     # The palette entry stays: "OSC 105" covers the special colours.
-    assert screen.palette_colors == {3: Color(0xAA, 0xBB, 0xCC)}
+    assert screen.colors.by_index == {3: Color(0xAA, 0xBB, 0xCC)}
 
 
 # ----------------------------------------------------------------------
@@ -332,5 +332,5 @@ def test_a_hard_reset_puts_every_colour_back(pane):
     stream.feed("\x1b]4;3;#aabbcc\x1b\\")
     stream.feed("\x1b]10;#ddeeff\x1b\\")
     stream.feed("\x1bc")
-    assert screen.palette_colors == {}
-    assert screen.dynamic_colors == {}
+    assert screen.colors.by_index == {}
+    assert screen.colors.by_code == {}

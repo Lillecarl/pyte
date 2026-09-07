@@ -18,7 +18,7 @@ in `xcms.py`. Nothing about a colour space belongs here.
 from enum import StrEnum
 from typing import Dict, List, NamedTuple, Tuple
 
-from .colors import PALETTE
+from .colors import DEFAULT_COLORS, PALETTE, Color, parse_color
 
 __all__ = [
     "DYNAMIC_COLOR_CODES",
@@ -30,7 +30,9 @@ __all__ = [
     "MAX_POINTER_SHAPES",
     "POINTER_SHAPES",
     "POINTER_SHAPE_ALIASES",
+    "QUERY",
     "SPECIAL_COLOR_NAMES",
+    "ColorOverrides",
     "Osc",
     "PointerShapeRead",
     "PointerShapes",
@@ -388,3 +390,176 @@ class PointerShapes:
             else:
                 answers.append("0")
         return "22;%s" % ",".join(answers)
+
+
+#: The value that asks for a colour instead of setting one.
+QUERY = "?"
+
+
+class ColorOverrides:
+    """
+    The colours that a program set, over the ones a pane starts with.
+
+    Two tables, because a program names a colour two ways. "OSC 4" and
+    "OSC 5" number one, and "OSC 10" and the codes after it name one.
+    The two arrive apart and go back apart, so they are kept apart, and
+    they are together here because one question reads both: what colour
+    does this pane draw for that?
+
+    Every method that answers a program returns the payloads to send
+    and writes nothing. A pane has one screen of these, and a reset
+    takes them all away.
+    """
+
+    __slots__ = ("by_index", "by_code")
+
+    def __init__(self) -> None:
+        #: What "OSC 4" and "OSC 5" set, by the index into the palette
+        #: and the special colours after it.
+        self.by_index: Dict[int, Color] = {}
+
+        #: What "OSC 10" and the codes after it set, by the code that
+        #: set it.
+        self.by_code: Dict[str, Color] = {}
+
+    def color_of(self, index: int) -> Color | None:
+        """
+        The colour that "OSC 4" reports for an index.
+
+        The palette comes first and the special colours follow it. The
+        answer is what a program set, or the default when it set
+        nothing. `None` is an index that this pane does not hold.
+        """
+        held = self.by_index.get(index)
+        if held is not None:
+            return held
+        if index < len(PALETTE):
+            return PALETTE[index]
+        # A special colour that nobody set draws in the colour of the
+        # text. xterm leaves such a colour unset and paints the text
+        # colour, so that is the honest answer.
+        #
+        # It is the foreground this pane holds now, and not the default
+        # one. A program can set the foreground with "OSC 10", and the
+        # bold text of that program then draws in the colour it set.
+        if index - FIRST_SPECIAL_COLOR < len(SPECIAL_COLOR_NAMES):
+            return self.named("foreground")
+        return None
+
+    def named(self, name: str) -> Color:
+        """
+        The colour that a name stands for, as this pane holds it now.
+
+        A dynamic colour that a program set wins over the default. Both
+        "OSC 10" and the kitty query read the same colour, so both read
+        this.
+        """
+        for code, named in DYNAMIC_COLOR_CODES.items():
+            if named == name and code in self.by_code:
+                return self.by_code[code]
+        return DEFAULT_COLORS[name]
+
+    def read_indexed(self, code: str, param: str, offset: int) -> List[str]:
+        """
+        Read "OSC 4" or "OSC 5": the palette and the special colours.
+
+        The payload holds index and value pairs. A value of "?" asks
+        for the colour and the others set it. `offset` is what the
+        written index needs to reach the table, because "OSC 5"
+        numbers the special colours from zero and "OSC 4" numbers them
+        after the palette.
+
+        Each query gets a payload of its own. A program reads one
+        answer for each question it asked, so two questions may not
+        come back as one.
+        """
+        answers = []
+        parts = param.split(";")
+        for index in range(0, len(parts) - 1, 2):
+            number, value = parts[index], parts[index + 1]
+            if not number.isdigit():
+                continue
+            entry = int(number) + offset
+            if value.strip() == QUERY:
+                color = self.color_of(entry)
+                if color is not None:
+                    answers.append("%s;%s;%s" % (code, number, color.spec))
+            else:
+                color = parse_color(value)
+                if color is not None and self.color_of(entry) is not None:
+                    self.by_index[entry] = color
+        return answers
+
+    def reset_indexed(self, param: str, offset: int, count: int) -> None:
+        """
+        Read "OSC 104" or "OSC 105": put colours back to the defaults.
+
+        The payload names the indexes to put back. An empty payload
+        puts back every colour that the sequence covers, which is the
+        palette for one code and the special colours for the other.
+        """
+        if not param.strip():
+            for entry in range(offset, offset + count):
+                self.by_index.pop(entry, None)
+            return
+        for number in param.split(";"):
+            if number.isdigit():
+                self.by_index.pop(int(number) + offset, None)
+
+    def read_dynamic(self, code: str, param: str) -> List[str]:
+        """
+        Read "OSC 10" and the codes after it: the colours that a
+        terminal names rather than numbers.
+
+        One payload may carry several values, and each one moves on to
+        the next code. "OSC 10 ; spec1 ; spec2" sets the foreground and
+        then the background. A code that a pane does not hold is
+        counted and skipped, so the ones after it still land right.
+        """
+        answers = []
+        for step, value in enumerate(param.split(";")):
+            number = str(int(code) + step)
+            if number not in DYNAMIC_COLOR_CODES:
+                continue
+            if value.strip() == QUERY:
+                color = self.by_code.get(
+                    number, DEFAULT_COLORS[DYNAMIC_COLOR_CODES[number]]
+                )
+                answers.append("%s;%s" % (number, color.spec))
+            else:
+                color = parse_color(value)
+                if color is not None:
+                    self.by_code[number] = color
+        return answers
+
+    def reset_dynamic(self, code: str) -> None:
+        "Read \"OSC 110\" and the codes after it: put one colour back."
+        self.by_code.pop(code, None)
+
+    def answer_kitty(self, param: str) -> str | None:
+        """
+        The payload that answers a kitty colour query, e.g.
+        "OSC 21 ; background=?", or `None` when there is nothing to
+        answer.
+
+        kitty joins its answers into one sequence, which is what its
+        own protocol says. The xterm queries answer one at a time.
+        """
+        keys = parse_kitty_color_query(param)
+        if keys is None:
+            return None
+
+        answers = []
+        for key, is_query in keys:
+            if not is_query:
+                continue
+            if key.isdigit() and int(key) < len(PALETTE):
+                color = self.color_of(int(key))
+                answers.append("%s=%s" % (key, color.spec))
+            elif key in DEFAULT_COLORS:
+                answers.append("%s=%s" % (key, self.named(key).spec))
+            else:
+                answers.append("%s=" % key)  # Not a colour that we hold.
+        if not answers:
+            return None
+        return "21;%s" % ";".join(answers)
