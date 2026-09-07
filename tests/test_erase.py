@@ -5,7 +5,8 @@ A terminal that does not do this loses the colour bar that a program
 draws with "CSI K", which is how htop paints the header of its table.
 """
 from pyte.colors import SgrColor
-from pyte.screen import Screen, WrittenCell
+from pyte.cells import WrittenCell
+from pyte.screen import Screen
 from pyte.streams import Stream
 
 

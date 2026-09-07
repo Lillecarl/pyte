@@ -10,7 +10,8 @@ The line keeps every column it had. libvterm alone halves it, and the
 other five judges keep it whole; `test_the_panel.py` holds that vote.
 Lillecarl/pymux#55.
 """
-from pyte.screen import Screen, DoubleHeight, LineAttribute
+from pyte.page import DoubleHeight, LineAttribute
+from pyte.screen import Screen
 from pyte.streams import Stream
 
 LINES, COLUMNS = 5, 10

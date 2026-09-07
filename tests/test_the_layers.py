@@ -32,6 +32,7 @@ PACKAGE = Path(pyte.__file__).parent
 #: The screen and everything under it. No I/O and no toolkit.
 PURE = {
     "cache",
+    "cells",
     "charsets",
     "colors",
     "control",
@@ -40,6 +41,7 @@ PURE = {
     "kitty_keys",
     "modes",
     "osc",
+    "page",
     "placeholders",
     "png",
     "screen",
@@ -217,5 +219,11 @@ def test_the_reading_sees_an_import_where_there_is_one():
     found no import anywhere would pass every module.
     """
     outside, inside = _imports(MODULES["screen"])
+    assert {"cells", "colors", "images", "kitty_keys", "page"} <= inside
+
+    # `cells` is where the one outside import of the pure layer is:
+    # `wcwidth` measures a character, and nothing else here reaches
+    # outside the standard library at all.
+    outside, inside = _imports(MODULES["cells"])
     assert "wcwidth" in outside
-    assert {"cache", "colors", "images", "kitty_keys"} <= inside
+    assert {"cache", "colors"} <= inside
