@@ -11,7 +11,7 @@ that a resize keeps every line is `test_reflow_keeps_the_content.py`,
 and it judges the same function through the screen.
 """
 from pyte.cells import PLAIN_APPEARANCE, WrittenCell
-from pyte.page import Page
+from pyte.page import Page, TextLine
 
 
 def _a_page(*rows):
@@ -108,6 +108,51 @@ def test_the_attribute_comes_from_the_row_the_line_starts_on():
     assert [line.attribute for line in lines] == ["double"]
 
 
+def test_the_text_of_a_line_joins_the_rows_it_took():
+    "The cheap half: the text, and no cell of it."
+    page = _a_page("one", "|two", "three", "|four", "|five")
+    assert page.text_lines(0, 4) == [
+        TextLine("onetwo", 0, 1),
+        TextLine("threefourfive", 2, 4),
+    ]
+
+
+def test_a_text_line_stops_where_the_caller_stopped():
+    """
+    The row below `last` may be a wrap of it. The caller asked for
+    rows, so a line the range cuts into arrives cut.
+    """
+    page = _a_page("one", "|two", "|three")
+    assert page.text_lines(0, 1) == [TextLine("onetwo", 0, 1)]
+
+
+def test_a_row_of_nothing_is_a_text_line_of_nothing():
+    page = _a_page("one", "", "")
+    assert page.text_lines(0, 2) == [
+        TextLine("one", 0, 0),
+        TextLine("", 1, 1),
+        TextLine("", 2, 2),
+    ]
+
+
+def test_a_range_that_holds_nothing_gives_no_text_line():
+    "A buffer with no row at all asks for nothing, and gets nothing."
+    assert _a_page().text_lines(0, -1) == []
+
+
+def test_the_rows_of_a_text_line_unwrap_to_its_cells():
+    """
+    The two halves agree: the rows a `TextLine` names hold that line
+    and no other. That is what copy mode does when a person looks at
+    a line.
+    """
+    page = _a_page("one", "|two", "three")
+    for shown in page.text_lines(0, 2):
+        lines, _ = page.unwrap(shown.first, shown.last)
+        assert len(lines) == 1
+        assert "".join(cell.char for cell in lines[0].cells) == shown.text
+
+
 def test_nothing_is_written_by_reading():
     """
     The buffer makes a row for a number it does not hold, so a
@@ -116,4 +161,5 @@ def test_nothing_is_written_by_reading():
     """
     page = _a_page("one")
     page.unwrap(0, 10)
+    page.text_lines(0, 10)
     assert set(page.data_buffer) == {0}

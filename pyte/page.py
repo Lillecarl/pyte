@@ -27,6 +27,7 @@ __all__ = (
     "PLAIN_LINE",
     "Page",
     "Row",
+    "TextLine",
 )
 
 
@@ -166,6 +167,22 @@ class LogicalLine:
         )
 
 
+class TextLine(NamedTuple):
+    """
+    One line of the buffer as text, and the rows it is laid out on.
+
+    `Page.text_lines` gives these. The rows are there so that a reader
+    which shows the text can ask `Page.unwrap` for the cells of one
+    line when somebody looks at it.
+    """
+
+    text: str
+
+    #: The first and the last row the line takes, both inside it.
+    first: int
+    last: int
+
+
 class Page:
     """
     One screen of cells, and whether the cursor shows on it.
@@ -207,6 +224,57 @@ class Page:
         """
         line = self.data_buffer.get(row)
         return line is not None and line.wrapped
+
+    def text_lines(self, first: int, last: int) -> "List[TextLine]":
+        """
+        The lines the range holds, as text and as the rows each one
+        is laid out on.
+
+        **It carries no cell.** A reader that shows text and wants the
+        cells of one line only when somebody looks at it asks this, and
+        then `unwrap` for the rows of that one line. Copy mode does
+        that: it opens on fifty thousand rows and shows a screenful,
+        and it pays for the text of all of them because a `Document`
+        holds one string. Lillecarl/pymux#131.
+
+        The rows come with the text and not in a list beside it. Two
+        containers that a caller has to keep in step are two containers
+        that go out of step. Lillecarl/pymux#134.
+
+        Nothing here writes, and a row the buffer does not hold gives
+        no characters.
+        """
+        if first > last:
+            return []
+
+        lines = []
+        text = ""
+        start = first
+        data_buffer = self.data_buffer
+
+        for number in range(first, last + 1):
+            row = data_buffer.get(number)
+
+            # A row that no wrap made starts a line, which ends the one
+            # before it. The first row of the range starts the first
+            # line whether a wrap made it or not: the caller asked for
+            # these rows, so a line it cuts into arrives cut.
+            if number != first and not (row is not None and row.wrapped):
+                lines.append(TextLine(text, start, number - 1))
+                text = ""
+                start = number
+
+            if row:
+                # One join per row and not one per line: nearly every
+                # line is one row, and a second join over a list of one
+                # cost a third of the whole read. A line that spans
+                # rows adds to the string, which CPython does in place.
+                text += "".join(
+                    row[column].char for column in range(max(row) + 1)
+                )
+
+        lines.append(TextLine(text, start, last))
+        return lines
 
     def unwrap(
         self, first: int, last: int, cursor: "Tuple[int, int] | None" = None
