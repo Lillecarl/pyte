@@ -122,6 +122,67 @@ def test_a_rectangle_erase_leaves_the_marks():
     assert _continues(screen, 2)
 
 
+# ----------------------------------------------------------------------
+# A move that brings blank rows in. Lillecarl/pymux#179.
+
+
+def test_a_scroll_down_ends_the_wrap_under_the_blank_row():
+    """
+    SD puts a blank row at the top of the region and pushes the rows
+    down. The row that lands under the blank one continued a line the
+    scroll has taken away, so it continues nothing now.
+
+    The region starts in the middle of the line, which is what makes
+    the mark stale. A region that takes the whole line moves the row
+    that starts it as well, and that row carries no mark to begin
+    with.
+
+    Without this the buffer said two things at once. `Page.unwrap`
+    reads the mark, so it joined the blank row and the rows under it
+    into one line, while `_first_row_to_lay_out` reads a row the buffer
+    does not hold as a line of its own. A resize answered with the
+    second reading, and a blank line appeared out of nothing.
+    Lillecarl/pymux#179.
+    """
+    screen = _screen("a" * 32 + "\x1b[2;4r" + "\x1b[T")
+
+    assert _continues(screen, 1) is False
+    assert not _continues(screen, 2)
+    assert _continues(screen, 3)
+
+
+def test_a_scroll_up_ends_the_wrap_under_the_blank_row():
+    """
+    SU brings its blank rows in at the bottom of the region, so the
+    row under the region is the one that continued a line the scroll
+    took away.
+    """
+    screen = _screen("a" * 32 + "\x1b[2;3r" + "\x1b[3;1H\x1b[S")
+
+    assert _continues(screen, 1)
+    assert not _continues(screen, 3)
+
+
+def test_inserting_a_line_ends_the_wrap_under_it():
+    "IL brings a blank row in the same way, at the cursor."
+    screen = _screen("a" * 20 + "\x1b[2;1H\x1b[L")
+
+    assert not _continues(screen, 2)
+    assert _continues(screen, 3)
+
+
+def test_a_scroll_that_moves_a_whole_line_keeps_the_mark():
+    """
+    The rows of one line move together, so nothing about them
+    changed. Only the row that lands under a blank one loses its mark.
+    """
+    screen = _screen("a" * 20 + "\x1b[T")
+
+    assert not _continues(screen, 1)
+    assert _continues(screen, 2)
+    assert _continues(screen, 3)
+
+
 def test_the_alternate_screen_gives_the_mark_back():
     """
     A visit to the other screen leaves the first one as it was.

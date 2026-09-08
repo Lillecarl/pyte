@@ -2160,6 +2160,28 @@ class Screen:
                 self._erase_columns(data_buffer[row + line_offset], horizontal)
 
         if horizontal is None:
+            # A row that follows a blank row does not continue it.
+            #
+            # The move brings blank rows into the region: at the top of
+            # it for a scroll down, and at the bottom for a scroll up.
+            # The row under them still carries the mark it had, and
+            # that mark describes a line the move has taken away. A
+            # reflow then reads the blank row and the rows under it as
+            # one line, and the blank line disappears into the next
+            # one. Lillecarl/pymux#179.
+            #
+            # `erase_in_display` says the same thing about the row
+            # under the range it erases, and cites libvterm and xterm
+            # for it. Lillecarl/pymux#142.
+            #
+            # It says nothing about the row the move brings to the top
+            # of the region, whose own predecessor the move discarded.
+            # That is a different question and xterm answers it the
+            # other way: it moves the rows and their marks and clears
+            # neither. Lillecarl/pymux#188.
+            under_the_blanks = top + steps if amount < 0 else bottom + 1
+            self._forget_the_wrap_marks([under_the_blanks + line_offset])
+
             # Graphics placements scroll with the text. An image sits on
             # whole lines, so it moves only when whole lines move.
             self.graphics.scroll(top + line_offset, bottom + line_offset, amount)
