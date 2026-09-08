@@ -350,3 +350,93 @@ def test_the_ss3_form_belongs_to_a_pane_that_pushed_no_flag():
             == "\x1b[D"[:3]
         )
         assert translate_key_data("\x1bOP", flags=flags)[:3] == "\x1b[P"
+
+
+#: One row per key: the name, what a terminal in the legacy encoding
+#: sends, and what the same terminal sends once something asked it to
+#: disambiguate.
+#:
+#: The keypad is the interesting part. A terminal folds it onto the
+#: main keyboard while it speaks the legacy encoding, and stops as soon
+#: as anything asks it to disambiguate. So a pane that asked for
+#: nothing reads a keypad key only if this end folds it back.
+WHAT_A_KEYBOARD_SENDS = [
+    ("escape", "\x1b", "\x1b[27u"),
+    ("ctrl+a", "\x01", "\x1b[97;5u"),
+    ("alt+a", "\x1ba", "\x1b[97;3u"),
+    ("ctrl+i", "\t", "\x1b[105;5u"),
+    ("keypad 0", "0", "\x1b[57399u"),
+    ("keypad 9", "9", "\x1b[57408u"),
+    ("keypad .", ".", "\x1b[57409u"),
+    ("keypad /", "/", "\x1b[57410u"),
+    ("keypad *", "*", "\x1b[57411u"),
+    ("keypad -", "-", "\x1b[57412u"),
+    ("keypad +", "+", "\x1b[57413u"),
+    ("keypad enter", "\r", "\x1b[57414u"),
+    ("keypad =", "=", "\x1b[57415u"),
+    ("keypad left", "\x1b[D", "\x1b[57417u"),
+    ("keypad up", "\x1b[A", "\x1b[57419u"),
+    ("keypad page up", "\x1b[5~", "\x1b[57421u"),
+    ("keypad home", "\x1b[H", "\x1b[57423u"),
+    ("keypad insert", "\x1b[2~", "\x1b[57425u"),
+    ("keypad delete", "\x1b[3~", "\x1b[57426u"),
+]
+
+#: Keys that the protocol numbers and the legacy encoding cannot write.
+#: A terminal reports one only when something asked it to.
+KEYS_WITH_NO_LEGACY_FORM = [
+    ("caps lock", "\x1b[57358u"),
+    ("menu", "\x1b[57363u"),
+    ("f13", "\x1b[57376u"),
+    ("keypad separator", "\x1b[57416u"),
+    ("play", "\x1b[57428u"),
+    ("left shift", "\x1b[57441u"),
+    ("right super", "\x1b[57450u"),
+]
+
+
+def test_a_pane_reads_the_same_key_from_either_keyboard():
+    """
+    A terminal that speaks the protocol is a terminal that speaks the
+    legacy encoding, plus more. So a pane that asked for nothing must
+    read one key the same way from both, or asking the terminal of the
+    person for the protocol would change what every program reads.
+
+    Lillecarl/pymux#166.
+    """
+    for name, legacy, protocol in WHAT_A_KEYBOARD_SENDS:
+        assert translate_key_data(protocol, flags=0) == translate_key_data(
+            legacy, flags=0
+        ), name
+
+
+def test_a_key_the_legacy_encoding_cannot_write_reaches_no_such_pane():
+    """
+    The protocol numbers these in the Private Use Area, and `chr` of
+    one of them is a character no keyboard has. A pane that asked for
+    nothing hears nothing, which is what kitty does as well.
+    """
+    for name, protocol in KEYS_WITH_NO_LEGACY_FORM:
+        assert translate_key_data(protocol, flags=0) == "", name
+
+
+def test_a_pane_that_asked_reads_the_number_of_the_key():
+    "The fold is for the legacy encoding. It must not hide a key."
+    assert translate_key_data("\x1b[57399u", flags=DISAMBIGUATE) == (
+        "\x1b[57399u"
+    )
+    assert translate_key_data("\x1b[57441u", flags=DISAMBIGUATE) == (
+        "\x1b[57441u"
+    )
+    assert translate_key_data("\x1b[57376u", flags=REPORT_ALL) == "\x1b[57376u"
+    assert translate_key_data("\x1b[57399u", flags=ASSOCIATED_TEXT) == (
+        "\x1b[57399u"
+    )
+
+
+def test_a_folded_keypad_key_follows_the_cursor_key_mode():
+    "The fold gives a normal key, and a normal arrow reads DECCKM."
+    assert translate_key_data(
+        "\x1b[57419u", flags=0, application_mode=True
+    ) == "\x1bOA"
+    assert translate_key_data("\x1b[57419u", flags=0) == "\x1b[A"

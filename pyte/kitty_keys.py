@@ -106,8 +106,82 @@ class FlagsMode(IntEnum):
     CLEAR_THE_BITS = 3
 
 
+class KeyCode(IntEnum):
+    """
+    The code of a key that writes one control character.
+
+    The protocol numbers a key by the character it writes without any
+    modifier, so these four carry their C0 code and not a number of
+    their own.
+    """
+
+    TAB = 9
+    ENTER = 13
+    ESCAPE = 27
+    BACKSPACE = 127
+
+
+class FunctionalKey(IntEnum):
+    """
+    The number of a keypad key, in the Private Use Area.
+
+    The protocol numbers every key that writes no character from
+    `FIRST_FUNCTIONAL_KEY` up. Only the keypad is named here, because
+    only the keypad has a normal key to fold onto. The names are the
+    ones kitty uses (`functional_key_number_to_name_map` in
+    `kitty/key_encoding.py`).
+    """
+
+    KP_0 = 57399
+    KP_1 = 57400
+    KP_2 = 57401
+    KP_3 = 57402
+    KP_4 = 57403
+    KP_5 = 57404
+    KP_6 = 57405
+    KP_7 = 57406
+    KP_8 = 57407
+    KP_9 = 57408
+    KP_DECIMAL = 57409
+    KP_DIVIDE = 57410
+    KP_MULTIPLY = 57411
+    KP_SUBTRACT = 57412
+    KP_ADD = 57413
+    KP_ENTER = 57414
+    KP_EQUAL = 57415
+    KP_SEPARATOR = 57416
+    KP_LEFT = 57417
+    KP_RIGHT = 57418
+    KP_UP = 57419
+    KP_DOWN = 57420
+    KP_PAGE_UP = 57421
+    KP_PAGE_DOWN = 57422
+    KP_HOME = 57423
+    KP_END = 57424
+    KP_INSERT = 57425
+    KP_DELETE = 57426
+    KP_BEGIN = 57427
+
+
+class TildeKey(IntEnum):
+    'The number of a key in the "CSI number ~" form.'
+
+    INSERT = 2
+    DELETE = 3
+    PAGE_UP = 5
+    PAGE_DOWN = 6
+
+
+#: The first code point of the Private Use Area. A key numbered from
+#: here up writes no character of its own.
+FIRST_FUNCTIONAL_KEY = 0xE000
+
 # Final bytes of the "CSI 1 ; modifier <letter>" functional key form.
 _LETTER_FINALS = "ABCDEFHPQS"
+
+#: The number a key of the letter form carries. It is always one: the
+#: letter names the key, so the number has nothing to say.
+_LETTER_FORM_CODE = 1
 
 
 #: The most flag sets one screen keeps. The specification asks a
@@ -412,12 +486,81 @@ def _serialize(
 #: Keys that the legacy encoding writes as one control character. A
 #: release of one of them has no legacy form, and kitty reports it only
 #: when the pane asks for all keys as escape codes.
-_CONTROL_CODES = (13, 9, 127)
+_CONTROL_CODES = (KeyCode.ENTER, KeyCode.TAB, KeyCode.BACKSPACE)
+
+#: The normal key of each keypad key, as `(code, final)`.
+#:
+#: A terminal folds the keypad onto the main keyboard while it speaks
+#: the legacy encoding, and stops folding it as soon as anything asks
+#: it to disambiguate. kitty does it in `convert_kp_key_to_normal_key`,
+#: under `if (!ev.disambiguate && !ev.report_text ...)`
+#: (`kitty/key_encoding.c`). So a pane that asked for nothing reads a
+#: keypad key only if this end folds it back.
+#:
+#: `KP_SEPARATOR` and `KP_BEGIN` are not here, for the same reason they
+#: are not in kitty's function: neither has a normal key.
+_KEYPAD_TO_NORMAL = {
+    **{
+        FunctionalKey.KP_0 + n: (ord("0") + n, "u") for n in range(10)
+    },
+    FunctionalKey.KP_DECIMAL: (ord("."), "u"),
+    FunctionalKey.KP_DIVIDE: (ord("/"), "u"),
+    FunctionalKey.KP_MULTIPLY: (ord("*"), "u"),
+    FunctionalKey.KP_SUBTRACT: (ord("-"), "u"),
+    FunctionalKey.KP_ADD: (ord("+"), "u"),
+    FunctionalKey.KP_ENTER: (KeyCode.ENTER, "u"),
+    FunctionalKey.KP_EQUAL: (ord("="), "u"),
+    FunctionalKey.KP_LEFT: (_LETTER_FORM_CODE, "D"),
+    FunctionalKey.KP_RIGHT: (_LETTER_FORM_CODE, "C"),
+    FunctionalKey.KP_UP: (_LETTER_FORM_CODE, "A"),
+    FunctionalKey.KP_DOWN: (_LETTER_FORM_CODE, "B"),
+    FunctionalKey.KP_HOME: (_LETTER_FORM_CODE, "H"),
+    FunctionalKey.KP_END: (_LETTER_FORM_CODE, "F"),
+    FunctionalKey.KP_PAGE_UP: (TildeKey.PAGE_UP, "~"),
+    FunctionalKey.KP_PAGE_DOWN: (TildeKey.PAGE_DOWN, "~"),
+    FunctionalKey.KP_INSERT: (TildeKey.INSERT, "~"),
+    FunctionalKey.KP_DELETE: (TildeKey.DELETE, "~"),
+}
+
+
+def _folded(event: KeyEvent, flags: int) -> KeyEvent | None:
+    """
+    The key event as a pane in the legacy encoding reads it.
+
+    The event as it stands, for a pane that asked for a form which can
+    carry the number of a key. `None` for a key that the legacy
+    encoding cannot write at all.
+
+    The protocol numbers every key that writes no character from
+    `FIRST_FUNCTIONAL_KEY` up, so `chr(code)` on one of them gives a
+    character no keyboard has and no program wants. A keypad key folds
+    onto its normal key. Every other one -- a lock key, a modifier key,
+    a media key, F13 upwards -- has no legacy form, so a pane that
+    speaks the legacy encoding does not hear it. kitty does the same.
+    Lillecarl/pymux#166.
+    """
+    carries_the_number = flags & (
+        KeyboardFlag.DISAMBIGUATE
+        | KeyboardFlag.REPORT_ALL_KEYS
+        | KeyboardFlag.REPORT_ASSOCIATED_TEXT
+    )
+    if carries_the_number:
+        return event
+    if event.final != "u" or event.code < FIRST_FUNCTIONAL_KEY:
+        return event
+    normal = _KEYPAD_TO_NORMAL.get(event.code)
+    if normal is None:
+        return None
+    code, final = normal
+    return event._replace(code=code, final=final)
 
 
 def _encode_event(event: KeyEvent, flags: int, application_mode: bool) -> str:
     "Encode a key event for a pane with the given protocol flags."
-    code, mods, final, text, alternates, kind = event
+    plain = _folded(event, flags)
+    if plain is None:
+        return ""
+    code, mods, final, text, alternates, kind = plain
     mods_value = mods + 1
 
     # Only a pane that asked for the event types can read a release. A
@@ -435,10 +578,19 @@ def _encode_event(event: KeyEvent, flags: int, application_mode: bool) -> str:
     embedded = text if flags & KeyboardFlag.REPORT_ASSOCIATED_TEXT else ""
 
     if final == "u":
-        ambiguous = bool(mods & (Modifier.CTRL | Modifier.ALT)) or code == 27
+        ambiguous = (
+            bool(mods & (Modifier.CTRL | Modifier.ALT))
+            or code == KeyCode.ESCAPE
+        )
+        # A functional key still here belongs to a pane that reads the
+        # number of a key: `_folded` took it away from every other one.
+        # It goes out as an escape code whatever else is asked for,
+        # because `chr` of it is a character no keyboard has.
+        no_legacy_form = code >= FIRST_FUNCTIONAL_KEY
         if (
             flags & KeyboardFlag.REPORT_ALL_KEYS
             or (flags & KeyboardFlag.DISAMBIGUATE and ambiguous)
+            or no_legacy_form
             or kind != EventType.PRESS
             or alternates
             or embedded
