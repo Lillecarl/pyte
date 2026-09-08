@@ -41,6 +41,20 @@ let
     in
     if value == "" then "tests" else value;
 
+  # The seed a roaming run draws from. Every seed is its own
+  # derivation, so a seed that failed is a name somebody can build
+  # again:
+  #
+  #     PYTE_HYPOTHESIS_SEED=1743 nix build --file . checks.pyte-roaming
+  #
+  # Without one it takes the clock. A hunt that nix caches is not a
+  # hunt: it would draw once and answer out of the store for ever.
+  seed =
+    let
+      value = builtins.getEnv "PYTE_HYPOTHESIS_SEED";
+    in
+    if value == "" then toString builtins.currentTime else value;
+
   prepare = ''
     cp -r ${testSources}/tests .
     chmod -R +w .
@@ -82,6 +96,27 @@ in
       export PYTE_GROUP=unit
     '';
   } runPytest;
+
+  # The property tests again, drawing examples nobody has seen.
+  #
+  # **Not a gate.** The gate runs the pinned profile, so it draws the
+  # same examples every time and a green run means the same thing
+  # twice. That is what a gate is for, and it is also why the gate
+  # alone stops finding anything new. This one runs the same property
+  # tests off a fresh seed. `tests/conftest.py` holds both profiles.
+  # Lillecarl/pymux#180.
+  #
+  # `-m hypothesis` is the plugin's own mark, put on every test that
+  # draws. So a property test written tomorrow lands here by being one,
+  # the way a test file lands in a group by what it imports.
+  roaming = suite {
+    name = "pyte-roaming";
+    inputs = [ pythonWithTests ];
+    env = { inherit selection seed; };
+    setup = prepare + ''
+      export PYTE_GROUP=unit
+    '';
+  } "${runPytest} -m hypothesis --hypothesis-profile=roaming --hypothesis-seed=$seed";
 
   # The colour specs, judged against the real Xlib. `pyte/xcms.py` is a
   # port of the colour management of Xlib, and only a comparison against
