@@ -15,7 +15,11 @@ The levels are xterm's, and so are the examples:
 Lillecarl/pymux#169.
 """
 import pyte
-from pyte.keys import KeyModifierResource, ModifyOtherKeys
+from pyte.keys import (
+    FormatOtherKeys,
+    KeyModifierResource,
+    ModifyOtherKeys,
+)
 
 
 def a_screen():
@@ -248,6 +252,89 @@ def test_what_the_pane_asked_for_is_not_forgotten():
     screen.extended_keys_allowed = True
 
     assert screen.modify_other_keys == ModifyOtherKeys.EVERY_MODIFIER
+
+
+# ----------------------------------------------------------------------
+# Which of the two forms it writes. XTFMTKEYS, resource 4.
+
+
+def test_the_tilde_form_is_the_one_a_terminal_writes():
+    screen, stream, _ = a_screen()
+    stream.feed("\x1b[>4;2m")
+
+    assert screen.format_other_keys == FormatOtherKeys.TILDE
+    assert screen.encode_key("\x01") == "\x1b[27;5;97~"
+
+
+def test_a_program_can_ask_for_the_csi_u_form():
+    """
+    xterm's own example: "when modifyOtherKeys is set to 1, for
+    example alt-Tab sends CSI 9 ; 3 u (changing the order of
+    parameters)". Lillecarl/pymux#183.
+    """
+    screen, stream, _ = a_screen()
+    stream.feed("\x1b[>4;1m")
+
+    stream.feed("\x1b[>4;1f")
+
+    assert screen.format_other_keys == FormatOtherKeys.CSI_U
+    assert screen.encode_key("\x1b\t") == "\x1b[9;3u"
+
+
+def test_the_form_can_be_put_back():
+    screen, stream, _ = a_screen()
+    stream.feed("\x1b[>4;2m\x1b[>4;1f")
+
+    stream.feed("\x1b[>4;0f")
+
+    assert screen.encode_key("\x01") == "\x1b[27;5;97~"
+
+
+def test_xtfmtkeys_does_not_move_the_cursor():
+    """
+    Its final byte is the one HVP has, and the private marker is the
+    whole difference. Reading it as a position moved the cursor to row
+    four, and every character the program drew after it landed in the
+    wrong place. Lillecarl/pymux#183.
+    """
+    screen, stream, _ = a_screen()
+    stream.feed("\x1b[3;3H")
+    where = (screen.pt_cursor_position.x, screen.pt_cursor_position.y)
+
+    stream.feed("\x1b[>4;1f")
+
+    assert (screen.pt_cursor_position.x, screen.pt_cursor_position.y) == where
+
+
+def test_the_query_does_not_clear_a_tab_stop():
+    "Its final byte is TBC's, and again the marker is the difference."
+    screen, stream, replies = a_screen()
+    stops = set(screen.tabstops)
+
+    stream.feed("\x1b[?4g")
+
+    assert set(screen.tabstops) == stops
+    assert replies == ["\x1b[>4;0f"]
+
+
+def test_the_query_answers_what_the_screen_really_writes():
+    screen, stream, replies = a_screen()
+    stream.feed("\x1b[>4;1f")
+
+    stream.feed("\x1b[?4g")
+
+    assert replies == ["\x1b[>4;1f"]
+
+
+def test_a_pane_the_host_holds_back_writes_neither_form():
+    "A form nothing writes is not a form."
+    screen, stream, _ = a_screen()
+    stream.feed("\x1b[>4;2m\x1b[>4;1f")
+
+    screen.extended_keys_allowed = False
+
+    assert screen.format_other_keys == FormatOtherKeys.TILDE
+    assert screen.encode_key("\x01") == "\x01"
 
 
 def test_the_private_marker_is_not_sgr():

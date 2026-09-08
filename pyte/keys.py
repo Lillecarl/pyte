@@ -185,6 +185,30 @@ class ModifyOtherKeys(IntEnum):
     EVERY_KEY = 3
 
 
+class FormatOtherKeys(IntEnum):
+    """
+    Which of its two forms the extended mode writes a key in.
+
+    XTFMTKEYS resource 4, the mirror of the XTMODKEYS one. xterm says
+    what the two are (`ctlseqs.ms`, under "Alt and Meta Keys"):
+
+    > The formatOtherKeys resource tells xterm to change the format of
+    > the escape sequences sent when modifyOtherKeys applies. When
+    > modifyOtherKeys is set to 1, for example alt-Tab sends
+    > CSI 9 ; 3 u (changing the order of parameters).
+
+    So one feature with two spellings, and this picks the spelling.
+    `TILDE` is what a terminal writes unless a program asks otherwise.
+
+    xterm names the drawback of the other one itself: "applications may
+    confuse it with CSI u (restore-cursor)". `Screen` tells those apart
+    by the marker, which `tests/test_save_restore_cursor.py` holds.
+    """
+
+    TILDE = 0
+    CSI_U = 1
+
+
 class KeyCode(IntEnum):
     """
     The code of a key that writes one control character.
@@ -841,6 +865,7 @@ def _encode_event(
     application_mode: bool,
     modify_other_keys: int = ModifyOtherKeys.OFF,
     application_keypad: bool = False,
+    format_other_keys: int = FormatOtherKeys.TILDE,
 ) -> str:
     "Encode a key event for a pane with the given protocol flags."
     if application_keypad:
@@ -900,8 +925,9 @@ def _encode_event(
         # never gets here, because every branch above answers first.
         # Lillecarl/pymux#169.
         if _wants_the_escape_form(modify_other_keys, code, mods, text):
-            return "%s27;%d;%d~" % (CSI, mods_value, code
-            )
+            if format_other_keys == FormatOtherKeys.CSI_U:
+                return "%s%d;%du" % (CSI, code, mods_value)
+            return "%s27;%d;%d~" % (CSI, mods_value, code)
 
         # Legacy form.
         if back_tab:
@@ -969,6 +995,7 @@ def translate_key_data(
     synthesize: bool = True,
     modify_other_keys: int = ModifyOtherKeys.OFF,
     application_keypad: bool = False,
+    format_other_keys: int = FormatOtherKeys.TILDE,
 ) -> str:
     """
     Translate raw key data into the encoding for a pane with the given
@@ -1016,6 +1043,7 @@ def translate_key_data(
                 application_mode,
                 modify_other_keys,
                 application_keypad,
+                format_other_keys,
             )
         )
         if double and item.event == EventType.PRESS:

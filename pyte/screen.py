@@ -108,6 +108,20 @@ from .terminfo import (
 __all__ = ("Screen",)
 
 
+def _first_parameter(parameter: object) -> int:
+    """
+    One parameter as a number, whatever shape it arrived in.
+
+    A parameter with colons in it arrives as a tuple of its
+    subparameters, and the sequences that read this take no
+    subparameter, so the first slot is the whole of it. An empty
+    tuple is a parameter that was written and left blank.
+    """
+    if isinstance(parameter, tuple):
+        return parameter[0] if parameter else 0
+    return parameter
+
+
 def _four(params: Tuple[int, ...], first: int) -> Tuple[int, int, int, int]:
     """
     Four parameters, counting from `first`, with zero for a missing one.
@@ -252,6 +266,12 @@ class Screen:
         # branch of the encoder answers before the extended one.
         self.key_modifier_options: Dict[int, int] = {}
 
+        # What XTFMTKEYS was told, per resource. The mirror of the
+        # above: that one says how much modifier information a group
+        # of keys carries, and this one says which form it goes out
+        # in. Only resource 4 changes anything here.
+        self.key_format_options: Dict[int, int] = {}
+
         # What the terminal that feeds this pane its keys can report,
         # in the same flags. The host sets it; zero means a terminal
         # that speaks the legacy encoding only. It belongs to the host
@@ -366,6 +386,7 @@ class Screen:
             synthesize=self.synthesize_key_events,
             modify_other_keys=self.modify_other_keys,
             application_keypad=self.in_application_keypad,
+            format_other_keys=self.format_other_keys,
         )
 
     @property
@@ -404,40 +425,83 @@ class Screen:
             keys.KeyModifierResource.OTHER_KEYS, keys.ModifyOtherKeys.OFF
         )
 
+    @property
+    def format_other_keys(self) -> int:
+        """
+        Which of its two forms the extended mode writes a key in.
+
+        Zero for a pane the host holds back, the same as the mode it
+        chooses the form of: a form nothing writes is not a form.
+        """
+        if not self.extended_keys_allowed:
+            return keys.FormatOtherKeys.TILDE
+        return self.key_format_options.get(
+            keys.KeyModifierResource.OTHER_KEYS, keys.FormatOtherKeys.TILDE
+        )
+
+    def set_key_format_options(self, *params: int) -> None:
+        """
+        XTFMTKEYS ("CSI > Pp ; Pv f"): which form a key with a modifier
+        goes out in.
+
+        The mirror of XTMODKEYS, and the same shape: a resource alone
+        puts that one back, and a value sets it. The two together are
+        one feature -- how much leaves the legacy encoding, and how
+        what leaves is written. Lillecarl/pymux#183.
+        """
+        self._remember_a_key_option(self.key_format_options, params)
+
+    def report_key_format_options(self, *params: int) -> None:
+        'XTQFMTKEYS ("CSI ? Pp g"): what is one of them set to?'
+        if not params:
+            return
+        resource = _first_parameter(params[0])
+        if resource == keys.KeyModifierResource.OTHER_KEYS:
+            value = self.format_other_keys
+        else:
+            value = self.key_format_options.get(resource, 0)
+        self.reply_csi(">%i;%if" % (resource, value))
+
+    @staticmethod
+    def _remember_a_key_option(
+        options: Dict[int, int], params: Sequence[object]
+    ) -> None:
+        """
+        What XTMODKEYS and XTFMTKEYS both do with what they carry.
+
+        With no parameter at all every resource goes back to where it
+        started, and with the resource alone that one does.
+
+        **The first of those two is unreachable here.** The CSI parser
+        turns an empty parameter into a zero, so "CSI > f" arrives as
+        the number zero and cannot be told from "CSI > 0 f". The
+        narrower reading wins, and the branch stays for the day the
+        parser can say the difference. Lillecarl/pymux#178.
+        """
+        if not params:
+            options.clear()
+            return
+        resource = _first_parameter(params[0])
+        if len(params) < 2:
+            options.pop(resource, None)
+            return
+        options[resource] = _first_parameter(params[1])
+
     def set_key_modifier_options(self, *params: int) -> None:
         """
         XTMODKEYS ("CSI > Pp ; Pv m"): how much modifier information a
         group of keys carries.
 
-        With no parameter at all every resource goes back to where it
-        started, and with the resource alone that one does. xterm says
-        both, and a program that is finishing sends "CSI > 4 m" to put
-        modifyOtherKeys back.
-
-        **The first of those two is unreachable here.** The CSI parser
-        turns an empty parameter into a zero, so "CSI > m" arrives as
-        the number zero and cannot be told from "CSI > 0 m". The
-        narrower reading wins, and the branch below stays for the day
-        the parser can say the difference. Lillecarl/pymux#178.
+        A program that is finishing sends "CSI > 4 m" to put
+        modifyOtherKeys back. `_remember_a_key_option` says what the
+        rest of the shape is.
 
         A value this screen does not act on is still kept, so that
         XTQMODKEYS answers what it was told. A resource that is
         remembered and not acted on is honest; one that is forgotten
         makes a program believe it failed to set it.
         """
-        if not params:
-            self.key_modifier_options = {}
-            return
-        resource = params[0]
-        if isinstance(resource, tuple):
-            resource = resource[0] if resource else 0
-        if len(params) < 2:
-            self.key_modifier_options.pop(resource, None)
-            return
-        value = params[1]
-        if isinstance(value, tuple):
-            value = value[0] if value else 0
-        self.key_modifier_options[resource] = value
+        self._remember_a_key_option(self.key_modifier_options, params)
 
     def report_key_modifier_options(self, *params: int) -> None:
         """
@@ -456,9 +520,7 @@ class Screen:
         """
         if not params:
             return
-        resource = params[0]
-        if isinstance(resource, tuple):
-            resource = resource[0] if resource else 0
+        resource = _first_parameter(params[0])
         if resource == keys.KeyModifierResource.OTHER_KEYS:
             # The one this screen acts on, so the answer is what it
             # really does and not what it was told.
@@ -598,11 +660,13 @@ class Screen:
         self.kitty_flags_stack = ()
         self.graphics.clear()
 
-        # XTMODKEYS goes back to where it started too. It does not swap
-        # with the alternate screen, the way the flag stack does: xterm
-        # holds it as a resource of the terminal and not as state of a
-        # screen, so a program that switches screens keeps what it set.
+        # XTMODKEYS goes back to where it started too, and so does
+        # XTFMTKEYS. Neither swaps with the alternate screen, the way
+        # the flag stack does: xterm holds them as resources of the
+        # terminal and not as state of a screen, so a program that
+        # switches screens keeps what it set.
         self.key_modifier_options = {}
+        self.key_format_options = {}
 
         # The shape of the cursor, as DECSCUSR names it. A reset puts
         # it back to the shape that the terminal starts with.
@@ -2641,9 +2705,18 @@ class Screen:
     # these ends at `ensure_bounds`.
 
     def cursor_position(
-        self, line: int | None = None, column: int | None = None
+        self,
+        line: int | None = None,
+        column: int | None = None,
+        private: object = False,
     ) -> None:
         """Set the cursor to a specific `line` and `column`.
+
+        A private marker makes another sequence, and it is not HVP.
+        "CSI > Pp ; Pv f" is XTFMTKEYS, which says which form a key
+        with a modifier goes out in. Reading that as a position moved
+        the cursor to row four, and every character the program drew
+        after it landed in the wrong place. Lillecarl/pymux#183.
 
         In origin mode the region is the whole page that a program
         sees. A row past the bottom of it holds at the bottom, the way
@@ -2657,6 +2730,12 @@ class Screen:
         :param int line: line number to move the cursor to.
         :param int column: column number to move the cursor to.
         """
+        if private == ">":
+            self.set_key_format_options(line, column)
+            return
+        if private:
+            return
+
         column = (column or 1) - 1
         line = (line or 1) - 1
 
@@ -3612,13 +3691,24 @@ class Screen:
         "Set a horizontal tab stop at cursor position."
         self.tabstops.add(self.pt_cursor_position.x)
 
-    def clear_tab_stop(self, type_of: int | None = None) -> None:
+    def clear_tab_stop(
+        self, type_of: int | None = None, private: object = False
+    ) -> None:
         """Clears a horizontal tab stop in a specific way, depending
         on the ``type_of`` value:
         * ``0`` or nothing -- Clears a horizontal tab stop at cursor
           position.
         * ``3`` -- Clears all horizontal tab stops.
+
+        A private marker makes another sequence, and it is not TBC.
+        "CSI ? Pp g" is XTQFMTKEYS, which asks which form a key with a
+        modifier goes out in. Lillecarl/pymux#183.
         """
+        if private is True:
+            self.report_key_format_options(type_of)
+            return
+        if private:
+            return
         if not type_of:
             # Clears a horizontal tab stop at cursor position, if it's
             # present, or silently fails if otherwise.
