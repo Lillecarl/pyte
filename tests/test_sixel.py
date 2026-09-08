@@ -2,6 +2,7 @@
 Tests for the sixel decoder and for the sixel images that a pane
 stores.
 """
+
 from pyte.screen import Screen
 from pyte.sixel import DEFAULT_PALETTE, decode_sixel
 from pyte.streams import Stream

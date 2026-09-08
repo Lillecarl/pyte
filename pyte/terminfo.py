@@ -21,6 +21,7 @@ in, so what comes out stands on its own.
 
 Lillecarl/pymux#129.
 """
+
 import sys
 from enum import IntEnum
 from typing import Dict

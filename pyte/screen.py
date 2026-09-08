@@ -16,6 +16,7 @@ different, and is now simply what this package does:
     - 256 colours, true colour, and colours a program names itself.
     - CPR, device attributes, and the other reports a program reads.
 """
+
 from collections import namedtuple
 from enum import IntEnum
 from typing import (
@@ -849,7 +850,7 @@ class Screen:
         self.protection |= Protection.ISO
 
     def end_protected_area(self) -> None:
-        "EPA (\"ESC W\"): stop marking the cells that a program draws."
+        'EPA ("ESC W"): stop marking the cells that a program draws.'
         self.protection &= ~Protection.ISO
 
     def set_character_protection(self, *params: int, **kwargs) -> None:
@@ -1122,9 +1123,7 @@ class Screen:
     # A resize lays the buffer out again at the new width; `_reflow` at
     # the end of this file does that work.
 
-    def resize(
-        self, lines: int | None = None, columns: int | None = None
-    ) -> None:
+    def resize(self, lines: int | None = None, columns: int | None = None) -> None:
         # Save the dimensions.
         lines = lines if lines is not None else self.lines
         columns = columns if columns is not None else self.columns
@@ -1491,10 +1490,7 @@ class Screen:
 
         # DECCOLM takes the page to 132 columns, clears it and puts the
         # cursor home.
-        if (
-            PrivateMode.COLUMNS_132.flag in modes
-            and self._may_change_the_page_width()
-        ):
+        if PrivateMode.COLUMNS_132.flag in modes and self._may_change_the_page_width():
             self._ask_for_page_width(self.WIDE_PAGE)
 
         # According to `vttest`, DECOM should also home the cursor, see
@@ -1630,10 +1626,7 @@ class Screen:
             self.horizontal_margins = None
 
         # Lines below follow the logic in :meth:`set_mode`.
-        if (
-            PrivateMode.COLUMNS_132.flag in modes
-            and self._may_change_the_page_width()
-        ):
+        if PrivateMode.COLUMNS_132.flag in modes and self._may_change_the_page_width():
             self._ask_for_page_width(self.NARROW_PAGE)
 
         if PrivateMode.ORIGIN.flag in modes:
@@ -1876,9 +1869,7 @@ class Screen:
                 if wide_chars:
                     broken = row.get(cursor_position_x)
                     row[cursor_position_x] = pt_char
-                    if broken is not None and (
-                        broken.char == "" or broken.width > 1
-                    ):
+                    if broken is not None and (broken.char == "" or broken.width > 1):
                         self.repair_wide_char(row, cursor_position_x)
                         self.repair_wide_char(row, cursor_position_x + 1)
                 else:
@@ -2020,9 +2011,7 @@ class Screen:
             # A linefeed on the last row of the screen brings a new
             # line in. Anywhere else it only moves the cursor, and the
             # row below is already there.
-            brings_a_line_in = (
-                cursor_position.y - self.line_offset == self.lines - 1
-            )
+            brings_a_line_in = cursor_position.y - self.line_offset == self.lines - 1
 
             cursor_position.y += 1
 
@@ -2075,9 +2064,7 @@ class Screen:
         """
         self._scroll_region(count or 1)
 
-    def scroll_down(
-        self, *params: int, private: object = False, **kwargs
-    ) -> None:
+    def scroll_down(self, *params: int, private: object = False, **kwargs) -> None:
         """
         SD ("CSI Ps T"): move the lines of the scrolling region down.
 
@@ -2145,9 +2132,7 @@ class Screen:
 
             if horizontal is None:
                 if inside:
-                    data_buffer[row + line_offset] = data_buffer[
-                        origin + line_offset
-                    ]
+                    data_buffer[row + line_offset] = data_buffer[origin + line_offset]
                 else:
                     self._erase_row(row + line_offset)
             elif inside:
@@ -2239,9 +2224,7 @@ class Screen:
         if self.in_alternate_screen:
             remove_above = self.line_offset
         else:
-            remove_above = max(
-                0, self.pt_cursor_position.y - self.get_history_limit()
-            )
+            remove_above = max(0, self.pt_cursor_position.y - self.get_history_limit())
         data_buffer = self.page.data_buffer
         for line in range(self.history_floor, remove_above):
             data_buffer.pop(line, None)
@@ -2808,9 +2791,7 @@ class Screen:
 
         :param int column: column number to move the cursor to.
         """
-        self.pt_cursor_position.x = self._column_in_origin_mode(
-            (column or 1) - 1
-        )
+        self.pt_cursor_position.x = self._column_in_origin_mode((column or 1) - 1)
         self.ensure_bounds()
 
     def cursor_to_absolute_column(self, column: int | None = None) -> None:
@@ -3149,9 +3130,7 @@ class Screen:
 
         top, bottom = self.margins or Margins(0, self.lines - 1)
         _left, right = self.left_right
-        self._move_columns(
-            top, bottom, self.pt_cursor_position.x, right, count or 1
-        )
+        self._move_columns(top, bottom, self.pt_cursor_position.x, right, count or 1)
 
     def delete_columns(self, count: int | None = None) -> None:
         """
@@ -3165,9 +3144,7 @@ class Screen:
 
         top, bottom = self.margins or Margins(0, self.lines - 1)
         _left, right = self.left_right
-        self._move_columns(
-            top, bottom, self.pt_cursor_position.x, right, -(count or 1)
-        )
+        self._move_columns(top, bottom, self.pt_cursor_position.x, right, -(count or 1))
 
     def forward_index(self) -> None:
         """
@@ -3330,9 +3307,7 @@ class Screen:
             # stops at the last line in use. A background has to reach
             # the bottom of the screen, though.
             last_line = (
-                max(max_line, line_offset + self.lines - 1)
-                if appearance
-                else max_line
+                max(max_line, line_offset + self.lines - 1) if appearance else max_line
             )
 
             try:
@@ -3388,9 +3363,7 @@ class Screen:
                 if reads_the_marks:
                     # A cell that carries a mark stays, so the row
                     # cannot go away whole.
-                    self._erase_row_in_place(
-                        data_buffer[line], erased, private is True
-                    )
+                    self._erase_row_in_place(data_buffer[line], erased, private is True)
                     continue
 
                 data_buffer[line] = Row(Cell(" ", PLAIN_APPEARANCE))
@@ -3823,7 +3796,9 @@ class Screen:
     # SGR builds a `Rendition` and "OSC 8" opens a hyperlink. The two
     # arrive apart and a cell holds both, as one interned `Appearance`.
 
-    def select_graphic_rendition(self, *attrs_tuple: int, private: bool = False) -> None:
+    def select_graphic_rendition(
+        self, *attrs_tuple: int, private: bool = False
+    ) -> None:
         """
         SGR ("CSI Ps m"): the style of the cells that come next.
 
@@ -4128,9 +4103,7 @@ class Screen:
             # screen is the one the buffer was written into.
             self._reflow(self.line_offset + self.lines - 1)
 
-    def placeholder_runs(
-        self, first_row: int, last_row: int
-    ) -> List[PlaceholderRun]:
+    def placeholder_runs(self, first_row: int, last_row: int) -> List[PlaceholderRun]:
         """
         The unicode placeholder runs between two rows of the scroll
         buffer, for an embedder that draws the images.
@@ -4333,9 +4306,7 @@ class Screen:
         else:
             state = ModeReport.SET if enabled else ModeReport.RESET
 
-        self.reply_csi(
-            "%s%i;%i$y" % ("?" if is_private else "", number, state)
-        )
+        self.reply_csi("%s%i;%i$y" % ("?" if is_private else "", number, state))
 
     def set_cursor_style(self, *params: int, **kwargs) -> None:
         """
@@ -4457,9 +4428,7 @@ class Screen:
             elif value is True:
                 self.reply_dcs("1+r%s" % encoded)
             else:
-                self.reply_dcs(
-                    "1+r%s=%s" % (encoded, str(value).encode("utf-8").hex())
-                )
+                self.reply_dcs("1+r%s=%s" % (encoded, str(value).encode("utf-8").hex()))
 
     def _current_rendition(self) -> str:
         """
@@ -4488,7 +4457,10 @@ class Screen:
             (rendition.bold, "1"),
             (rendition.dim, "2"),
             (rendition.italic, "3"),
-            (rendition.underline, UNDERLINE_PARAMETERS[rendition.underline_style or ""]),
+            (
+                rendition.underline,
+                UNDERLINE_PARAMETERS[rendition.underline_style or ""],
+            ),
             (rendition.blink, "5"),
             (rendition.reverse, "7"),
             (rendition.hidden, "8"),
@@ -4528,9 +4500,7 @@ class Screen:
 
         return ";".join(parts)
 
-    def report_window(
-        self, *params: int, private: object = False, **kwargs
-    ) -> None:
+    def report_window(self, *params: int, private: object = False, **kwargs) -> None:
         """
         Window manipulation ("CSI Ps t").
 
@@ -4577,9 +4547,7 @@ class Screen:
             self.titles.pop(which)
         elif what == WindowOp.REPORT_CELL_SIZE_PIXELS:
             # Cell size in pixels: height first, then width.
-            self.reply_csi(
-                "6;%i;%it" % (ASSUMED_CELL_HEIGHT, ASSUMED_CELL_WIDTH)
-            )
+            self.reply_csi("6;%i;%it" % (ASSUMED_CELL_HEIGHT, ASSUMED_CELL_WIDTH))
         elif what == WindowOp.REPORT_TEXT_AREA_CHARS:
             # Size of the text area, in cells.
             self.reply_csi("8;%i;%it" % (self.lines, self.columns))
@@ -4634,16 +4602,20 @@ class Screen:
         lines = self._wanted(params, 1, None)
         columns = self._wanted(params, 2, None)
         self.resize_func(
-            self.MAX_LINES if lines == 0 else
-            None if lines is None else max(1, lines // ASSUMED_CELL_HEIGHT),
-            self.MAX_COLUMNS if columns == 0 else
-            None if columns is None else max(1, columns // ASSUMED_CELL_WIDTH),
+            self.MAX_LINES
+            if lines == 0
+            else None
+            if lines is None
+            else max(1, lines // ASSUMED_CELL_HEIGHT),
+            self.MAX_COLUMNS
+            if columns == 0
+            else None
+            if columns is None
+            else max(1, columns // ASSUMED_CELL_WIDTH),
         )
 
     @staticmethod
-    def _wanted(
-        params: Tuple[int, ...], index: int, whole: int | None
-    ) -> int | None:
+    def _wanted(params: Tuple[int, ...], index: int, whole: int | None) -> int | None:
         """
         One number of a resize: how many, all of them, or leave it.
 
@@ -4709,12 +4681,10 @@ class Screen:
         # round. The suite that drives this reads one cell at a time,
         # so an answer that never comes costs more than a wrong one.
         top, bottom = sorted(
-            (max(0, min(top, self.lines - 1)),
-             max(0, min(bottom, self.lines - 1)))
+            (max(0, min(top, self.lines - 1)), max(0, min(bottom, self.lines - 1)))
         )
         left, right = sorted(
-            (max(0, min(left, self.columns - 1)),
-             max(0, min(right, self.columns - 1)))
+            (max(0, min(left, self.columns - 1)), max(0, min(right, self.columns - 1)))
         )
 
         line_offset = self.line_offset
@@ -4817,9 +4787,7 @@ class Screen:
             stack = keys.with_flags_set(
                 self.kitty_flags_stack,
                 params[0] if params else 0,
-                params[1]
-                if len(params) > 1
-                else keys.FlagsMode.SET_EXACTLY,
+                params[1] if len(params) > 1 else keys.FlagsMode.SET_EXACTLY,
             )
             if stack is not None:
                 self.kitty_flags_stack = stack
@@ -4868,9 +4836,7 @@ class Screen:
         elif code == Osc.PALETTE_COLOR:
             self._reply_each(self.colors.read_indexed(code, param, 0))
         elif code == Osc.SPECIAL_COLOR:
-            self._reply_each(
-                self.colors.read_indexed(code, param, FIRST_SPECIAL_COLOR)
-            )
+            self._reply_each(self.colors.read_indexed(code, param, FIRST_SPECIAL_COLOR))
         elif code == Osc.RESET_PALETTE_COLOR:
             self.colors.reset_indexed(param, 0, len(PALETTE))
         elif code == Osc.RESET_SPECIAL_COLOR:
@@ -4935,11 +4901,11 @@ class Screen:
         self.osc_func(code, param)
 
     def set_icon_name(self, param: str) -> None:
-        "\"OSC 0\" and \"OSC 1\": the label of the icon."
+        '"OSC 0" and "OSC 1": the label of the icon.'
         self.titles.set_icon(param)
 
     def set_title(self, param: str) -> None:
-        "\"OSC 0\" and \"OSC 2\": the title of the window."
+        '"OSC 0" and "OSC 2": the title of the window.'
         self.titles.set_window(param)
 
     # ------------------------------------------------------------------
@@ -5147,9 +5113,7 @@ class Screen:
         # the end of the line, which is where it was.
         row = data_buffer.get(cursor_position.y)
         cell = None if row is None else row.get(cursor_position.x)
-        cursor_character = (
-            cell.char if isinstance(cell, WrittenCell) else None
-        )
+        cursor_character = cell.char if isinstance(cell, WrittenCell) else None
 
         # Unwrap the rows that have to be laid out again into the lines
         # a program wrote. That is the screen and the lines that reach
@@ -5284,9 +5248,7 @@ class Screen:
             None if cell is None else cell.char
         ):
             # FIXME:
-            raise Exception(
-                "Reflow failed: {!r} {!r}".format(cursor_character, cell)
-            )
+            raise Exception("Reflow failed: {!r} {!r}".format(cursor_character, cell))
 
         # **The content says how far the buffer reaches.** The screen
         # is the last `lines` rows of it, and everything above them is

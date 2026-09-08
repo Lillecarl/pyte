@@ -1,13 +1,13 @@
 """
-    nanoterm
-    ~~~~~~~~
+nanoterm
+~~~~~~~~
 
-    An example showing how to feed :class:`~pyte.streams.Stream` from
-    a running terminal app.
+An example showing how to feed :class:`~pyte.streams.Stream` from
+a running terminal app.
 
-    :copyright: (c) 2015 by pyte authors and contributors,
-                see AUTHORS for details.
-    :license: LGPL, see LICENSE for more details.
+:copyright: (c) 2015 by pyte authors and contributors,
+            see AUTHORS for details.
+:license: LGPL, see LICENSE for more details.
 """
 
 import os
@@ -28,15 +28,17 @@ if __name__ == "__main__":
 
     p_pid, master_fd = pty.fork()
     if p_pid == 0:  # Child.
-        os.execvpe(sys.argv[1], sys.argv[1:],
-                   env=dict(TERM="linux", COLUMNS="80", LINES="24"))
+        os.execvpe(
+            sys.argv[1], sys.argv[1:], env=dict(TERM="linux", COLUMNS="80", LINES="24")
+        )
 
     while True:
         try:
-            [_master_fd], _wlist, _xlist = select.select(
-                [master_fd], [], [], 1)
-        except (KeyboardInterrupt,  # Stop right now!
-                ValueError):        # Nothing to read.
+            [_master_fd], _wlist, _xlist = select.select([master_fd], [], [], 1)
+        except (
+            KeyboardInterrupt,  # Stop right now!
+            ValueError,
+        ):  # Nothing to read.
             break
         else:
             data = os.read(master_fd, 1024)

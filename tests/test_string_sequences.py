@@ -1,4 +1,5 @@
 """Tests for APC, DCS, SOS and PM string sequences."""
+
 import pyte
 from pyte.screen import Screen
 

@@ -7,6 +7,7 @@ it is told instead has to be true: **naming an entry that is not
 installed is worse than naming xterm**, so nothing is claimed until the
 compiled entry is found.
 """
+
 import pytest
 
 from pyte.environment import (

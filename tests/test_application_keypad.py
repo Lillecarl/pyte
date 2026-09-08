@@ -14,6 +14,7 @@ The table is xterm's, out of `kypd_num` and `kypd_apl` in its
 `input.c`. Both are indexed by the keysym less `XK_KP_Space`, so the
 pair says what one key sends in each mode.
 """
+
 import pyte
 from pyte.keys import FunctionalKey
 from pyte.modes import PrivateMode
@@ -35,6 +36,7 @@ KEYPAD = [
     ("equal", FunctionalKey.KP_EQUAL, "=", "\x1bOX"),
     ("enter", FunctionalKey.KP_ENTER, "\r", "\x1bOM"),
 ]
+
 
 #: What the terminal of the person sends for a keypad key. It only
 #: says "keypad" once something asked it to disambiguate; before that

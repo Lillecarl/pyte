@@ -12,6 +12,7 @@ Nothing here reads a sequence or writes one. `screen.py` parses SGR
 into a `Rendition` and `page.py` says what holds the cells.
 Lillecarl/pymux#129.
 """
+
 from enum import IntFlag
 from functools import lru_cache
 from typing import NamedTuple, Tuple
@@ -214,9 +215,9 @@ _CHAR_CACHE: FastDictCache[Tuple[str, "Appearance"], Cell] = FastDictCache(
 
 #: The same for the cells that carry a mark. Nearly no program marks
 #: one, so this one stays small.
-_PROTECTED_CHAR_CACHE: FastDictCache[
-    Tuple[str, "Appearance", int], Cell
-] = FastDictCache(ProtectedCell, size=10 * 1000)
+_PROTECTED_CHAR_CACHE: FastDictCache[Tuple[str, "Appearance", int], Cell] = (
+    FastDictCache(ProtectedCell, size=10 * 1000)
+)
 
 
 class Rendition(NamedTuple):
@@ -312,7 +313,9 @@ class Appearance:
         if not self.hyperlink:
             return "Appearance(%r)" % (self.rendition,)
         return "Appearance(%r, %r, %r)" % (
-            self.rendition, self.hyperlink, self.hyperlink_id
+            self.rendition,
+            self.hyperlink,
+            self.hyperlink_id,
         )
 
 
@@ -325,9 +328,9 @@ class Appearance:
 #: dropping one is every cell that still points at it comparing unequal
 #: to the next. Both front ends size their own style cache off this
 #: one, so it is the number that decides all three.
-appearance_of: FastDictCache[
-    Tuple[Rendition, str, str], Appearance
-] = FastDictCache(Appearance, size=10 * 1000)
+appearance_of: FastDictCache[Tuple[Rendition, str, str], Appearance] = FastDictCache(
+    Appearance, size=10 * 1000
+)
 
 #: How a screen draws before any program has asked for anything, and
 #: what an untouched cell carries.

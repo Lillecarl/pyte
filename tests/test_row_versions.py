@@ -28,6 +28,7 @@ generates its own: the erase, the scroll and the rectangle families
 are where whole ranges of rows move at once, and those are the paths a
 recording is least likely to reach.
 """
+
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
@@ -52,8 +53,7 @@ def cells_of(screen, row_number: int):
     if not row:
         return ()
     return tuple(
-        (row[column].char, row[column].appearance)
-        for column in range(max(row) + 1)
+        (row[column].char, row[column].appearance) for column in range(max(row) + 1)
     )
 
 
@@ -72,9 +72,7 @@ class Believing:
 
     def read(self, rows) -> dict:
         for row_number in rows:
-            version = self.screen.written_at.get(
-                row_number, self.screen.everything_at
-            )
+            version = self.screen.written_at.get(row_number, self.screen.everything_at)
             if self.at.get(row_number) != version:
                 self.drawn[row_number] = cells_of(self.screen, row_number)
                 self.at[row_number] = version
@@ -102,9 +100,7 @@ def everything(screen, reader) -> range:
     return range(min(numbers), max(numbers) + 1)
 
 
-def check(
-    chunks, lines: int = 24, columns: int = 80, history=None
-) -> None:
+def check(chunks, lines: int = 24, columns: int = 80, history=None) -> None:
     """
     Feed the chunks one at a time, and after each one say that the
     believing reader holds what the screen really holds.
@@ -142,42 +138,58 @@ def check(
 #: The sequences that move rows about, with the numbers left open so
 #: that hypothesis can fill them in.
 MOVERS = [
-    "\x1b[%d;%dH",      # CUP: put the cursor somewhere.
-    "\x1b[%d;%dr",      # DECSTBM: a scrolling region.
-    "\x1b[%dL",         # IL: insert lines.
-    "\x1b[%dM",         # DL: delete lines.
-    "\x1b[%dS",         # SU: scroll up.
-    "\x1b[%dT",         # SD: scroll down.
-    "\x1b[%d@",         # ICH: insert characters.
-    "\x1b[%dP",         # DCH: delete characters.
-    "\x1b[%dX",         # ECH: erase characters.
-    "\x1b[%dJ",         # ED: erase in display.
-    "\x1b[%dK",         # EL: erase in line.
-    "\x1b[%d;%d;%d;%d$z",   # DECERA: erase a rectangle.
-    "\x1b[%d;%d;%d;%d${",   # DECSERA: erase what no mark holds.
+    "\x1b[%d;%dH",  # CUP: put the cursor somewhere.
+    "\x1b[%d;%dr",  # DECSTBM: a scrolling region.
+    "\x1b[%dL",  # IL: insert lines.
+    "\x1b[%dM",  # DL: delete lines.
+    "\x1b[%dS",  # SU: scroll up.
+    "\x1b[%dT",  # SD: scroll down.
+    "\x1b[%d@",  # ICH: insert characters.
+    "\x1b[%dP",  # DCH: delete characters.
+    "\x1b[%dX",  # ECH: erase characters.
+    "\x1b[%dJ",  # ED: erase in display.
+    "\x1b[%dK",  # EL: erase in line.
+    "\x1b[%d;%d;%d;%d$z",  # DECERA: erase a rectangle.
+    "\x1b[%d;%d;%d;%d${",  # DECSERA: erase what no mark holds.
     "\x1b[%d;%d;%d;%d;%d$x",  # DECFRA: fill a rectangle.
     "\x1b[%d;%d;%d;%d;%d;%d;%d;%d$v",  # DECCRA: copy a rectangle.
-    "\x1b[%d D",        # unscroll: bring lines back from the history.
-    "\x1b[%d'}",        # DECIC: insert columns.
-    "\x1b[%d'~",        # DECDC: delete columns.
-    "\x1b[8;%d;%dt",    # XTWINOPS: resize, which reflows the buffer.
+    "\x1b[%d D",  # unscroll: bring lines back from the history.
+    "\x1b[%d'}",  # DECIC: insert columns.
+    "\x1b[%d'~",  # DECDC: delete columns.
+    "\x1b[8;%d;%dt",  # XTWINOPS: resize, which reflows the buffer.
 ]
 
 #: The sequences that take no number at all.
 PLAIN = [
-    "\n", "\r", esc(escape.IND), esc(escape.RI), esc(escape.NEL), esc(escape.DECSC), esc(escape.DECRC),
-    sharp(Sharp.DECALN),           # DECALN: fill the screen with E.
-    esc(escape.RIS),            # RIS: a full reset.
-    csi(Csi.DECSTR),          # DECSTR: a soft reset.
-    set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR), reset_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR),   # The other page, and back.
-    set_mode(PrivateMode.LEFT_RIGHT_MARGIN), reset_mode(PrivateMode.LEFT_RIGHT_MARGIN),       # Left and right margins.
-    set_mode(PrivateMode.ORIGIN), reset_mode(PrivateMode.ORIGIN),         # Origin mode.
-    set_mode(PrivateMode.AUTOWRAP), reset_mode(PrivateMode.AUTOWRAP),         # Autowrap.
-    set_mode(PrivateMode.COLUMNS_132), reset_mode(PrivateMode.COLUMNS_132),         # DECCOLM: 132 columns, and back.
-    csi(escape.SGR, 0), csi(escape.SGR, 7), csi(escape.SGR, 31, 44),
-    csi(Csi.DECSCA, 1), csi(Csi.DECSCA, 0),         # DECSCA: mark what an erase leaves.
-    esc(Escape.SPA), esc(Escape.EPA),               # SPA and EPA, the other mark.
-    "text", "wider text that wraps around the end of a short row",
+    "\n",
+    "\r",
+    esc(escape.IND),
+    esc(escape.RI),
+    esc(escape.NEL),
+    esc(escape.DECSC),
+    esc(escape.DECRC),
+    sharp(Sharp.DECALN),  # DECALN: fill the screen with E.
+    esc(escape.RIS),  # RIS: a full reset.
+    csi(Csi.DECSTR),  # DECSTR: a soft reset.
+    set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR),
+    reset_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR),  # The other page, and back.
+    set_mode(PrivateMode.LEFT_RIGHT_MARGIN),
+    reset_mode(PrivateMode.LEFT_RIGHT_MARGIN),  # Left and right margins.
+    set_mode(PrivateMode.ORIGIN),
+    reset_mode(PrivateMode.ORIGIN),  # Origin mode.
+    set_mode(PrivateMode.AUTOWRAP),
+    reset_mode(PrivateMode.AUTOWRAP),  # Autowrap.
+    set_mode(PrivateMode.COLUMNS_132),
+    reset_mode(PrivateMode.COLUMNS_132),  # DECCOLM: 132 columns, and back.
+    csi(escape.SGR, 0),
+    csi(escape.SGR, 7),
+    csi(escape.SGR, 31, 44),
+    csi(Csi.DECSCA, 1),
+    csi(Csi.DECSCA, 0),  # DECSCA: mark what an erase leaves.
+    esc(Escape.SPA),
+    esc(Escape.EPA),  # SPA and EPA, the other mark.
+    "text",
+    "wider text that wraps around the end of a short row",
 ]
 
 
@@ -294,7 +306,11 @@ def test_the_other_page_says_that_every_row_changed():
     reader = Believing(screen)
     reader.read(everything(screen, reader))
 
-    for chunk in (set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR), "the other one", reset_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR)):
+    for chunk in (
+        set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR),
+        "the other one",
+        reset_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR),
+    ):
         stream.feed(chunk)
         rows = everything(screen, reader)
         believed = reader.read(rows)

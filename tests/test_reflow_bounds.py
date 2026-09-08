@@ -20,6 +20,7 @@ the old behaviour, kept here and nowhere else.
 `test_reflow_keeps_the_content.py` is the other half: it says a resize
 keeps every line of the whole buffer, history included.
 """
+
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 

@@ -1,16 +1,16 @@
 """
-    terminal_emulator
-    ~~~~~~~~~~~~~~~~~
+terminal_emulator
+~~~~~~~~~~~~~~~~~
 
-    An example showing how to use :mod:`pyte` to implement a basic
-    terminal emulator using Textual.
-    To exit the application, hit Ctrl-C.
+An example showing how to use :mod:`pyte` to implement a basic
+terminal emulator using Textual.
+To exit the application, hit Ctrl-C.
 
-    .. note:: This example requires the ``textual`` library, at least v0.6.0.
+.. note:: This example requires the ``textual`` library, at least v0.6.0.
 
-    :copyright: (c) 2022 by pyte authors and contributors,
-                see AUTHORS for details.
-    :license: LGPL, see LICENSE for more details.
+:copyright: (c) 2022 by pyte authors and contributors,
+            see AUTHORS for details.
+:license: LGPL, see LICENSE for more details.
 """
 
 import asyncio
@@ -80,7 +80,7 @@ class Terminal(Widget, can_focus=True):
                         cursor.stylize("reverse")
                         new_text = text[:x]
                         new_text.append(cursor)
-                        new_text.append(text[x + 1:])
+                        new_text.append(text[x + 1 :])
                         text = new_text
                     lines.append(text)
                 self._display = PyteDisplay(lines)
@@ -88,7 +88,6 @@ class Terminal(Widget, can_focus=True):
 
 
 class TerminalEmulator(App):
-
     def __init__(self, ncol, nrow):
         self.ncol = ncol
         self.nrow = nrow
@@ -109,7 +108,12 @@ class TerminalEmulator(App):
         pid, fd = pty.fork()
         if pid == 0:
             argv = shlex.split("bash")
-            env = dict(TERM="linux", LC_ALL="en_GB.UTF-8", COLUMNS=str(self.ncol), LINES=str(self.nrow))
+            env = dict(
+                TERM="linux",
+                LC_ALL="en_GB.UTF-8",
+                COLUMNS=str(self.ncol),
+                LINES=str(self.nrow),
+            )
             os.execvpe(argv[0], argv, env)
         return fd
 

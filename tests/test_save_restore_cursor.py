@@ -14,6 +14,7 @@ xterm does.
 DECSLRM and names the columns of the scrolling region. `left_right`
 covers that side; this file covers the other one.
 """
+
 import pytest
 
 from pyte.screen import Screen
@@ -131,10 +132,9 @@ def test_a_restore_takes_origin_mode_off_again(save, restore):
     setting it back leaves a mode on that the program turned off.
     """
     screen, stream = _screen()
-    stream.feed(save + (
-        csi(escape.DECSTBM, 2, 5)
-        + set_mode(PrivateMode.ORIGIN)
-    ) + restore)
+    stream.feed(
+        save + (csi(escape.DECSTBM, 2, 5) + set_mode(PrivateMode.ORIGIN)) + restore
+    )
     stream.feed(csi(escape.CUP, 1, 1) + "X")
     assert screen.data_buffer[0][0].char == "X"
 
@@ -149,7 +149,12 @@ def test_a_restore_leaves_the_wrap_alone(save, restore):
     leaves the wrap off.
     """
     screen, stream = _screen(lines=4, columns=8)
-    stream.feed(set_mode(PrivateMode.AUTOWRAP) + save + reset_mode(PrivateMode.AUTOWRAP) + restore)
+    stream.feed(
+        set_mode(PrivateMode.AUTOWRAP)
+        + save
+        + reset_mode(PrivateMode.AUTOWRAP)
+        + restore
+    )
     stream.feed(csi(escape.CUP, 1, 7) + "abcd")
     assert screen.pt_cursor_position.y == 0
 
@@ -186,8 +191,7 @@ def test_the_mode_that_saves_the_cursor_puts_it_home():
     '"?1049" saves the cursor first, so it can send it home.'
     screen, stream = _screen(lines=4, columns=8)
     stream.feed(
-        csi(escape.CUP, 2, 3)
-        + set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR)
+        csi(escape.CUP, 2, 3) + set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR)
     )
     assert (screen.pt_cursor_position.y, screen.pt_cursor_position.x) == (0, 0)
     stream.feed(reset_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR))

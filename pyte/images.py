@@ -13,6 +13,7 @@ Not implemented yet: animation (actions ``f``, ``a`` and ``c``),
 scrolling placements along with the text, the file- and shared-memory
 transmission media, and z-index handling beyond storing the value.
 """
+
 import base64
 import zlib
 from enum import IntEnum
@@ -215,9 +216,7 @@ class GraphicsState:
                 result = self._delete(keys, screen)
             else:
                 # Animation and composition are not implemented.
-                raise GraphicsError(
-                    "EINVAL", "unsupported action: %r" % action
-                )
+                raise GraphicsError("EINVAL", "unsupported action: %r" % action)
         except GraphicsError as exc:
             result = (self._prefix(keys) + exc.code + ":" + exc.args[0], False)
         except ValueError:
@@ -341,9 +340,7 @@ class GraphicsState:
                 height = self._int(keys, "v")
                 if width <= 0 or height <= 0:
                     raise GraphicsError("EINVAL", "width and height required")
-                expected = (
-                    width * height * (3 if fmt == PixelFormat.RGB else 4)
-                )
+                expected = width * height * (3 if fmt == PixelFormat.RGB else 4)
                 if len(data) != expected:
                     raise GraphicsError(
                         "EINVAL", "data size does not match width and height"
@@ -351,9 +348,7 @@ class GraphicsState:
             else:
                 raise GraphicsError("EINVAL", "unknown format: %i" % fmt)
 
-            image = GraphicsImage(
-                fmt, width, height, data, number=self._int(keys, "I")
-            )
+            image = GraphicsImage(fmt, width, height, data, number=self._int(keys, "I"))
             if store and self._total_image_data() + len(data) > MAX_TOTAL_IMAGE_DATA:
                 raise GraphicsError("EINVAL", "image storage quota exceeded")
             if store:
@@ -513,9 +508,7 @@ class GraphicsState:
     # ------------------------------------------------------------------
     # Deletion.
 
-    def _delete(
-        self, keys: Dict[str, str], screen
-    ) -> Tuple[str, bool] | None:
+    def _delete(self, keys: Dict[str, str], screen) -> Tuple[str, bool] | None:
         specifier = keys.get("d", "a")
         lower = specifier.lower()
         free_data = specifier.isupper()
@@ -539,8 +532,9 @@ class GraphicsState:
             number = self._int(keys, "I")
             image = self.newest_by_number.get(number)
             targets = [
-                pl for pl in self.placements if image is not None and
-                pl.image_id in self._ids_of(image)
+                pl
+                for pl in self.placements
+                if image is not None and pl.image_id in self._ids_of(image)
             ]
         elif lower == "c":
             cursor = screen.pt_cursor_position
@@ -556,8 +550,7 @@ class GraphicsState:
             targets = [
                 pl
                 for pl in self.placements
-                if pl.x <= x < pl.x + pl.columns
-                and pl.y <= y < pl.y + pl.rows
+                if pl.x <= x < pl.x + pl.columns and pl.y <= y < pl.y + pl.rows
             ]
             if lower == "q":
                 z = self._int(keys, "z")
@@ -566,9 +559,7 @@ class GraphicsState:
             low = self._int(keys, "x")
             high = self._int(keys, "y")
             image_ids = [
-                image_id
-                for image_id in self.images_by_id
-                if low <= image_id <= high
+                image_id for image_id in self.images_by_id if low <= image_id <= high
             ]
             targets = [pl for pl in self.placements if pl.image_id in image_ids]
         else:
@@ -587,9 +578,7 @@ class GraphicsState:
 
     def _ids_of(self, image: GraphicsImage) -> List[int]:
         return [
-            image_id
-            for image_id, known in self.images_by_id.items()
-            if known is image
+            image_id for image_id, known in self.images_by_id.items() if known is image
         ]
 
     def _new_image_id(self) -> int:
@@ -609,9 +598,7 @@ class GraphicsState:
         id must delete the old placements; the new data is not
         displayed until a placement is created.)
         """
-        self.placements = [
-            pl for pl in self.placements if pl.image_id != image_id
-        ]
+        self.placements = [pl for pl in self.placements if pl.image_id != image_id]
         image = self.images_by_id.pop(image_id, None)
         if image is not None:
             for number, known in list(self.newest_by_number.items()):
@@ -621,9 +608,7 @@ class GraphicsState:
     # ------------------------------------------------------------------
     # Sixel.
 
-    def add_sixel(
-        self, width: int, height: int, data: bytes, screen
-    ) -> int | None:
+    def add_sixel(self, width: int, height: int, data: bytes, screen) -> int | None:
         """
         Store a decoded sixel image and place it at the cursor.
 

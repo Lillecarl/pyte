@@ -1,6 +1,7 @@
 """
 Tests for the kitty graphics protocol state in Screen.
 """
+
 import base64
 import zlib
 
@@ -113,9 +114,7 @@ def test_compressed_transmission():
     screen, stream, responses = make_screen()
     data = rgb_image(4, 2)
     compressed = zlib.compress(data)
-    stream.feed(
-        apc("a=t,f=24,s=4,v=2,i=13,o=z", base64.b64encode(compressed).decode())
-    )
+    stream.feed(apc("a=t,f=24,s=4,v=2,i=13,o=z", base64.b64encode(compressed).decode()))
     assert responses == ["\x1b_Gi=13;OK\x1b\\"]
     assert screen.graphics.images_by_id[13].data == data
 
@@ -150,9 +149,7 @@ def test_query_action_does_not_store():
 def test_both_id_and_number_is_an_error():
     screen, stream, responses = make_screen()
     data = rgb_image(4, 2)
-    stream.feed(
-        apc("a=t,f=24,s=4,v=2,i=17,I=7", base64.b64encode(data).decode())
-    )
+    stream.feed(apc("a=t,f=24,s=4,v=2,i=17,I=7", base64.b64encode(data).decode()))
     assert responses[0].startswith("\x1b_Gi=17,I=7;EINVAL:")
 
 
@@ -453,7 +450,9 @@ def test_a_chunked_transmission_that_is_short_stores_nothing():
     encoded = base64.b64encode(data).decode()
     stream.feed(apc("a=T,f=24,s=20,v=40,i=22,m=1", encoded[: len(encoded) // 2]))
     stream.feed(apc("m=0"))
-    assert responses == ["\x1b_Gi=22;EINVAL:data size does not match width and height\x1b\\"]
+    assert responses == [
+        "\x1b_Gi=22;EINVAL:data size does not match width and height\x1b\\"
+    ]
     assert 22 not in screen.graphics.images_by_id
     assert screen.graphics.placements == []
 

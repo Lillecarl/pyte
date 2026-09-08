@@ -16,6 +16,7 @@ The answer is three 16 bit components. On a screen of eight bits per
 channel the low byte of each is zero, so `>> 8` gives what a pane
 holds.
 """
+
 import ctypes
 import os
 from typing import Tuple

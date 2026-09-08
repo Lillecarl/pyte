@@ -11,6 +11,7 @@ modern programs use. The answer has to be true: a capability that is
 claimed and not served is worse than one that is missing, because the
 program stops asking and draws what the terminal cannot draw.
 """
+
 import pytest
 
 from pyte.screen import Screen

@@ -4,6 +4,7 @@ Inserting and deleting lines.
 An empty line that one of these leaves takes the background that is
 set, the same way an erased cell does.
 """
+
 from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte import escape
@@ -45,8 +46,10 @@ def test_delete_lines_moves_the_lines_below_up():
 
 
 def _cursor(screen):
-    return (screen.pt_cursor_position.y - screen.line_offset,
-            screen.pt_cursor_position.x)
+    return (
+        screen.pt_cursor_position.y - screen.line_offset,
+        screen.pt_cursor_position.x,
+    )
 
 
 def test_delete_lines_moves_the_cursor_to_the_first_column():

@@ -19,6 +19,7 @@ expects as a literal. This is for the other side: the sequences a test
 feeds a parser, and the replies a test makes a terminal give. Getting
 one of those wrong is a passing test that asserts the wrong thing.
 """
+
 from enum import StrEnum
 from typing import Iterable, Sequence, Union
 
@@ -300,6 +301,7 @@ def announce(final: str) -> str:
     """
     return _ESC + " " + final
 
+
 #: One parameter of a sequence. `None` is an empty parameter, which is
 #: how a program asks for the default of that position rather than for
 #: zero. A sequence of them is a parameter with subparameters, which
@@ -407,8 +409,7 @@ def _marker_of(modes: Sequence[Mode]) -> str:
     private = [isinstance(mode, PrivateMode) for mode in modes]
     if any(private) and not all(private):
         raise ValueError(
-            "a private mode and an ANSI mode cannot go in one sequence: %r"
-            % (modes,)
+            "a private mode and an ANSI mode cannot go in one sequence: %r" % (modes,)
         )
     return "?" if any(private) else ""
 

@@ -2,6 +2,7 @@
 A cache for the small immutable objects that a screen makes by the
 thousand.
 """
+
 from collections import deque
 from typing import Callable, Deque, Dict, Hashable, Tuple, TypeVar
 

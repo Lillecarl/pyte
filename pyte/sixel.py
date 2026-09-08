@@ -13,6 +13,7 @@ Not implemented: the pixel aspect ratio of the raster attributes (the
 `Pan`/`Pad` pair), and the "print" and "cursor" DCS sequences that
 share the introducer.
 """
+
 import colorsys
 import re
 import sys
@@ -59,8 +60,7 @@ def _percent(value: int) -> int:
 
 
 DEFAULT_PALETTE: List[Tuple[int, int, int]] = [
-    (_percent(r), _percent(g), _percent(b))
-    for r, g, b in _VT340_PALETTE_PERCENT
+    (_percent(r), _percent(g), _percent(b)) for r, g, b in _VT340_PALETTE_PERCENT
 ]
 
 # Number of colour registers. (A VT340 has 256.)
@@ -306,5 +306,3 @@ def _read_int(text: str, index: int) -> Tuple[int, int]:
     if start == index:
         return (0, index)
     return (int(text[start:index]), index)
-
-

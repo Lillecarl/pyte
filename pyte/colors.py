@@ -16,6 +16,7 @@ file.** How a renderer writes a colour is that renderer's, and
 
 Nothing here reads or writes a sequence.
 """
+
 from string import hexdigits
 from typing import Dict, List, NamedTuple
 
@@ -63,9 +64,12 @@ class Color(NamedTuple):
         sends, and what a program reading the answer expects.
         """
         return "rgb:%02x%02x/%02x%02x/%02x%02x" % (
-            self.red, self.red,
-            self.green, self.green,
-            self.blue, self.blue,
+            self.red,
+            self.red,
+            self.green,
+            self.green,
+            self.blue,
+            self.blue,
         )
 
     @property
@@ -169,10 +173,7 @@ def _parse_hash(spec: str) -> Color | None:
     if len(spec) % _COMPONENTS != 0:
         return None
     width = len(spec) // _COMPONENTS
-    parts = [
-        spec[index * width : (index + 1) * width]
-        for index in range(_COMPONENTS)
-    ]
+    parts = [spec[index * width : (index + 1) * width] for index in range(_COMPONENTS)]
     return _parse_parts(parts, scale=False)
 
 
@@ -260,9 +261,9 @@ def parse_color(spec: str) -> Color | None:
     if spec.startswith("#"):
         return _parse_hash(spec[1:])
     if spec.startswith("rgb:"):
-        return _parse_parts(spec[len("rgb:"):].split("/"), scale=True)
+        return _parse_parts(spec[len("rgb:") :].split("/"), scale=True)
     if spec.startswith("rgbi:"):
-        return _parse_intensities(spec[len("rgbi:"):])
+        return _parse_intensities(spec[len("rgbi:") :])
     name, colon, rest = spec.partition(":")
     if colon and name in SPACES:
         return _parse_space(name, rest)

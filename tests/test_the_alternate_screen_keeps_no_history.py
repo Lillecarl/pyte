@@ -17,6 +17,7 @@ buffer to the highest, so those rows are lines of the document, and
 the history pymux shows is taller than the screen a program drew.
 Lillecarl/pymux#132.
 """
+
 from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte.modes import PrivateMode

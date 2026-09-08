@@ -6,6 +6,7 @@ cursor one column, and move the region when the cursor stands on a
 margin. All four carry a rectangle: every row of the region moves, and
 the cells outside the margins stay where they are.
 """
+
 from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte import escape
@@ -56,8 +57,7 @@ def test_an_insert_of_columns_takes_a_count():
     screen, stream = _screen()
     _grid(stream)
     stream.feed(csi(escape.CUP, 1, 2) + csi(Csi.DECIC, 2))
-    assert _lines(screen) == ["a  bcde", "f  ghij", "k  lmno", "p  qrst",
-                              "u  vwxy"]
+    assert _lines(screen) == ["a  bcde", "f  ghij", "k  lmno", "p  qrst", "u  vwxy"]
 
 
 def test_an_insert_of_columns_holds_to_the_rows_of_the_region():
@@ -177,10 +177,7 @@ def test_a_forward_index_at_the_last_column_moves_the_screen():
     "Without margins the last column is the right margin."
     screen, stream = _screen()
     stream.feed(
-        csi(escape.CUP, 1, 10)
-        + "x"
-        + csi(escape.CUP, 1, 10)
-        + esc(Escape.DECFI)
+        csi(escape.CUP, 1, 10) + "x" + csi(escape.CUP, 1, 10) + esc(Escape.DECFI)
     )
     assert _line(screen, 0) == "        x"
 

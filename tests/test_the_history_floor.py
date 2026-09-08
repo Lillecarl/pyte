@@ -18,6 +18,7 @@ The alphabet comes from `test_row_versions`, because the paths that
 move whole ranges of rows are the ones that could put a row under the
 floor, and that file already names them.
 """
+
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
@@ -111,10 +112,7 @@ def test_the_notes_about_a_row_go_when_the_row_does():
     stream = Stream(screen)
     # Every line wraps, so a mark is written on nearly every row.
     stream.feed(
-        "".join(
-            "row %d " % number + "x" * COLUMNS + "\r\n"
-            for number in range(300)
-        )
+        "".join("row %d " % number + "x" * COLUMNS + "\r\n" for number in range(300))
     )
     screen._remove_old_lines_from_history()
 

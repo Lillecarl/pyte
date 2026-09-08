@@ -11,6 +11,7 @@ with one comma wrong compiles to nothing, and a pane whose `TERM`
 names an entry that is not there is worse off than one that says
 `xterm-256color`.
 """
+
 import pathlib
 import shutil
 import subprocess

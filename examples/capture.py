@@ -1,12 +1,12 @@
 """
-    capture
-    ~~~~~~~
+capture
+~~~~~~~
 
-    An example showing how to capure output from a running terminal app.
+An example showing how to capure output from a running terminal app.
 
-    :copyright: (c) 2015 by pyte authors and contributors,
-                see AUTHORS for details.
-    :license: LGPL, see LICENSE for more details.
+:copyright: (c) 2015 by pyte authors and contributors,
+            see AUTHORS for details.
+:license: LGPL, see LICENSE for more details.
 """
 
 import os
@@ -31,10 +31,11 @@ if __name__ == "__main__":
     with open(output_path, "wb") as handle:
         while True:
             try:
-                [_master_fd], _wlist, _xlist = select.select(
-                    [master_fd], [], [], 1)
-            except (KeyboardInterrupt,  # Stop right now!
-                    ValueError):        # Nothing to read.
+                [_master_fd], _wlist, _xlist = select.select([master_fd], [], [], 1)
+            except (
+                KeyboardInterrupt,  # Stop right now!
+                ValueError,
+            ):  # Nothing to read.
                 break
 
             try:

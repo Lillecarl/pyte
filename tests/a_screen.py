@@ -6,6 +6,7 @@ a look at the result. They used upstream's `Screen`, which had a
 `display` property. That screen is gone, and this is the two lines that
 replace it.
 """
+
 from pyte.screen import Screen
 
 __all__ = ("a_screen", "display")

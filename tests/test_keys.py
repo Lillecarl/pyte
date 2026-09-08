@@ -5,6 +5,7 @@ Tests for the key data translation in pyte.keys.
 feeding the pane) into the encoding that the pane expects, given its
 kitty keyboard protocol flags.
 """
+
 from pyte.keys import translate_key_data
 
 DISAMBIGUATE = 0b1
@@ -120,10 +121,7 @@ def test_mixed_data():
     # Text, control characters and sequences in one chunk.
     data = "a\x01b\x1b[97;5u c"
     assert translate_key_data(data, flags=0) == "a\x01b\x01 c"
-    assert (
-        translate_key_data(data, flags=DISAMBIGUATE)
-        == "a\x1b[97;5ub\x1b[97;5u c"
-    )
+    assert translate_key_data(data, flags=DISAMBIGUATE) == "a\x1b[97;5ub\x1b[97;5u c"
 
 
 def test_trailing_escape():
@@ -169,8 +167,7 @@ RELEASE = "\x1b[98;5:3u"
 def test_a_release_reaches_a_pane_that_asked_for_the_event_types():
     assert translate_key_data(RELEASE, flags=EVENT_TYPES) == "\x1b[98;5:3u"
     assert (
-        translate_key_data(RELEASE, flags=EVENT_TYPES | DISAMBIGUATE)
-        == "\x1b[98;5:3u"
+        translate_key_data(RELEASE, flags=EVENT_TYPES | DISAMBIGUATE) == "\x1b[98;5:3u"
     )
 
 
@@ -195,10 +192,7 @@ def test_a_release_of_enter_needs_all_keys_as_escape_codes():
     for code in (13, 9, 127):
         release = "\x1b[%d;:3u" % code
         assert translate_key_data(release, flags=EVENT_TYPES) == ""
-        assert (
-            translate_key_data(release, flags=EVENT_TYPES | REPORT_ALL)
-            == release
-        )
+        assert translate_key_data(release, flags=EVENT_TYPES | REPORT_ALL) == release
 
 
 def test_a_repeat_without_the_flag_is_a_press():
@@ -209,13 +203,9 @@ def test_a_repeat_without_the_flag_is_a_press():
 
 def test_the_other_codes_of_a_key_reach_a_pane_that_asked():
     "The shifted key and the key of the base layout."
+    assert translate_key_data("\x1b[97:65;2u", flags=ALTERNATE_KEYS) == "\x1b[97:65;2u"
     assert (
-        translate_key_data("\x1b[97:65;2u", flags=ALTERNATE_KEYS)
-        == "\x1b[97:65;2u"
-    )
-    assert (
-        translate_key_data("\x1b[97::99;2u", flags=ALTERNATE_KEYS)
-        == "\x1b[97::99;2u"
+        translate_key_data("\x1b[97::99;2u", flags=ALTERNATE_KEYS) == "\x1b[97::99;2u"
     )
     # Without the flag they go away, and the key itself stays.
     assert translate_key_data("\x1b[97:65;2u", flags=REPORT_ALL) == "\x1b[97;2u"
@@ -231,9 +221,7 @@ def test_the_text_of_a_key_reaches_a_pane_that_asked():
     )
     assert translate_key_data("a", flags=ASSOCIATED_TEXT) == "\x1b[97;;97u"
     # A key that writes no text carries none.
-    assert translate_key_data("\r", flags=REPORT_ALL | ASSOCIATED_TEXT) == (
-        "\x1b[13u"
-    )
+    assert translate_key_data("\r", flags=REPORT_ALL | ASSOCIATED_TEXT) == ("\x1b[13u")
     assert translate_key_data("\x01", flags=REPORT_ALL | ASSOCIATED_TEXT) == (
         "\x1b[97;5u"
     )
@@ -247,10 +235,7 @@ def test_the_text_of_a_key_reaches_a_pane_that_asked():
 
 def test_a_legacy_key_answers_with_a_press_and_a_release():
     assert translate_key_data("a", flags=EVENT_TYPES) == "a\x1b[97;:3u"
-    assert (
-        translate_key_data("a", flags=EVENT_TYPES | DISAMBIGUATE)
-        == "a\x1b[97;:3u"
-    )
+    assert translate_key_data("a", flags=EVENT_TYPES | DISAMBIGUATE) == "a\x1b[97;:3u"
     assert translate_key_data("\x01", flags=EVENT_TYPES) == "\x01\x1b[97;5:3u"
     assert translate_key_data("A", flags=EVENT_TYPES) == "A\x1b[97;2:3u"
 
@@ -258,9 +243,7 @@ def test_a_legacy_key_answers_with_a_press_and_a_release():
 def test_a_made_up_release_keeps_the_form_of_the_key():
     "An arrow comes up in the form of an arrow, not of a text key."
     assert translate_key_data("\x1b[D", flags=EVENT_TYPES) == "\x1b[D\x1b[1;:3D"
-    assert translate_key_data("\x1b[2~", flags=EVENT_TYPES) == (
-        "\x1b[2~\x1b[2;:3~"
-    )
+    assert translate_key_data("\x1b[2~", flags=EVENT_TYPES) == ("\x1b[2~\x1b[2;:3~")
 
 
 def test_enter_gets_no_made_up_release_either():
@@ -278,13 +261,9 @@ def test_enter_gets_no_made_up_release_either():
 
 def test_a_keyboard_that_sends_its_own_release_is_left_alone():
     "Two releases for one key would be worse than none."
+    assert translate_key_data("a", flags=EVENT_TYPES, source_flags=0b11111) == "a"
     assert (
-        translate_key_data("a", flags=EVENT_TYPES, source_flags=0b11111) == "a"
-    )
-    assert (
-        translate_key_data(
-            "\x1b[97;:3u", flags=EVENT_TYPES, source_flags=0b11111
-        )
+        translate_key_data("\x1b[97;:3u", flags=EVENT_TYPES, source_flags=0b11111)
         == "\x1b[97;:3u"
     )
 
@@ -292,10 +271,7 @@ def test_a_keyboard_that_sends_its_own_release_is_left_alone():
 def test_nothing_is_made_up_without_the_switch():
     "The host can ask for presses only. The pane then hears that."
     assert translate_key_data("a", flags=EVENT_TYPES, synthesize=False) == "a"
-    assert (
-        translate_key_data("\x01", flags=EVENT_TYPES, synthesize=False)
-        == "\x01"
-    )
+    assert translate_key_data("\x01", flags=EVENT_TYPES, synthesize=False) == "\x01"
 
 
 def test_a_pane_that_asked_for_no_event_type_reads_no_release():
@@ -321,12 +297,8 @@ def test_the_shifted_key_of_a_letter_is_the_letter():
 
 def test_a_key_with_no_shifted_key_of_its_own_reports_none():
     "Which key gives an exclamation mark is a question of the layout."
-    assert translate_key_data("!", flags=ALTERNATE_KEYS | REPORT_ALL) == (
-        "\x1b[33u"
-    )
-    assert translate_key_data("a", flags=ALTERNATE_KEYS | REPORT_ALL) == (
-        "\x1b[97u"
-    )
+    assert translate_key_data("!", flags=ALTERNATE_KEYS | REPORT_ALL) == ("\x1b[33u")
+    assert translate_key_data("a", flags=ALTERNATE_KEYS | REPORT_ALL) == ("\x1b[97u")
 
 
 def test_the_shifted_key_waits_for_a_pane_that_asked():
@@ -340,9 +312,7 @@ def test_the_ss3_form_belongs_to_a_pane_that_pushed_no_flag():
     the legacy mode: no disambiguate, no event types, no report of all
     keys. A pane that pushed one of those reads the CSI form.
     """
-    assert (
-        translate_key_data("\x1bOD", flags=0, application_mode=True) == "\x1bOD"
-    )
+    assert translate_key_data("\x1bOD", flags=0, application_mode=True) == "\x1bOD"
     assert translate_key_data("\x1bOP", flags=0) == "\x1bOP"
     for flags in (DISAMBIGUATE, EVENT_TYPES, REPORT_ALL):
         assert (
@@ -422,16 +392,10 @@ def test_a_key_the_legacy_encoding_cannot_write_reaches_no_such_pane():
 
 def test_a_pane_that_asked_reads_the_number_of_the_key():
     "The fold is for the legacy encoding. It must not hide a key."
-    assert translate_key_data("\x1b[57399u", flags=DISAMBIGUATE) == (
-        "\x1b[57399u"
-    )
-    assert translate_key_data("\x1b[57441u", flags=DISAMBIGUATE) == (
-        "\x1b[57441u"
-    )
+    assert translate_key_data("\x1b[57399u", flags=DISAMBIGUATE) == ("\x1b[57399u")
+    assert translate_key_data("\x1b[57441u", flags=DISAMBIGUATE) == ("\x1b[57441u")
     assert translate_key_data("\x1b[57376u", flags=REPORT_ALL) == "\x1b[57376u"
-    assert translate_key_data("\x1b[57399u", flags=ASSOCIATED_TEXT) == (
-        "\x1b[57399u"
-    )
+    assert translate_key_data("\x1b[57399u", flags=ASSOCIATED_TEXT) == ("\x1b[57399u")
 
 
 #: A key in xterm's modifyOtherKeys form, and the bytes a pane that
@@ -465,9 +429,7 @@ def test_a_key_in_the_modify_other_keys_form_is_the_key_it_names():
 
 def test_a_pane_that_asked_reads_the_same_key_in_its_own_form():
     "One key event in the middle, and each end writes its own form."
-    assert translate_key_data("\x1b[27;5;97~", flags=DISAMBIGUATE) == (
-        "\x1b[97;5u"
-    )
+    assert translate_key_data("\x1b[27;5;97~", flags=DISAMBIGUATE) == ("\x1b[97;5u")
     assert translate_key_data("\x1b[27;3;9~", flags=REPORT_ALL) == "\x1b[9;3u"
 
 
@@ -516,9 +478,10 @@ def test_the_back_tab_belongs_to_the_legacy_mode_alone():
     """
     for flags in (DISAMBIGUATE, REPORT_ALL):
         assert translate_key_data("\x1b[9;2u", flags=flags) == "\x1b[9;2u"
-    assert translate_key_data(
-        "\x1b[9;2u", flags=EVENT_TYPES, synthesize=False
-    ) == "\x1b[9;2u"
+    assert (
+        translate_key_data("\x1b[9;2u", flags=EVENT_TYPES, synthesize=False)
+        == "\x1b[9;2u"
+    )
 
 
 def test_a_back_tab_from_a_legacy_keyboard_passes_through():
@@ -535,7 +498,5 @@ def test_a_plain_tab_is_not_a_back_tab():
 
 def test_a_folded_keypad_key_follows_the_cursor_key_mode():
     "The fold gives a normal key, and a normal arrow reads DECCKM."
-    assert translate_key_data(
-        "\x1b[57419u", flags=0, application_mode=True
-    ) == "\x1bOA"
+    assert translate_key_data("\x1b[57419u", flags=0, application_mode=True) == "\x1bOA"
     assert translate_key_data("\x1b[57419u", flags=0) == "\x1b[A"

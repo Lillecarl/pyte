@@ -87,7 +87,7 @@ def test_non_csi_sequences():
         stream = pyte.Stream(screen)
         stream.feed(ctrl.ESC + "[5" + cmd)
         assert handler.count == 1
-        assert handler.args == (5, )
+        assert handler.args == (5,)
 
         # b) multiple params, and starts with CSI, not ESC [
         handler = argcheck()
@@ -166,9 +166,7 @@ def test_interrupt():
     stream.feed(ctrl.CSI + "10;" + ctrl.SUB + "10" + esc.HVP)
 
     assert not handler.count
-    assert bugger.seen == [
-        ctrl.SUB, "10" + esc.HVP
-    ]
+    assert bugger.seen == [ctrl.SUB, "10" + esc.HVP]
 
 
 def test_control_characters():
@@ -183,12 +181,15 @@ def test_control_characters():
     assert handler.args == (10, 10)
 
 
-@pytest.mark.parametrize('osc,st', [
-    (ctrl.OSC_C0, ctrl.ST_C0),
-    (ctrl.OSC_C0, ctrl.ST_C1),
-    (ctrl.OSC_C1, ctrl.ST_C0),
-    (ctrl.OSC_C1, ctrl.ST_C1)
-])
+@pytest.mark.parametrize(
+    "osc,st",
+    [
+        (ctrl.OSC_C0, ctrl.ST_C0),
+        (ctrl.OSC_C0, ctrl.ST_C1),
+        (ctrl.OSC_C1, ctrl.ST_C0),
+        (ctrl.OSC_C1, ctrl.ST_C1),
+    ],
+)
 def test_set_title_icon_name(osc, st):
     screen = a_screen(80, 24)
     stream = pyte.Stream(screen)
@@ -319,13 +320,20 @@ def test_an_unknown_announcer_is_eaten_as_well():
     assert handler.count == 1  # Only the "ok".
 
 
-@pytest.mark.parametrize("input,expected", [
-    (b"foo", [["draw", ["foo"], {}]]),
-    (b"\x1b[1;24r\x1b[4l\x1b[24;1H", [
-        ["set_margins", [1, 24], {}],
-        ["reset_mode", [4], {}],
-        ["cursor_position", [24, 1], {}]])
-])
+@pytest.mark.parametrize(
+    "input,expected",
+    [
+        (b"foo", [["draw", ["foo"], {}]]),
+        (
+            b"\x1b[1;24r\x1b[4l\x1b[24;1H",
+            [
+                ["set_margins", [1, 24], {}],
+                ["reset_mode", [4], {}],
+                ["cursor_position", [24, 1], {}],
+            ],
+        ),
+    ],
+)
 def test_debug_stream(input, expected):
     output = io.StringIO()
     stream = pyte.ByteStream(pyte.DebugScreen(to=output))
@@ -362,7 +370,7 @@ def test_byte_stream_feed():
     stream = pyte.ByteStream(screen)
     stream.feed("Нерусский текст".encode())
     assert handler.count == 1
-    assert handler.args == ("Нерусский текст", )
+    assert handler.args == ("Нерусский текст",)
 
 
 def test_byte_stream_define_charset_unknown():

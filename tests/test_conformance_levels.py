@@ -9,6 +9,7 @@ pyte does not drop every later sequence. It drops the three that
 esctest2 asks about, because a program that asks for a VT220 and then
 finds a VT520 has learned nothing from asking.
 """
+
 import pytest
 
 from pyte.screen import Screen
@@ -61,30 +62,31 @@ def test_decrqm_comes_back_with_the_level():
 
 def test_the_column_margins_hold_from_the_terminal_that_brought_them():
     screen, stream, answers = make_screen()
-    stream.feed(VT400 + (
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 3, 6)
-    ))
+    stream.feed(
+        VT400 + (set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 3, 6))
+    )
     assert screen.horizontal_margins == (2, 5)
 
 
 @pytest.mark.parametrize("level", [VT200, VT300])
 def test_the_mode_does_not_set_on_an_earlier_terminal(level):
     screen, stream, answers = make_screen()
-    stream.feed(level + (
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 3, 6)
-    ))
+    stream.feed(
+        level + (set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 3, 6))
+    )
     assert screen.horizontal_margins is None
 
 
 def test_the_same_byte_saves_the_cursor_on_an_earlier_terminal():
     "Without the mode, 'CSI s' is SCOSC, so it saves and does not name a region."
     screen, stream, answers = make_screen()
-    stream.feed(VT300 + (
-        csi(escape.CUP, 2, 4)
-        + set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 3, 6)
-    ))
+    stream.feed(
+        VT300
+        + (
+            csi(escape.CUP, 2, 4)
+            + set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
+            + csi(Csi.DECSLRM, 3, 6)
+        )
+    )
     stream.feed(csi(escape.CUP, 1, 1) + csi(Csi.KITTY_KEYBOARD))
     assert (screen.pt_cursor_position.y, screen.pt_cursor_position.x) == (1, 3)

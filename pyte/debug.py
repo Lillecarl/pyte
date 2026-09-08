@@ -28,6 +28,7 @@ on its own. That is what a minimiser for a recorded fault would need.
 It came from upstream pyte, where it lived in `screens.py` beside three
 screens that this package no longer has.
 """
+
 from __future__ import annotations
 
 import json

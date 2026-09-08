@@ -17,6 +17,7 @@ harness `WANTSCREEN rb` and the same bytes, and it pops a line, fills
 the top row and puts the cursor at `4,2`, which is what these tests
 assert. Lillecarl/pymux#57.
 """
+
 from pyte.cells import WrittenCell
 from pyte.screen import Screen
 from pyte.streams import Stream

@@ -11,6 +11,7 @@ The rules it must not lose are the refusals. A tool that rewrites the
 expected value of an assertion turns a test into one that passes
 whatever the code does, and nothing downstream would say so.
 """
+
 import ast
 import sys
 from pathlib import Path
@@ -129,9 +130,7 @@ def test_a_code_that_osc_py_does_not_name_stays_a_string():
 
 
 def test_the_terminator_is_named():
-    assert rewritten("\x1b]11;?\x07") == (
-        'osc("11", "?", end=Terminator.BEL)'
-    )
+    assert rewritten("\x1b]11;?\x07") == ('osc("11", "?", end=Terminator.BEL)')
 
 
 def test_a_device_control_string_and_an_application_one():
@@ -204,7 +203,7 @@ def test_a_quote_in_the_text_is_left_to_repr():
     is how a rewrite writes bytes nobody meant.
     """
     assert rewritten("a'b\x1b[2J") == '"a\'b" + csi(escape.ED, 2)'
-    assert rewritten('a"b\x1b[2J') == '\'a"b\' + csi(escape.ED, 2)'
+    assert rewritten('a"b\x1b[2J') == "'a\"b' + csi(escape.ED, 2)"
 
 
 def test_a_string_is_named_whole_or_not_at_all():
@@ -269,9 +268,7 @@ def test_what_an_assertion_expects_is_left_alone():
     rewrite there asks the writer to mark its own work, and the test
     passes whatever the writer does.
     """
-    changes, _ = changes_in(
-        'def t():\n    assert answers == ["\\x1b[0n"]\n'
-    )
+    changes, _ = changes_in('def t():\n    assert answers == ["\\x1b[0n"]\n')
     assert changes == []
 
 
@@ -285,14 +282,10 @@ def test_what_a_string_method_is_asked_about_is_left_alone():
     a test that expected `csi(escape.SGR, 0)` would have stopped
     asking anything at all.
     """
-    changes, _ = changes_in(
-        'def t():\n    assert line.endswith("\\x1b[2T")\n'
-    )
+    changes, _ = changes_in('def t():\n    assert line.endswith("\\x1b[2T")\n')
     assert changes == []
 
-    changes, _ = changes_in(
-        'def t():\n    x = answer.removeprefix("\\x1b[2T")\n'
-    )
+    changes, _ = changes_in('def t():\n    x = answer.removeprefix("\\x1b[2T")\n')
     assert changes == []
 
 
@@ -306,9 +299,7 @@ def test_a_sequence_going_into_a_call_is_not_an_expectation():
     "Even when the call is one side of a comparison."
     source = 'def t():\n    assert feed("\\x1b[2T") == [1]\n'
     changes, _ = changes_in(source)
-    assert [change.rewrite.expression for change in changes] == [
-        "csi(Csi.SD, 2)"
-    ]
+    assert [change.rewrite.expression for change in changes] == ["csi(Csi.SD, 2)"]
 
 
 def test_a_docstring_is_left_alone():
@@ -331,10 +322,7 @@ def test_a_long_line_is_wrapped_and_not_left_alone():
     on it goes onto several lines, the way somebody writing it by hand
     would do.
     """
-    source = (
-        'def t():\n'
-        '    feed("\\x1b[5;7r\\x1b[?69h\\x1b[5;7s\\x1b[?6h")\n'
-    )
+    source = 'def t():\n    feed("\\x1b[5;7r\\x1b[?69h\\x1b[5;7s\\x1b[?6h")\n'
     changes, skipped = changes_in(source)
     assert len(changes) == 1
     assert skipped == []
@@ -382,8 +370,7 @@ def test_two_rewrites_on_one_line_are_not_wrapped():
     about one string in it.
     """
     source = (
-        'def t():\n'
-        '    feed("\\x1b[5;7r\\x1b[?69h\\x1b[5;7s", "\\x1b[5;7r\\x1b[?69h")\n'
+        'def t():\n    feed("\\x1b[5;7r\\x1b[?69h\\x1b[5;7s", "\\x1b[5;7r\\x1b[?69h")\n'
     )
     written = applied(source, changes_in(source)[0])
 

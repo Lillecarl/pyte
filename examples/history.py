@@ -1,11 +1,11 @@
 """
-    history
-    ~~~~~~~
+history
+~~~~~~~
 
-    A tiny example to show how pagination works.
+A tiny example to show how pagination works.
 
-    :copyright: (c) 2011-2013 by Selectel, see AUTHORS for details.
-    :license: LGPL, see LICENSE for more details.
+:copyright: (c) 2011-2013 by Selectel, see AUTHORS for details.
+:license: LGPL, see LICENSE for more details.
 """
 
 import os
@@ -37,8 +37,11 @@ if __name__ == "__main__":
     stream = pyte.Stream(screen)
 
     pages = 3
-    stream.feed(os.linesep.join(random_string(screen.columns)
-                                for _ in range(screen.lines * pages)))
+    stream.feed(
+        os.linesep.join(
+            random_string(screen.columns) for _ in range(screen.lines * pages)
+        )
+    )
     screen.prev_page()
 
     print_screen(screen, "Hit ENTER to move up!")

@@ -26,6 +26,7 @@ that line a blank nobody wrote. The cursor travels as an offset now
 and no read makes a cell, so the lines after the first resize are the
 lines before it. Lillecarl/pymux#143.
 """
+
 from hypothesis import HealthCheck, example, given, settings
 from hypothesis import strategies as st
 
@@ -112,8 +113,7 @@ def logical_lines(screen):
     lines = [line for line in lines if line]
 
     return tuple(
-        tuple((cell.char, cell.appearance) for cell in cells)
-        for cells in lines
+        tuple((cell.char, cell.appearance) for cell in cells) for cells in lines
     )
 
 
@@ -236,4 +236,3 @@ def test_a_column_change_keeps_every_line_with_a_short_history(chunks, widths):
     for width in widths:
         screen.resize(screen.lines, width)
         assert logical_lines(screen) == before
-

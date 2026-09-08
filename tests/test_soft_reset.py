@@ -5,6 +5,7 @@ It keeps the text and the cursor, and puts the settings back. A program
 sends it when it starts and when it ends, so that the terminal that the
 next program finds is the one it knows.
 """
+
 from pyte.modes import AnsiMode, PrivateMode
 from pyte.screen import Screen
 from pyte.streams import Stream
@@ -56,9 +57,7 @@ LEFT_RIGHT_MODE = 69
 def test_origin_mode_goes_off():
     screen, stream, _answers = _screen()
     stream.feed(
-        csi(escape.DECSTBM, 2, 4)
-        + set_mode(PrivateMode.ORIGIN)
-        + csi(Csi.DECSTR)
+        csi(escape.DECSTBM, 2, 4) + set_mode(PrivateMode.ORIGIN) + csi(Csi.DECSTR)
     )
     assert PrivateMode.ORIGIN.flag not in screen.mode
 
@@ -85,10 +84,7 @@ def test_the_cursor_stays_visible():
 def test_the_saved_cursor_goes_home():
     screen, stream, _answers = _screen()
     stream.feed(
-        csi(escape.CUP, 3, 5)
-        + esc(escape.DECSC)
-        + csi(Csi.DECSTR)
-        + esc(escape.DECRC)
+        csi(escape.CUP, 3, 5) + esc(escape.DECSC) + csi(Csi.DECSTR) + esc(escape.DECRC)
     )
     assert (screen.pt_cursor_position.x, screen.pt_cursor_position.y) == (0, 0)
 

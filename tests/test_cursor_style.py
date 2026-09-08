@@ -10,6 +10,7 @@ a pair is the number after it.
 The pane keeps this, and what draws the pane puts it on the terminal of
 the user.
 """
+
 from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte.modes import PrivateMode
@@ -87,12 +88,12 @@ def test_decrqm_answers_for_the_blinking():
     screen, stream, responses = make_screen()
     stream.feed(csi(Csi.DECSCUSR, 6))
     responses.clear()
-    stream.feed(csi(Csi.DECRQM, 12, private='?'))
+    stream.feed(csi(Csi.DECRQM, 12, private="?"))
     assert responses == ["\x1b[?12;2$y"]  # Reset.
 
     stream.feed(csi(Csi.DECSCUSR, 5))
     responses.clear()
-    stream.feed(csi(Csi.DECRQM, 12, private='?'))
+    stream.feed(csi(Csi.DECRQM, 12, private="?"))
     assert responses == ["\x1b[?12;1$y"]  # Set.
 
 

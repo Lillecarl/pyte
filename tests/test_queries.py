@@ -5,6 +5,7 @@ A program that asks and gets no answer waits. Every query that pyte
 understands therefore gets an answer, and one that it does not
 understand gets the answer that says so.
 """
+
 import pytest
 
 from pyte.screen import Screen

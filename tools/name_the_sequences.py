@@ -41,6 +41,7 @@ change that nobody can check is worth less than no change at all.
   They are counted and printed, so the next builder is chosen from
   what is actually there rather than from a guess.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -118,9 +119,33 @@ A_CSI_SEQUENCE = re.compile(
 #: the alphabet, so "CSI 3 D" came out as `csi(escape.IND, 3)`, which
 #: writes the right bytes under a name that means something else.
 CSI_NAMES = (
-    "ICH", "CUU", "CUD", "CUF", "CUB", "CNL", "CPL", "CHA", "CUP",
-    "ED", "EL", "IL", "DL", "DCH", "ECH", "HPR", "DA", "VPA", "VPR",
-    "HVP", "TBC", "SM", "RM", "SGR", "DSR", "DECSTBM", "HPA",
+    "ICH",
+    "CUU",
+    "CUD",
+    "CUF",
+    "CUB",
+    "CNL",
+    "CPL",
+    "CHA",
+    "CUP",
+    "ED",
+    "EL",
+    "IL",
+    "DL",
+    "DCH",
+    "ECH",
+    "HPR",
+    "DA",
+    "VPA",
+    "VPR",
+    "HVP",
+    "TBC",
+    "SM",
+    "RM",
+    "SGR",
+    "DSR",
+    "DECSTBM",
+    "HPA",
 )
 
 #: What each final byte is called, so that a rewrite names it.
@@ -280,16 +305,14 @@ def _a_sequence_at(text: str, at: int) -> "Tuple[str, int] | str":
     if text.startswith(CSI, at):
         return _a_csi_at(text, at)
 
-    after = text[at + 1: at + 2]
+    after = text[at + 1 : at + 2]
     if after in _STRING_FAMILIES:
         return _a_string_sequence_at(text, at, _STRING_FAMILIES[after])
 
     return _an_escape_at(text, at)
 
 
-def _a_string_sequence_at(
-    text: str, at: int, call: str
-) -> "Tuple[str, int] | str":
+def _a_string_sequence_at(text: str, at: int, call: str) -> "Tuple[str, int] | str":
     """
     The OSC, DCS or APC that starts at `at`, and how long it is.
 
@@ -420,7 +443,7 @@ def _an_escape_at(text: str, at: int) -> "Tuple[str, int] | str":
         head = "\x1b" + intermediate
         if not text.startswith(head, at):
             continue
-        final = text[at + len(head): at + len(head) + 1]
+        final = text[at + len(head) : at + len(head) + 1]
         if final in names:
             return (
                 "%s(%s)" % (call, names[final]),
@@ -443,9 +466,7 @@ def _values_of(params: str) -> List[int | None]:
     return [int(one) if one else None for one in params.split(";")]
 
 
-def _a_mode_call(
-    final: str, private: str, values: List[int | None]
-) -> str | None:
+def _a_mode_call(final: str, private: str, values: List[int | None]) -> str | None:
     "SM or RM, when `modes.py` names every mode in it."
     if final not in (escape.SM, escape.RM):
         return None
@@ -568,10 +589,7 @@ def _expectations(tree: ast.AST) -> set:
 
 def _reads_a_string(node: ast.Call) -> bool:
     "Whether this call asks a question about a string."
-    return (
-        isinstance(node.func, ast.Attribute)
-        and node.func.attr in READS_A_STRING
-    )
+    return isinstance(node.func, ast.Attribute) and node.func.attr in READS_A_STRING
 
 
 def _strings_of(tree: ast.AST) -> Iterator[ast.Constant]:
@@ -591,12 +609,11 @@ def _strings_of(tree: ast.AST) -> Iterator[ast.Constant]:
         if isinstance(node, ast.JoinedStr):
             for part in ast.walk(node):
                 inside_a_format.add(id(part))
-        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef,
-                             ast.AsyncFunctionDef)):
+        if isinstance(
+            node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+        ):
             first = node.body[0] if node.body else None
-            if isinstance(first, ast.Expr) and isinstance(
-                first.value, ast.Constant
-            ):
+            if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant):
                 docstrings.add(id(first.value))
 
     leave_alone = inside_a_format | docstrings | _expectations(tree)
@@ -684,8 +701,11 @@ def applied(source: str, changes: List[Change]) -> str:
     had.
     """
     lines = source.splitlines(keepends=True)
-    was_long = {number for number, line in enumerate(lines, 1)
-                if len(line.rstrip("\n")) > ROOM_ON_A_LINE}
+    was_long = {
+        number
+        for number, line in enumerate(lines, 1)
+        if len(line.rstrip("\n")) > ROOM_ON_A_LINE
+    }
 
     on_this_line: dict = {}
     for change in changes:
@@ -700,9 +720,7 @@ def applied(source: str, changes: List[Change]) -> str:
             continue
 
         line = lines[first_line - 1]
-        written = _spliced(
-            line, first_column, last_column, change.rewrite.expression
-        )
+        written = _spliced(line, first_column, last_column, change.rewrite.expression)
 
         # One rewrite to a line, or the wraps would have to be laid out
         # around each other. Two on one line stay on it.
@@ -743,8 +761,8 @@ def _brackets_around(line: str, start: int, end: int) -> bool:
     it says nothing.
     """
     raw = line.encode("utf-8")
-    before = raw[start - 1: start]
-    after = raw[end: end + 1]
+    before = raw[start - 1 : start]
+    after = raw[end : end + 1]
     return (before, after) in ((b"(", b")"), (b"[", b"]"))
 
 
@@ -781,9 +799,7 @@ def _spliced(line: str, start: int, end: int, expression: str) -> str:
     parse.
     """
     raw = line.encode("utf-8")
-    return (
-        raw[:start] + expression.encode("utf-8") + raw[end:]
-    ).decode("utf-8")
+    return (raw[:start] + expression.encode("utf-8") + raw[end:]).decode("utf-8")
 
 
 def with_the_imports(source: str, changes: List[Change]) -> str:

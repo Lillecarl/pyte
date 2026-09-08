@@ -7,6 +7,7 @@ than against the assumptions of this repository. The filter tests build
 their own images and apply the forward filter by hand, which checks the
 filter arithmetic on its own.
 """
+
 import struct
 import zlib
 
@@ -143,9 +144,7 @@ def test_a_png_without_image_data_is_refused():
 
 def test_broken_image_data_is_refused():
     header = struct.pack(">IIBBBBB", 2, 2, 8, 6, 0, 0, 0)
-    assert (
-        decode_png(_build([(b"IHDR", header), (b"IDAT", b"not zlib")])) is None
-    )
+    assert decode_png(_build([(b"IHDR", header), (b"IDAT", b"not zlib")])) is None
 
 
 def test_an_image_past_the_pixel_bound_is_refused():
@@ -217,9 +216,7 @@ def _rgb_png(rows, filter_type):
         raw += _filter_row(filter_type, line, previous, 3)
         previous = line
 
-    return _build(
-        [(b"IHDR", header), (b"IDAT", zlib.compress(bytes(raw)))]
-    )
+    return _build([(b"IHDR", header), (b"IDAT", zlib.compress(bytes(raw)))])
 
 
 ROWS = [
@@ -234,9 +231,7 @@ def test_every_filter_round_trips(filter_type):
     width, height, data = decode_png(_rgb_png(ROWS, filter_type))
     assert (width, height) == (3, 3)
     got = [pixel[:3] for pixel in pixels(data)]
-    expected = [
-        tuple(row[i : i + 3]) for row in ROWS for i in range(0, len(row), 3)
-    ]
+    expected = [tuple(row[i : i + 3]) for row in ROWS for i in range(0, len(row), 3)]
     assert got == expected
 
 

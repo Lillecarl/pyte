@@ -17,6 +17,7 @@ the builder writes.
 The literals are also why `pyte/tools/name_the_sequences.py` may not
 touch this file, and its exclusion list says so.
 """
+
 import pytest
 
 from pyte import escape

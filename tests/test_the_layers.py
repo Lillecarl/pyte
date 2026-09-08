@@ -18,6 +18,7 @@ layer fails here instead.
 Everything that parses or holds is held to the rules. The disassembler
 is not: it is a program, it writes to a file, and `TOOLS` names it.
 """
+
 import ast
 from pathlib import Path
 
@@ -159,8 +160,7 @@ def test_every_module_has_a_layer():
     """
     unplaced = sorted(name for name in MODULES if name not in PURE | TOOLS)
     assert unplaced == [], (
-        "these modules are in no layer: add each one to PURE or TOOLS "
-        "in this file"
+        "these modules are in no layer: add each one to PURE or TOOLS in this file"
     )
 
 
@@ -198,9 +198,9 @@ def test_the_pure_layer_does_no_input_or_output(name):
     talks to nobody. A module that imports `os` has left that behind.
     """
     outside, _inside = _imports(MODULES[name])
-    assert outside <= MAY_IMPORT, (
-        "%s imports %s, which the pure layer may not"
-        % (name, sorted(outside - MAY_IMPORT))
+    assert outside <= MAY_IMPORT, "%s imports %s, which the pure layer may not" % (
+        name,
+        sorted(outside - MAY_IMPORT),
     )
 
 

@@ -1,25 +1,25 @@
 """
-    pyte
-    ~~~~
+pyte
+~~~~
 
-    Command-line tool for "disassembling" escape and CSI sequences::
+Command-line tool for "disassembling" escape and CSI sequences::
 
-        $ echo -e "\\e[Jfoo" | python -m pyte
-        ERASE_IN_DISPLAY 0
-        DRAW f
-        DRAW o
-        DRAW o
-        LINEFEED
+    $ echo -e "\\e[Jfoo" | python -m pyte
+    ERASE_IN_DISPLAY 0
+    DRAW f
+    DRAW o
+    DRAW o
+    LINEFEED
 
-        $ python -m pyte foo
-        DRAW f
-        DRAW o
-        DRAW o
+    $ python -m pyte foo
+    DRAW f
+    DRAW o
+    DRAW o
 
-    :copyright: (c) 2011-2012 by Selectel.
-    :copyright: (c) 2012-2017 by pyte authors and contributors,
-                    see AUTHORS for details.
-    :license: LGPL, see LICENSE for more details.
+:copyright: (c) 2011-2012 by Selectel.
+:copyright: (c) 2012-2017 by pyte authors and contributors,
+                see AUTHORS for details.
+:license: LGPL, see LICENSE for more details.
 """
 
 if __name__ == "__main__":

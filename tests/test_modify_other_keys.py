@@ -14,6 +14,7 @@ The levels are xterm's, and so are the examples:
 `xterm-snapshots/ctlseqs.ms`, under "Alt and Meta Keys".
 Lillecarl/pymux#169.
 """
+
 import pyte
 from pyte.keys import (
     FormatOtherKeys,

@@ -39,6 +39,7 @@ eight, and a gate that is red by luck teaches everybody to run it
 again instead of to look. So there are two profiles and the gate takes
 the pinned one. Lillecarl/pymux#180.
 """
+
 import os
 import re
 from pathlib import Path
@@ -127,8 +128,7 @@ def pytest_ignore_collect(collection_path, config):
         return None
     if GROUP not in GROUPS:
         raise ValueError(
-            "PYTE_GROUP is %r, and the groups are %s"
-            % (GROUP, ", ".join(GROUPS))
+            "PYTE_GROUP is %r, and the groups are %s" % (GROUP, ", ".join(GROUPS))
         )
     if collection_path.suffix != ".py":
         return None

@@ -5,6 +5,7 @@ The window title and the icon label, and the stack that holds them.
 "CSI 23 t" brings them back, which is what a program does around a
 title of its own. A pane has both, so it answers all four.
 """
+
 from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte.sequences import Csi, csi

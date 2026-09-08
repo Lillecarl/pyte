@@ -55,6 +55,7 @@ All three are served for a legacy terminal as well, as far as it can:
 The forms follow the encoder of kitty (`kitty/key_encoding.c`), so a
 pane sees what a real kitty gives it.
 """
+
 from enum import IntEnum, IntFlag
 from typing import List, NamedTuple, Sequence, Tuple
 
@@ -249,11 +250,7 @@ BACK_TAB = "[Z"
 #: kitty says in the same place: "the Lock modifiers are not reported
 #: for text producing keys, to keep them usable in legacy programs".
 _MODIFIERS_WITH_NO_LEGACY_FORM = (
-    Modifier.CTRL
-    | Modifier.ALT
-    | Modifier.SUPER
-    | Modifier.HYPER
-    | Modifier.META
+    Modifier.CTRL | Modifier.ALT | Modifier.SUPER | Modifier.HYPER | Modifier.META
 )
 
 
@@ -292,9 +289,7 @@ def _wants_the_escape_form(level: int, code: int, mods: int, text: str) -> bool:
     if level == ModifyOtherKeys.EVERY_MODIFIER:
         if mods & (Modifier.CTRL | Modifier.ALT):
             return True
-        return bool(mods & Modifier.SHIFT) and not _has_a_shifted_character(
-            code, text
-        )
+        return bool(mods & Modifier.SHIFT) and not _has_a_shifted_character(code, text)
     if level == ModifyOtherKeys.ALT_AND_META:
         return bool(mods & Modifier.ALT)
     return False
@@ -457,6 +452,7 @@ def with_flags_set(
 
 class KeyEvent(NamedTuple):
     "One decoded key event, in the terms of the keyboard protocol."
+
     code: int  # unicode key code, or the number of the CSI form
     mods: int  # shift/alt/ctrl bitmask (without the +1 offset)
     final: str  # "u", "~" or one of _LETTER_FINALS
@@ -621,9 +617,7 @@ def _parse_csi(data: str, start: int) -> Tuple[_Item, int]:
         # A key of the letter form carries no code of its own: the
         # first parameter is the one of the sequence, and it is one.
         code = _first(keys, 1 if final in _LETTER_FINALS else 0)
-        text = (
-            "".join(chr(n) for n in rows[2] if n) if len(rows) > 2 else ""
-        )
+        text = "".join(chr(n) for n in rows[2] if n) if len(rows) > 2 else ""
         return (
             KeyEvent(code, mods, final, text, alternates, event),
             i + 1 - start,
@@ -678,9 +672,7 @@ def parse_key_data(data: str) -> List[_Item]:
             else:
                 # alt+char in the legacy encoding.
                 inner = _control_or_text_event(nxt)
-                items.append(
-                    KeyEvent(inner.code, inner.mods | Modifier.ALT, "u")
-                )
+                items.append(KeyEvent(inner.code, inner.mods | Modifier.ALT, "u"))
                 i += 2
                 continue
             items.append(item)
@@ -721,9 +713,7 @@ def _serialize(
     if code != 1 or final == "~" or alternates or second or third:
         out += str(code)
     if alternates:
-        out += ":" + ":".join(
-            "" if slot is None else str(slot) for slot in alternates
-        )
+        out += ":" + ":".join("" if slot is None else str(slot) for slot in alternates)
     if second or third:
         out += ";"
         if mods_value != 1:
@@ -752,9 +742,7 @@ _CONTROL_CODES = (KeyCode.ENTER, KeyCode.TAB, KeyCode.BACKSPACE)
 #: `KP_SEPARATOR` and `KP_BEGIN` are not here, for the same reason they
 #: are not in kitty's function: neither has a normal key.
 _KEYPAD_TO_NORMAL = {
-    **{
-        FunctionalKey.KP_0 + n: (ord("0") + n, "u") for n in range(10)
-    },
+    **{FunctionalKey.KP_0 + n: (ord("0") + n, "u") for n in range(10)},
     FunctionalKey.KP_DECIMAL: (ord("."), "u"),
     FunctionalKey.KP_DIVIDE: (ord("/"), "u"),
     FunctionalKey.KP_MULTIPLY: (ord("*"), "u"),
@@ -795,9 +783,7 @@ SS3 = "\x1bO"
 #: works because pymux asks every terminal to disambiguate, and a
 #: terminal that does stops folding. Lillecarl/pymux#175.
 _KEYPAD_APPLICATION = {
-    **{
-        FunctionalKey.KP_0 + n: chr(ord("p") + n) for n in range(10)
-    },
+    **{FunctionalKey.KP_0 + n: chr(ord("p") + n) for n in range(10)},
     FunctionalKey.KP_MULTIPLY: "j",
     FunctionalKey.KP_ADD: "k",
     FunctionalKey.KP_SEPARATOR: "l",
@@ -895,8 +881,7 @@ def _encode_event(
 
     if final == "u":
         ambiguous = (
-            bool(mods & _MODIFIERS_WITH_NO_LEGACY_FORM)
-            or code == KeyCode.ESCAPE
+            bool(mods & _MODIFIERS_WITH_NO_LEGACY_FORM) or code == KeyCode.ESCAPE
         )
         # A functional key still here belongs to a pane that reads the
         # number of a key: `_folded` took it away from every other one.
@@ -917,9 +902,7 @@ def _encode_event(
             or alternates
             or embedded
         ):
-            return _serialize(
-                code, mods_value, "u", alternates, kind, embedded
-            )
+            return _serialize(code, mods_value, "u", alternates, kind, embedded)
 
         # The extended mode, which a pane asks for with XTMODKEYS and
         # not with the flag stack. A pane in one of the kitty modes

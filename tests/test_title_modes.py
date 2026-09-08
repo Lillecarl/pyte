@@ -10,6 +10,7 @@ say how the terminal reports one back.
 `SMTitleTests` of esctest2 asks for all four. Lillecarl/pymux#44 is
 where the gap was found.
 """
+
 import pytest
 
 from pyte.parameters import TitleMode
@@ -94,12 +95,13 @@ def test_the_marker_is_what_makes_it_a_title_mode():
     """
     asks = []
     screen = Screen(
-        4, 20,
+        4,
+        20,
         write_process_input=lambda data: None,
         resize_func=lambda lines, columns: asks.append((lines, columns)),
     )
     stream = Stream(screen)
-    stream.feed(csi(Csi.XTWINOPS, 4, private='>'))
+    stream.feed(csi(Csi.XTWINOPS, 4, private=">"))
     assert asks == []
     assert screen.titles.modes == set()
 

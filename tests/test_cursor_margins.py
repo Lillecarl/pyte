@@ -5,6 +5,7 @@ A cursor above the top margin moves up to the top of the screen, and
 one below the bottom margin moves down to the bottom of it. Anything
 else turns a move up into a move down, which is what pyte did.
 """
+
 from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte import escape
@@ -96,9 +97,7 @@ def test_a_move_down_above_the_region_counts_the_lines():
 def test_a_row_past_the_region_holds_at_the_bottom():
     screen, stream = _screen()
     stream.feed(
-        csi(escape.DECSTBM, 1, 2)
-        + set_mode(PrivateMode.ORIGIN)
-        + csi(escape.CUP, 3, 1)
+        csi(escape.DECSTBM, 1, 2) + set_mode(PrivateMode.ORIGIN) + csi(escape.CUP, 3, 1)
     )
     assert _row(screen) == 1
 
@@ -106,9 +105,7 @@ def test_a_row_past_the_region_holds_at_the_bottom():
 def test_it_holds_at_the_bottom_of_a_region_that_starts_lower():
     screen, stream = _screen()
     stream.feed(
-        csi(escape.DECSTBM, 2, 3)
-        + set_mode(PrivateMode.ORIGIN)
-        + csi(escape.CUP, 5, 1)
+        csi(escape.DECSTBM, 2, 3) + set_mode(PrivateMode.ORIGIN) + csi(escape.CUP, 5, 1)
     )
     assert _row(screen) == 2
 
@@ -127,9 +124,7 @@ def test_the_column_moves_even_when_the_row_is_past_the_region():
     "The move happens. pyte left the cursor where it stood."
     screen, stream = _screen()
     stream.feed(
-        csi(escape.DECSTBM, 1, 2)
-        + set_mode(PrivateMode.ORIGIN)
-        + csi(escape.CUP, 3, 4)
+        csi(escape.DECSTBM, 1, 2) + set_mode(PrivateMode.ORIGIN) + csi(escape.CUP, 3, 4)
     )
     assert (_row(screen), screen.pt_cursor_position.x) == (1, 3)
 
@@ -137,9 +132,7 @@ def test_the_column_moves_even_when_the_row_is_past_the_region():
 def test_a_row_inside_the_region_lands_where_it_was_asked():
     screen, stream = _screen()
     stream.feed(
-        csi(escape.DECSTBM, 1, 2)
-        + set_mode(PrivateMode.ORIGIN)
-        + csi(escape.CUP, 2, 1)
+        csi(escape.DECSTBM, 1, 2) + set_mode(PrivateMode.ORIGIN) + csi(escape.CUP, 2, 1)
     )
     assert _row(screen) == 1
 

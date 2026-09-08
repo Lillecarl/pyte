@@ -4,6 +4,7 @@ An erased cell takes the background that is set now.
 A terminal that does not do this loses the colour bar that a program
 draws with "CSI K", which is how htop paints the header of its table.
 """
+
 from pyte.colors import SgrColor
 from pyte.cells import WrittenCell
 from pyte.screen import Screen
@@ -116,10 +117,7 @@ def test_erase_in_display_reaches_a_screen_that_holds_nothing():
 def test_erase_characters_takes_the_background_of_now():
     screen, stream = _screen()
     stream.feed(
-        "hello"
-        + csi(escape.CUP, 1, 1)
-        + csi(escape.SGR, 43)
-        + csi(escape.ECH, 3)
+        "hello" + csi(escape.CUP, 1, 1) + csi(escape.SGR, 43) + csi(escape.ECH, 3)
     )
     row = _row(screen, 0)
     for column in range(3):

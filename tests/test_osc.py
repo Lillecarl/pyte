@@ -4,6 +4,7 @@ Tests for the OSC sequences that a pane sends.
 A pane has no palette of its own, but a program that asks for one needs
 an answer: without it, it waits forever.
 """
+
 from pyte.colors import DEFAULT_COLORS, PALETTE, Color
 from pyte.osc import parse_kitty_color_query
 from pyte.screen import Screen
@@ -47,9 +48,7 @@ def test_reading_a_kitty_colour_query():
         ("foreground", True),
         ("cursor", True),
     ]
-    assert parse_kitty_color_query("foreground=green") == [
-        ("foreground", False)
-    ]
+    assert parse_kitty_color_query("foreground=green") == [("foreground", False)]
     assert parse_kitty_color_query("background") == [("background", False)]
     assert parse_kitty_color_query("") is None
     assert parse_kitty_color_query(";;") is None
@@ -146,9 +145,7 @@ def test_a_kitty_colour_query():
 def test_several_kitty_keys_at_once():
     _screen, stream, responses = make_screen()
     stream.feed(osc(Osc.KITTY_COLORS, "foreground=?", "background=?"))
-    assert responses == [
-        "\x1b]21;foreground=%s;background=%s\x1b\\" % (WHITE, BLACK)
-    ]
+    assert responses == ["\x1b]21;foreground=%s;background=%s\x1b\\" % (WHITE, BLACK)]
 
 
 def test_a_kitty_query_for_a_palette_entry():

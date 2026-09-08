@@ -6,6 +6,7 @@ time, so it is the instrument that judges everything else. The answer
 is "DCS Pid ! ~ xxxx ST", and the value is the negated sum of the
 characters.
 """
+
 import re
 
 from pyte.screen import Screen
@@ -39,7 +40,10 @@ def checksum(stream, responses, request):
 def test_one_cell():
     screen, stream, responses = make_screen()
     stream.feed("abc")
-    assert checksum(stream, responses, csi(Csi.DECRQCRA, 7, 0, 1, 1, 1, 1)) == (7, ord("a"))
+    assert checksum(stream, responses, csi(Csi.DECRQCRA, 7, 0, 1, 1, 1, 1)) == (
+        7,
+        ord("a"),
+    )
 
 
 def test_a_rectangle_sums_its_cells():
@@ -53,7 +57,10 @@ def test_a_cell_nobody_wrote_counts_as_a_space():
     # The answer must never be "0000": a caller cannot tell that apart
     # from an answer that never came.
     screen, stream, responses = make_screen()
-    assert checksum(stream, responses, csi(Csi.DECRQCRA, 1, 0, 5, 5, 5, 5)) == (1, ord(" "))
+    assert checksum(stream, responses, csi(Csi.DECRQCRA, 1, 0, 5, 5, 5, 5)) == (
+        1,
+        ord(" "),
+    )
 
 
 def test_the_rectangle_is_clamped_to_the_screen():
@@ -61,7 +68,9 @@ def test_the_rectangle_is_clamped_to_the_screen():
     stream.feed("ab")
     # Past the last line and the last column. The whole screen holds
     # "ab" and fourteen spaces.
-    identifier, total = checksum(stream, responses, csi(Csi.DECRQCRA, 1, 0, 1, 1, 99, 99))
+    identifier, total = checksum(
+        stream, responses, csi(Csi.DECRQCRA, 1, 0, 1, 1, 99, 99)
+    )
     assert total == ord("a") + ord("b") + 14 * ord(" ")
 
 
@@ -107,7 +116,10 @@ def test_origin_mode_counts_the_rectangle_from_the_margins():
         + csi(Csi.DECSLRM, 5, 7)
         + set_mode(PrivateMode.ORIGIN)
     )
-    assert checksum(stream, responses, csi(Csi.DECRQCRA, 7, 0, 1, 1, 1, 1)) == (7, ord("X"))
+    assert checksum(stream, responses, csi(Csi.DECRQCRA, 7, 0, 1, 1, 1, 1)) == (
+        7,
+        ord("X"),
+    )
 
 
 def test_the_rectangle_counts_from_the_screen_without_origin_mode():
@@ -119,8 +131,14 @@ def test_the_rectangle_counts_from_the_screen_without_origin_mode():
         + set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
         + csi(Csi.DECSLRM, 5, 7)
     )
-    assert checksum(stream, responses, csi(Csi.DECRQCRA, 7, 0, 1, 1, 1, 1)) == (7, ord(" "))
-    assert checksum(stream, responses, csi(Csi.DECRQCRA, 7, 0, 5, 5, 5, 5)) == (7, ord("X"))
+    assert checksum(stream, responses, csi(Csi.DECRQCRA, 7, 0, 1, 1, 1, 1)) == (
+        7,
+        ord(" "),
+    )
+    assert checksum(stream, responses, csi(Csi.DECRQCRA, 7, 0, 5, 5, 5, 5)) == (
+        7,
+        ord("X"),
+    )
 
 
 def test_a_missing_corner_is_a_margin_in_origin_mode():

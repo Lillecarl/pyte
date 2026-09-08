@@ -1,4 +1,5 @@
 """Tests for the kitty keyboard protocol flag stack in Screen."""
+
 import pyte
 
 from pyte import keys
@@ -184,16 +185,14 @@ def test_apc_and_dcs_are_consumed():
     screen, stream, responses = make_screen()
 
     def row_text():
-        return "".join(
-            screen.page.data_buffer[0][i].char for i in range(40)
-        )
+        return "".join(screen.page.data_buffer[0][i].char for i in range(40))
 
     stream.feed("before\x1b_Gf=32,s=10,v=10;AAAA\x1b\\after")
     assert row_text().startswith("beforeafter")
     assert "AAAA" not in row_text()
 
     # A DCS that is not a sixel image. (A DECRQSS request.)
-    stream.feed("\x1bP$q\"p\x1b\\!")
+    stream.feed('\x1bP$q"p\x1b\\!')
     assert row_text().startswith("beforeafter!")
     assert "$q" not in row_text()
 

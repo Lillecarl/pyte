@@ -9,6 +9,7 @@ mode that makes the tab wrap first.
 The mode is off unless a program asks for it, so the ordinary tab is
 unchanged.
 """
+
 from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte.modes import PrivateMode

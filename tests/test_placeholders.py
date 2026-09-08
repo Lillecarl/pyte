@@ -6,6 +6,7 @@ per cell. The cells carry the image id in their foreground colour and
 the row and the column in combining characters. The terminal reads the
 screen back to find out what to draw.
 """
+
 import base64
 
 import pytest
@@ -52,8 +53,7 @@ def transmit_virtual(stream, image_id, width, height):
     "A virtual placement: it covers no cells of its own."
     data = base64.b64encode(rgb_image(width, height)).decode()
     stream.feed(
-        "\x1b_Ga=T,U=1,f=24,s=%i,v=%i,i=%i;%s\x1b\\"
-        % (width, height, image_id, data)
+        "\x1b_Ga=T,U=1,f=24,s=%i,v=%i,i=%i;%s\x1b\\" % (width, height, image_id, data)
     )
 
 

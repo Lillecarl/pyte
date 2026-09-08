@@ -11,6 +11,7 @@ here. What reads it back is a front end drawing a frame —
 in txterm — and copy mode, which walks the whole buffer.
 Lillecarl/pymux#129.
 """
+
 from collections import defaultdict, namedtuple
 from typing import DefaultDict, List, NamedTuple, Tuple
 
@@ -154,9 +155,7 @@ class Page:
         #: The cells, by row and then by column. A row that nobody
         #: wrote to is absent, and so is a column, so the cost of an
         #: empty screen is one dictionary.
-        self.data_buffer: DefaultDict[int, Row] = defaultdict(
-            lambda: Row(default_char)
-        )
+        self.data_buffer: DefaultDict[int, Row] = defaultdict(lambda: Row(default_char))
 
         #: Does the cursor show? DECTCEM ("?25") sets it, and it belongs
         #: to the screen in front, so the alternate screen has its own.
@@ -190,9 +189,7 @@ class Page:
         for number in range(first, last + 1):
             row = data_buffer.get(number)
             if row:
-                characters.extend(
-                    row[column].char for column in range(max(row) + 1)
-                )
+                characters.extend(row[column].char for column in range(max(row) + 1))
 
         return "".join(characters)
 
@@ -244,9 +241,7 @@ class Page:
                 # list of one cost a third of a read of the buffer. A
                 # line that spans rows adds to the string, which
                 # CPython does in place.
-                text += "".join(
-                    row[column].char for column in range(max(row) + 1)
-                )
+                text += "".join(row[column].char for column in range(max(row) + 1))
 
         lines.append(TextLine(text, start, last))
         return lines

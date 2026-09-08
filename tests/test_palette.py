@@ -12,6 +12,7 @@ xterm reads. The two forms here are the hash form and "rgb:". The
 tests for them live beside the ones for the sequences, because the two
 are only useful together.
 """
+
 import pytest
 
 from pyte.colors import DEFAULT_COLORS, PALETTE, Color, parse_color
@@ -37,105 +38,126 @@ def pane():
 # The spec parser.
 
 
-@pytest.mark.parametrize("spec, color", [
-    # A hash spec pads each component with zeros on the right. "#fff"
-    # is 0xf000 and not 0xffff, which is the trap in this form.
-    ("#fff", Color(0xF0, 0xF0, 0xF0)),
-    ("#888", Color(0x80, 0x80, 0x80)),
-    ("#f0f0f0", Color(0xF0, 0xF0, 0xF0)),
-    ("#aabbcc", Color(0xAA, 0xBB, 0xCC)),
-    ("#f00f00f00", Color(0xF0, 0xF0, 0xF0)),
-    ("#f000f000f000", Color(0xF0, 0xF0, 0xF0)),
-    ("#aaaabbbbcccc", Color(0xAA, 0xBB, 0xCC)),
-    # An "rgb:" spec scales instead, so one "f" is the full value.
-    ("rgb:f/f/f", Color(0xFF, 0xFF, 0xFF)),
-    ("rgb:f0f0/f0f0/f0f0", Color(0xF0, 0xF0, 0xF0)),
-    ("rgb:80/00/00", Color(0x80, 0x00, 0x00)),
-    ("rgb:FFFF/0000/0000", Color(0xFF, 0x00, 0x00)),
-])
+@pytest.mark.parametrize(
+    "spec, color",
+    [
+        # A hash spec pads each component with zeros on the right. "#fff"
+        # is 0xf000 and not 0xffff, which is the trap in this form.
+        ("#fff", Color(0xF0, 0xF0, 0xF0)),
+        ("#888", Color(0x80, 0x80, 0x80)),
+        ("#f0f0f0", Color(0xF0, 0xF0, 0xF0)),
+        ("#aabbcc", Color(0xAA, 0xBB, 0xCC)),
+        ("#f00f00f00", Color(0xF0, 0xF0, 0xF0)),
+        ("#f000f000f000", Color(0xF0, 0xF0, 0xF0)),
+        ("#aaaabbbbcccc", Color(0xAA, 0xBB, 0xCC)),
+        # An "rgb:" spec scales instead, so one "f" is the full value.
+        ("rgb:f/f/f", Color(0xFF, 0xFF, 0xFF)),
+        ("rgb:f0f0/f0f0/f0f0", Color(0xF0, 0xF0, 0xF0)),
+        ("rgb:80/00/00", Color(0x80, 0x00, 0x00)),
+        ("rgb:FFFF/0000/0000", Color(0xFF, 0x00, 0x00)),
+    ],
+)
 def test_a_spec_reads_as_the_colour_it_names(spec, color):
     assert parse_color(spec) == color
 
 
-@pytest.mark.parametrize("spec, color", [
-    # "rgbi:" names light and not values, and a display does not
-    # answer a request for light in a straight line. The three
-    # channels of the built-in Xcms display do not even agree with
-    # each other, so a grey request gives an answer that is not grey.
-    ("rgbi:1/1/1", Color(0xFF, 0xFF, 0xFF)),
-    ("rgbi:0/0/0", Color(0x00, 0x00, 0x00)),
-    ("rgbi:0.5/0.5/0.5", Color(0xC1, 0xBB, 0xBB)),
-    ("rgbi:1.0/0.0/0.0", Color(0xFF, 0x00, 0x00)),
-])
+@pytest.mark.parametrize(
+    "spec, color",
+    [
+        # "rgbi:" names light and not values, and a display does not
+        # answer a request for light in a straight line. The three
+        # channels of the built-in Xcms display do not even agree with
+        # each other, so a grey request gives an answer that is not grey.
+        ("rgbi:1/1/1", Color(0xFF, 0xFF, 0xFF)),
+        ("rgbi:0/0/0", Color(0x00, 0x00, 0x00)),
+        ("rgbi:0.5/0.5/0.5", Color(0xC1, 0xBB, 0xBB)),
+        ("rgbi:1.0/0.0/0.0", Color(0xFF, 0x00, 0x00)),
+    ],
+)
 def test_an_intensity_spec_reads_through_the_xcms_tables(spec, color):
     assert parse_color(spec) == color
 
 
-@pytest.mark.parametrize("spec, color", [
-    # The six spaces of CIE, checked against what xterm answers. Every
-    # one of these goes through the screen description of Xcms, so a
-    # match here says the port of it is right.
-    ("CIEXYZ:0.5/0.5/0.5", Color(0xDD, 0xB5, 0xA0)),
-    # libX11 divides the lightness by 9.03292 where CIE says 903.292,
-    # so a lightness of one is a hundred times too bright. xterm
-    # answers what libX11 computes, and so does this.
-    ("CIELab:1/1/1", Color(0x6C, 0x67, 0x67)),
-    ("CIELab:0.5/0.5/0.5", Color(0x52, 0x4F, 0x4F)),
-    ("TekHVC:1/1/1", Color(0x1A, 0x13, 0x0F)),
-    ("TekHVC:0.5/0.5/0.5", Color(0x11, 0x13, 0x0E)),
-])
+@pytest.mark.parametrize(
+    "spec, color",
+    [
+        # The six spaces of CIE, checked against what xterm answers. Every
+        # one of these goes through the screen description of Xcms, so a
+        # match here says the port of it is right.
+        ("CIEXYZ:0.5/0.5/0.5", Color(0xDD, 0xB5, 0xA0)),
+        # libX11 divides the lightness by 9.03292 where CIE says 903.292,
+        # so a lightness of one is a hundred times too bright. xterm
+        # answers what libX11 computes, and so does this.
+        ("CIELab:1/1/1", Color(0x6C, 0x67, 0x67)),
+        ("CIELab:0.5/0.5/0.5", Color(0x52, 0x4F, 0x4F)),
+        ("TekHVC:1/1/1", Color(0x1A, 0x13, 0x0F)),
+        ("TekHVC:0.5/0.5/0.5", Color(0x11, 0x13, 0x0E)),
+    ],
+)
 def test_a_cie_spec_reads_the_way_xterm_reads_it(spec, color):
     assert parse_color(spec) == color
 
 
-@pytest.mark.parametrize("spec,color", [
-    # A screen shows only part of what the eye sees, and these fall
-    # outside it. Xcms answers them by pulling the colour in, keeping
-    # the hue and the value and taking the chroma down.
-    ("CIEXYZ:1/1/1", Color(0xFF, 0xFF, 0xFF)),
-    ("CIEuvY:0.5/0.5/0.5", Color(0xFF, 0xA3, 0xAE)),
-    ("CIExyY:0.5/0.5/0.5", Color(0xF7, 0xB3, 0x0E)),
-    ("CIELuv:1/1/1", Color(0x16, 0x14, 0x0E)),
-])
+@pytest.mark.parametrize(
+    "spec,color",
+    [
+        # A screen shows only part of what the eye sees, and these fall
+        # outside it. Xcms answers them by pulling the colour in, keeping
+        # the hue and the value and taking the chroma down.
+        ("CIEXYZ:1/1/1", Color(0xFF, 0xFF, 0xFF)),
+        ("CIEuvY:0.5/0.5/0.5", Color(0xFF, 0xA3, 0xAE)),
+        ("CIExyY:0.5/0.5/0.5", Color(0xF7, 0xB3, 0x0E)),
+        ("CIELuv:1/1/1", Color(0x16, 0x14, 0x0E)),
+    ],
+)
 def test_a_cie_colour_outside_the_gamut_is_pulled_in(spec, color):
     assert parse_color(spec) == color
 
 
-@pytest.mark.parametrize("spec", [
-    "CIELab:1/1",       # Two components.
-    "CIELab:x/1/1",     # Not a number.
-    "CIELab:nan/1/1",
-    "CIEXWZ:1/1/1",     # Not a space that X11 knows.
-])
+@pytest.mark.parametrize(
+    "spec",
+    [
+        "CIELab:1/1",  # Two components.
+        "CIELab:x/1/1",  # Not a number.
+        "CIELab:nan/1/1",
+        "CIEXWZ:1/1/1",  # Not a space that X11 knows.
+    ],
+)
 def test_a_cie_spec_that_does_not_read_is_no_colour(spec):
     assert parse_color(spec) is None
 
 
-@pytest.mark.parametrize("spec", [
-    "rgbi:2/0/0",     # Past all the light there is.
-    "rgbi:-0.5/0/0",  # Less than none.
-    "rgbi:nan/0/0",   # `float` reads it; a colour is not it.
-    "rgbi:inf/0/0",
-    "rgbi:x/0/0",
-    "rgbi:1/1",
-])
+@pytest.mark.parametrize(
+    "spec",
+    [
+        "rgbi:2/0/0",  # Past all the light there is.
+        "rgbi:-0.5/0/0",  # Less than none.
+        "rgbi:nan/0/0",  # `float` reads it; a colour is not it.
+        "rgbi:inf/0/0",
+        "rgbi:x/0/0",
+        "rgbi:1/1",
+    ],
+)
 def test_an_intensity_outside_the_range_is_no_colour(spec):
     assert parse_color(spec) is None
 
 
-@pytest.mark.parametrize("spec", [
-    "",
-    "red",            # A name needs a colour database, which a pane has not.
-    "#ff",            # Not divisible by three.
-    "#fffff",         # Nor this one.
-    "#fffffffffffff",  # Too many digits for the form.
-    "#gggggg",        # Not hexadecimal.
-    "rgb:f/f",        # Two components.
-    "rgb:f/f/f/f",    # Four.
-    "rgb:/f/f",       # One of them empty.
-    "rgb:fffff/f/f",  # One of them too long.
-    "rgbx:f/f/f",
-])
+@pytest.mark.parametrize(
+    "spec",
+    [
+        "",
+        "red",  # A name needs a colour database, which a pane has not.
+        "#ff",  # Not divisible by three.
+        "#fffff",  # Nor this one.
+        "#fffffffffffff",  # Too many digits for the form.
+        "#gggggg",  # Not hexadecimal.
+        "rgb:f/f",  # Two components.
+        "rgb:f/f/f/f",  # Four.
+        "rgb:/f/f",  # One of them empty.
+        "rgb:fffff/f/f",  # One of them too long.
+        "rgbx:f/f/f",
+    ],
+)
 def test_a_spec_that_x11_does_not_read_is_no_colour(spec):
     assert parse_color(spec) is None
 
@@ -167,7 +189,9 @@ def test_two_queries_come_back_as_two_answers(pane):
     # one sequence leaves it reading the second answer as part of the
     # first, and every answer after that lands one place out of step.
     _screen, stream, responses = pane
-    stream.feed(osc(Osc.PALETTE_COLOR, "0", "rgb:f0f0/f0f0/f0f0", "1", "rgb:f0f0/0000/0000"))
+    stream.feed(
+        osc(Osc.PALETTE_COLOR, "0", "rgb:f0f0/f0f0/f0f0", "1", "rgb:f0f0/0000/0000")
+    )
     stream.feed(osc(Osc.PALETTE_COLOR, "0", "?", "1", "?"))
     assert responses == [
         "\x1b]4;0;rgb:f0f0/f0f0/f0f0\x1b\\",
@@ -271,9 +295,7 @@ def test_a_special_reset_puts_one_colour_back(pane):
     screen, stream, _responses = pane
     stream.feed(osc(Osc.SPECIAL_COLOR, "0", "#aabbcc", "1", "#ddeeff"))
     stream.feed(osc(Osc.RESET_SPECIAL_COLOR, "0"))
-    assert screen.colors.by_index == {
-        FIRST_SPECIAL_COLOR + 1: Color(0xDD, 0xEE, 0xFF)
-    }
+    assert screen.colors.by_index == {FIRST_SPECIAL_COLOR + 1: Color(0xDD, 0xEE, 0xFF)}
 
 
 def test_a_special_reset_with_no_payload_puts_them_all_back(pane):

@@ -17,6 +17,7 @@ screen sends it. `parameters.py` holds `TitleMode` and `TitlePart`,
 the numbers that name a mode and a half of the pair.
 Lillecarl/pymux#129.
 """
+
 from typing import List, Set, Tuple
 
 from .parameters import TitleMode, TitlePart
@@ -128,11 +129,11 @@ class Titles:
         return title
 
     def set_window(self, param: str) -> None:
-        "\"OSC 0\" and \"OSC 2\": the title of the window."
+        '"OSC 0" and "OSC 2": the title of the window.'
         self.window = self._meant(param)
 
     def set_icon(self, param: str) -> None:
-        "\"OSC 0\" and \"OSC 1\": the label of the icon."
+        '"OSC 0" and "OSC 1": the label of the icon.'
         self.icon = self._meant(param)
 
     def push(self) -> None:

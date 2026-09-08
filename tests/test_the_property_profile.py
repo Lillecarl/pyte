@@ -11,6 +11,7 @@ holds the promise each one makes, because the promise lives in the
 order two lines run in, and nothing else here would say when that
 order changed.
 """
+
 from hypothesis import settings
 
 #: What a run without `--hypothesis-profile` gets.

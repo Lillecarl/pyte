@@ -14,6 +14,7 @@ Nothing here acts on a mode. This says what the numbers mean; the
 screen decides what each one does, and `Screen._MODE_LEVELS` says which
 conformance level admits which. Lillecarl/pymux#129.
 """
+
 from enum import IntEnum
 
 __all__ = (

@@ -22,6 +22,7 @@ graphics protocol, in `images.py`. Neither one writes a sequence: each
 returns the payload to answer with, and the screen sends it.
 Lillecarl/pymux#129.
 """
+
 from enum import StrEnum
 from typing import Dict, List, NamedTuple, Tuple
 
@@ -82,11 +83,13 @@ class Osc(StrEnum):
 #: terminal of the user for the shape of the pointer (22), the
 #: clipboard (52) or a desktop notification (99). `Screen.osc_func`
 #: receives them, and a pane without such a function consumes them.
-FORWARDED_OSC = frozenset([
-    Osc.POINTER_SHAPE,
-    Osc.CLIPBOARD,
-    Osc.NOTIFICATION,
-])
+FORWARDED_OSC = frozenset(
+    [
+        Osc.POINTER_SHAPE,
+        Osc.CLIPBOARD,
+        Osc.NOTIFICATION,
+    ]
+)
 
 
 def asks_for_the_clipboard(payload: str) -> bool:
@@ -98,6 +101,7 @@ def asks_for_the_clipboard(payload: str) -> bool:
     """
     _selection, _semicolon, data = payload.partition(";")
     return data.strip() == "?"
+
 
 #: The codes of the dynamic colours, and the colour that each one
 #: names. "OSC 10" is the first of them, and a payload with several
@@ -220,14 +224,40 @@ MAX_POINTER_SHAPES = 16
 
 #: The shapes that a terminal must know, named after the cursor
 #: property of CSS.
-POINTER_SHAPES = frozenset([
-    "alias", "cell", "copy", "crosshair", "default", "e-resize",
-    "ew-resize", "grab", "grabbing", "help", "move", "n-resize",
-    "ne-resize", "nesw-resize", "no-drop", "not-allowed", "ns-resize",
-    "nw-resize", "nwse-resize", "pointer", "progress", "s-resize",
-    "se-resize", "sw-resize", "text", "vertical-text", "w-resize", "wait",
-    "zoom-in", "zoom-out",
-])
+POINTER_SHAPES = frozenset(
+    [
+        "alias",
+        "cell",
+        "copy",
+        "crosshair",
+        "default",
+        "e-resize",
+        "ew-resize",
+        "grab",
+        "grabbing",
+        "help",
+        "move",
+        "n-resize",
+        "ne-resize",
+        "nesw-resize",
+        "no-drop",
+        "not-allowed",
+        "ns-resize",
+        "nw-resize",
+        "nwse-resize",
+        "pointer",
+        "progress",
+        "s-resize",
+        "se-resize",
+        "sw-resize",
+        "text",
+        "vertical-text",
+        "w-resize",
+        "wait",
+        "zoom-in",
+        "zoom-out",
+    ]
+)
 
 #: The names that xterm used, which kitty takes as well. A set takes
 #: them; kitty leaves "arrow" and "beam" out of the set that its own
@@ -295,7 +325,7 @@ def pointer_shape_name(name: str) -> str | None:
 
 
 class PointerShapeRead(NamedTuple):
-    "What one \"OSC 22\" payload asks the screen to do."
+    'What one "OSC 22" payload asks the screen to do.'
 
     #: The payload to answer with, or `None` when the sequence asked
     #: no question.
@@ -540,7 +570,7 @@ class ColorOverrides:
         return answers
 
     def reset_dynamic(self, code: str) -> None:
-        "Read \"OSC 110\" and the codes after it: put one colour back."
+        'Read "OSC 110" and the codes after it: put one colour back.'
         self.by_code.pop(code, None)
 
     def answer_kitty(self, param: str) -> str | None:

@@ -5,6 +5,7 @@ A shell uses it when a full-screen program ends: instead of leaving
 blank space under the prompt, the lines that the program covered come
 back from the scroll buffer.
 """
+
 from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte import escape
@@ -32,9 +33,7 @@ def visible(screen):
     rows = []
     for y in range(offset, offset + screen.lines):
         row = screen.page.data_buffer.get(y, {})
-        text = "".join(
-            row[x].char if x in row else " " for x in range(screen.columns)
-        )
+        text = "".join(row[x].char if x in row else " " for x in range(screen.columns))
         rows.append(text.rstrip())
     return rows
 

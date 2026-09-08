@@ -4,6 +4,7 @@ SU and SD move the lines of the scrolling region, and leave the cursor.
 pyte has neither. A program that scrolls with "CSI S" instead of a
 linefeed saw nothing happen before.
 """
+
 from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte import escape

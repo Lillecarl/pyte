@@ -16,6 +16,7 @@ their own, `terminfo.py` holds the answers a program reads back, and
 `titles.py` holds the titles that `TitleMode` and `TitlePart` name.
 Lillecarl/pymux#129.
 """
+
 from enum import IntEnum
 
 __all__ = (
@@ -73,7 +74,7 @@ class AttributeExtent(IntEnum):
 
 
 class StatusDisplay(IntEnum):
-    "Where the output goes, as DECSASD (\"CSI Ps $ }\") sets it."
+    'Where the output goes, as DECSASD ("CSI Ps $ }") sets it.'
 
     MAIN = 0
     STATUS_LINE = 1
@@ -114,7 +115,7 @@ DEFAULT_CONFORMANCE_LEVEL = ConformanceLevel.VT500
 
 
 class WindowOp(IntEnum):
-    "The operations of \"CSI Ps t\" that a pane can answer."
+    'The operations of "CSI Ps t" that a pane can answer.'
 
     REPORT_TEXT_AREA_PIXELS = 14
 
@@ -169,7 +170,7 @@ class TitleMode(IntEnum):
 
 
 class TitlePart(IntEnum):
-    "Which title a push or a pop of \"CSI 22 t\" and \"CSI 23 t\" names."
+    'Which title a push or a pop of "CSI 22 t" and "CSI 23 t" names.'
 
     BOTH = 0
     ICON = 1

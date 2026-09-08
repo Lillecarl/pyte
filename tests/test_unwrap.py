@@ -10,6 +10,7 @@ These judge the joining itself, on a page built by hand. The property
 that a resize keeps every line is `test_reflow_keeps_the_content.py`,
 and it judges the same function through the screen.
 """
+
 from pyte.cells import PLAIN_APPEARANCE, WrittenCell
 from pyte.page import Page, TextLine
 

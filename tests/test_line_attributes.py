@@ -12,6 +12,7 @@ What still has to be true is that the bytes go away. An escape sequence
 nobody reads ends at the "#", and the digit after it lands on the screen
 as text.
 """
+
 import pytest
 
 from pyte.screen import Screen
@@ -21,7 +22,12 @@ from pyte.sequences import Sharp, sharp
 LINES, COLUMNS = 5, 10
 
 #: The four of them, and DECALN, which this screen does act on.
-ATTRIBUTES = [sharp(Sharp.DECDHL_TOP), sharp(Sharp.DECDHL_BOTTOM), sharp(Sharp.DECSWL), sharp(Sharp.DECDWL)]
+ATTRIBUTES = [
+    sharp(Sharp.DECDHL_TOP),
+    sharp(Sharp.DECDHL_BOTTOM),
+    sharp(Sharp.DECSWL),
+    sharp(Sharp.DECDWL),
+]
 
 
 def _screen(data, lines=LINES, columns=COLUMNS):

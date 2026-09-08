@@ -8,6 +8,7 @@ two answers.
 The check starts an Xvfb for this. Without one the tests skip, and the
 build says so, because a judge that cannot run proves nothing.
 """
+
 import pytest
 
 from pyte.colors import parse_color
@@ -70,16 +71,16 @@ CIE_SPECS = [
 #: different in every one of them, so a grid that suits one is
 #: nonsense in another.
 RANGES = {
-    "CIEXYZ": ([0.05, 0.3, 0.64, 0.95], [0.1, 0.4, 0.7, 1.0],
-               [0.05, 0.35, 0.8, 1.4]),
-    "CIEuvY": ([0.1, 0.19, 0.28, 0.4], [0.3, 0.4, 0.46, 0.55],
-               [0.05, 0.3, 0.65, 1.0]),
-    "CIExyY": ([0.15, 0.31, 0.45, 0.64], [0.06, 0.25, 0.33, 0.5],
-               [0.05, 0.3, 0.65, 1.0]),
+    "CIEXYZ": ([0.05, 0.3, 0.64, 0.95], [0.1, 0.4, 0.7, 1.0], [0.05, 0.35, 0.8, 1.4]),
+    "CIEuvY": ([0.1, 0.19, 0.28, 0.4], [0.3, 0.4, 0.46, 0.55], [0.05, 0.3, 0.65, 1.0]),
+    "CIExyY": (
+        [0.15, 0.31, 0.45, 0.64],
+        [0.06, 0.25, 0.33, 0.5],
+        [0.05, 0.3, 0.65, 1.0],
+    ),
     "CIELab": ([5, 30, 60, 95], [-60, -10, 20, 70], [-60, -10, 20, 70]),
     "CIELuv": ([5, 30, 60, 95], [-60, -10, 20, 70], [-60, -10, 20, 70]),
-    "TekHVC": ([0, 75, 160, 240, 300], [5, 30, 60, 95],
-               [10, 40, 80, 120]),
+    "TekHVC": ([0, 75, 160, 240, 300], [5, 30, 60, 95], [10, 40, 80, 120]),
 }
 
 #: A wider sweep of every space, to find the colours that the

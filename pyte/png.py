@@ -11,6 +11,7 @@ The decoder covers what a PNG writer normally produces: bit depths of
 1, 2, 4, 8 and 16, all five colour types, the transparency chunk, and
 the five filters. Interlaced images (Adam7) are refused.
 """
+
 import struct
 import zlib
 from typing import List, Tuple
@@ -82,9 +83,7 @@ def _unfilter(raw: bytes, height: int, stride: int, bytes_per_pixel: int) -> byt
         elif filter_type == 4:  # Paeth
             for i in range(stride):
                 left = line[i - bytes_per_pixel] if i >= bytes_per_pixel else 0
-                up_left = (
-                    previous[i - bytes_per_pixel] if i >= bytes_per_pixel else 0
-                )
+                up_left = previous[i - bytes_per_pixel] if i >= bytes_per_pixel else 0
                 line[i] = (line[i] + _paeth(left, previous[i], up_left)) & 0xFF
         elif filter_type != 0:
             raise ValueError("unknown filter type %i" % filter_type)
@@ -209,9 +208,7 @@ def decode_png(data: bytes) -> Tuple[int, int, bytes] | None:
                     if depth == 16:
                         match = (red, green, blue) == keys
                     else:
-                        match = (red, green, blue) == tuple(
-                            key & 0xFF for key in keys
-                        )
+                        match = (red, green, blue) == tuple(key & 0xFF for key in keys)
                     if match:
                         alpha = 0
                 out[offset : offset + 4] = bytes((red, green, blue, alpha))

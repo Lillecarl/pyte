@@ -1,18 +1,18 @@
 """
-    benchmark
-    ~~~~~~~~~
+benchmark
+~~~~~~~~~
 
-    A simple script for running benchmarks on captured process output.
+A simple script for running benchmarks on captured process output.
 
-    Example run::
+Example run::
 
-        $ BENCHMARK=tests/captured/ls.input python benchmark.py
-        .....................
-        ls.input: Mean +- std dev: 644 ns +- 23 ns
+    $ BENCHMARK=tests/captured/ls.input python benchmark.py
+    .....................
+    ls.input: Mean +- std dev: 644 ns +- 23 ns
 
-    :copyright: (c) 2016-2021 by pyte authors and contributors,
-                    see AUTHORS for details.
-    :license: LGPL, see LICENSE for more details.
+:copyright: (c) 2016-2021 by pyte authors and contributors,
+                see AUTHORS for details.
+:license: LGPL, see LICENSE for more details.
 """
 
 import io

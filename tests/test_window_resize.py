@@ -10,6 +10,7 @@ owns, and making one pane taller makes another shorter. So the ask
 goes to `resize_func` and the embedder decides. With no embedder the
 ask goes nowhere.
 """
+
 from pyte.images import ASSUMED_CELL_HEIGHT, ASSUMED_CELL_WIDTH
 from pyte.screen import Screen
 from pyte.streams import Stream
@@ -66,9 +67,7 @@ def test_a_number_that_is_not_there_leaves_that_side_alone():
 
 def test_a_resize_in_pixels_counts_them_in_cells():
     _screen_, stream, asks = _screen()
-    stream.feed(
-        "\x1b[4;%i;%it" % (30 * ASSUMED_CELL_HEIGHT, 100 * ASSUMED_CELL_WIDTH)
-    )
+    stream.feed("\x1b[4;%i;%it" % (30 * ASSUMED_CELL_HEIGHT, 100 * ASSUMED_CELL_WIDTH))
     assert asks == [(30, 100)]
 
 

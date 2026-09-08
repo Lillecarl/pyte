@@ -4,6 +4,7 @@ DA and DA2: what the terminal can do, and what it is.
 They are two questions, not one, and they take differently shaped
 answers. A program tells them apart by the prefix of the reply.
 """
+
 import pytest
 
 from pyte.parameters import ConformanceLevel
@@ -44,7 +45,9 @@ def test_da_answers_the_level_and_the_extensions(pane, sequence):
     ]
 
 
-@pytest.mark.parametrize("sequence", [csi(escape.DA, private='>'), csi(escape.DA, 0, private='>')])
+@pytest.mark.parametrize(
+    "sequence", [csi(escape.DA, private=">"), csi(escape.DA, 0, private=">")]
+)
 def test_da2_answers_the_type_and_the_firmware(pane, sequence):
     _screen, stream, responses = pane
     stream.feed(sequence)
@@ -56,7 +59,7 @@ def test_the_two_answers_carry_different_prefixes(pane):
     # DA that answers in the DA2 shape is read as a DA2 reply, and
     # every answer after it lands one place out of step.
     _screen, stream, responses = pane
-    stream.feed(csi(escape.DA) + csi(escape.DA, private='>'))
+    stream.feed(csi(escape.DA) + csi(escape.DA, private=">"))
     assert responses[0].startswith("\x1b[?")
     assert responses[1].startswith("\x1b[>")
 
@@ -78,8 +81,6 @@ def test_a_da_with_a_parameter_that_is_not_zero_is_ignored(pane):
     _screen, stream, responses = pane
     stream.feed(csi(escape.DA, 1))
     assert responses == []
-
-
 
 
 def test_decid_answers_the_way_da_answers(pane):

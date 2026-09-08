@@ -14,6 +14,7 @@ word, because the spelling belongs to whoever draws.
 path through a screen. This file judges the arithmetic alone, so a
 failure says which half is wrong.
 """
+
 import pytest
 
 from pyte.colors import Color, sgr_color, sgr_color_parameters

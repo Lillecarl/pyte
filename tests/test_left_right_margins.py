@@ -5,6 +5,7 @@ DECSLRM ("CSI Pl ; Pr s") names a left and a right margin, and private
 mode 69 (DECLRMM) says whether it may. The margins are the edges of the
 line for everything that draws or moves the cursor along it.
 """
+
 from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte.modes import PrivateMode
@@ -105,9 +106,9 @@ def test_the_margins_are_reported():
 
 def test_the_mode_is_answered_by_a_mode_query():
     _screen_, stream, answers = _screen()
-    stream.feed(csi(Csi.DECRQM, 69, private='?'))
+    stream.feed(csi(Csi.DECRQM, 69, private="?"))
     stream.feed(set_mode(PrivateMode.LEFT_RIGHT_MARGIN))
-    stream.feed(csi(Csi.DECRQM, 69, private='?'))
+    stream.feed(csi(Csi.DECRQM, 69, private="?"))
     assert answers == ["\x1b[?69;2$y", "\x1b[?69;1$y"]
 
 

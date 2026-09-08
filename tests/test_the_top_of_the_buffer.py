@@ -23,6 +23,7 @@ generated sequences as `test_row_versions`, because the paths that move
 whole ranges of rows are the ones that could put a row somewhere
 nobody expects.
 """
+
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
@@ -49,7 +50,9 @@ def say_nothing_sits_above_the_screen(screen) -> None:
     buffer = screen.page.data_buffer
     last = the_last_row_of_the_screen(screen)
     where = "max_y %d, line_offset %d, lines %d" % (
-        screen.max_y, screen.line_offset, screen.lines
+        screen.max_y,
+        screen.line_offset,
+        screen.lines,
     )
 
     if buffer:
@@ -91,8 +94,9 @@ def test_a_sequence_nobody_recorded(chunks):
 
 
 @given(
-    st.lists(st.tuples(st.integers(2, 40), st.integers(1, 12)), min_size=1,
-             max_size=12),
+    st.lists(
+        st.tuples(st.integers(2, 40), st.integers(1, 12)), min_size=1, max_size=12
+    ),
     st.integers(0, 30),
 )
 @settings(
@@ -111,8 +115,9 @@ def test_a_screen_that_is_resized_over_and_over(sizes, written):
     screen = a_screen(columns=COLUMNS, lines=LINES)
     stream = Stream(screen)
     stream.feed(
-        "".join("row %d of some text that wraps\r\n" % number
-                for number in range(written))
+        "".join(
+            "row %d of some text that wraps\r\n" % number for number in range(written)
+        )
     )
     for columns, lines in sizes:
         screen.resize(lines=lines, columns=columns)

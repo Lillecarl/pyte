@@ -1,24 +1,25 @@
 """
-    pyte.streams
-    ~~~~~~~~~~~~
+pyte.streams
+~~~~~~~~~~~~
 
-    This module provides three stream implementations with different
-    features; for starters, here's a quick example of how streams are
-    typically used:
+This module provides three stream implementations with different
+features; for starters, here's a quick example of how streams are
+typically used:
 
-    >>> from pyte.screen import Screen
-    >>> from pyte.streams import Stream
-    >>> screen = Screen(24, 80, write_process_input=lambda data: None)
-    >>> stream = Stream(screen)
-    >>> stream.feed("\x1b[5B")  # Move the cursor down 5 rows.
-    >>> screen.pt_cursor_position.y
-    5
+>>> from pyte.screen import Screen
+>>> from pyte.streams import Stream
+>>> screen = Screen(24, 80, write_process_input=lambda data: None)
+>>> stream = Stream(screen)
+>>> stream.feed("\x1b[5B")  # Move the cursor down 5 rows.
+>>> screen.pt_cursor_position.y
+5
 
-    :copyright: (c) 2011-2012 by Selectel.
-    :copyright: (c) 2012-2017 by pyte authors and contributors,
-                    see AUTHORS for details.
-    :license: LGPL, see LICENSE for more details.
+:copyright: (c) 2011-2012 by Selectel.
+:copyright: (c) 2012-2017 by pyte authors and contributors,
+                see AUTHORS for details.
+:license: LGPL, see LICENSE for more details.
 """
+
 from __future__ import annotations
 
 import codecs
@@ -239,19 +240,24 @@ class Stream:
     }
 
     #: A set of all events dispatched by the stream.
-    events = frozenset(itertools.chain(
-        basic.values(), escape.values(), sharp.values(), space.values(),
-        csi.values(),
-        ["define_charset"],
-        ["set_icon_name", "set_title"],  # OSC.
-        ["draw", "debug", "apc", "dcs"]))
+    events = frozenset(
+        itertools.chain(
+            basic.values(),
+            escape.values(),
+            sharp.values(),
+            space.values(),
+            csi.values(),
+            ["define_charset"],
+            ["set_icon_name", "set_title"],  # OSC.
+            ["draw", "debug", "apc", "dcs"],
+        )
+    )
 
     #: A regular expression pattern matching everything what can be
     #: considered plain text.
     _special = {ctrl.ESC, ctrl.CSI_C1, ctrl.NUL, ctrl.DEL, ctrl.OSC_C1}
     _special.update(basic)
-    _text_pattern = re.compile(
-        "[^" + "".join(map(re.escape, _special)) + "]+")
+    _text_pattern = re.compile("[^" + "".join(map(re.escape, _special)) + "]+")
     del _special
 
     def __init__(self, screen: Screen | None = None, strict: bool = True) -> None:
@@ -270,10 +276,12 @@ class Stream:
         :param pyte.screen.Screen screen: a screen to attach to.
         """
         if self.listener is not None:
-            warnings.warn("As of version 0.6.0 the listener queue is "
-                          "restricted to a single element. Existing "
-                          "listener {} will be replaced."
-                          .format(self.listener), DeprecationWarning)
+            warnings.warn(
+                "As of version 0.6.0 the listener queue is "
+                "restricted to a single element. Existing "
+                "listener {} will be replaced.".format(self.listener),
+                DeprecationWarning,
+            )
 
         if self.strict:
             for event in self.events:
@@ -317,7 +325,7 @@ class Stream:
                 else:
                     taking_plain_text = False
             else:
-                taking_plain_text = send(data[offset:offset + 1])
+                taking_plain_text = send(data[offset : offset + 1])
                 offset += 1
 
         self._taking_plain_text = taking_plain_text
@@ -356,8 +364,9 @@ class Stream:
         OSC_C1 = ctrl.OSC_C1
         NUL_OR_DEL = ctrl.NUL + ctrl.DEL
         CAN_OR_SUB = ctrl.CAN + ctrl.SUB
-        ALLOWED_IN_CSI = "".join([ctrl.BEL, ctrl.BS, ctrl.HT, ctrl.LF,
-                                  ctrl.VT, ctrl.FF, ctrl.CR])
+        ALLOWED_IN_CSI = "".join(
+            [ctrl.BEL, ctrl.BS, ctrl.HT, ctrl.LF, ctrl.VT, ctrl.FF, ctrl.CR]
+        )
         OSC_TERMINATORS = {ctrl.ST_C0, ctrl.ST_C1, ctrl.BEL}
         # Intermediate bytes of a CSI sequence. ECMA-48 gives them the
         # whole range 0x20 to 0x2f. They name the sequence together with
@@ -368,10 +377,13 @@ class Stream:
         # and the real final byte lands on the screen as text.
         INTERMEDIATE_IN_CSI = "".join(chr(code) for code in range(0x20, 0x30))
 
-        def create_dispatcher(mapping: Mapping[str, str]) -> dict[str, Callable[..., None]]:
-            return defaultdict(lambda: debug, {
-                event: getattr(listener, attr)
-                for event, attr in mapping.items()})
+        def create_dispatcher(
+            mapping: Mapping[str, str],
+        ) -> dict[str, Callable[..., None]]:
+            return defaultdict(
+                lambda: debug,
+                {event: getattr(listener, attr) for event, attr in mapping.items()},
+            )
 
         basic_dispatch = create_dispatcher(basic)
         sharp_dispatch = create_dispatcher(self.sharp)
@@ -380,9 +392,13 @@ class Stream:
         escape_dispatch = create_dispatcher(self.escape)
         # Only a CSI sequence carries parameters, so only its handlers
         # need the guard against a sequence that carries too many.
-        csi_dispatch = defaultdict(lambda: debug, {
-            event: limit_parameters(handler)
-            for event, handler in create_dispatcher(self.csi).items()})
+        csi_dispatch = defaultdict(
+            lambda: debug,
+            {
+                event: limit_parameters(handler)
+                for event, handler in create_dispatcher(self.csi).items()
+            },
+        )
 
         # String sequences (APC/DCS) dispatch to optional screen
         # methods. Screens that don't implement them get ``debug``.
@@ -417,7 +433,7 @@ class Stream:
                     # Custom escape sequences take precedence over the
                     # string sequences below.
                     escape_dispatch[char]()
-                    continue    # Don't go to CSI.
+                    continue  # Don't go to CSI.
                 elif char in "_PX^":
                     # APC ("_"), DCS ("P"), SOS ("X") and PM ("^") are
                     # string sequences: an opaque payload terminated by
@@ -451,7 +467,7 @@ class Stream:
 
                     if dispatch is not None and not aborted:
                         dispatch(data)
-                    continue    # Don't go to CSI.
+                    continue  # Don't go to CSI.
                 else:
                     if char == "#":
                         sharp_dispatch[(yield None)]()
@@ -469,7 +485,7 @@ class Stream:
                         listener.define_charset((yield None), mode=char)
                     else:
                         escape_dispatch[char]()
-                    continue    # Don't go to CSI.
+                    continue  # Don't go to CSI.
 
             if char in basic:
                 basic_dispatch[char]()
@@ -634,6 +650,7 @@ class ByteStream(Stream):
        Assume the input to :meth:`~pyte.streams.ByteStream.feed` is encoded
        using UTF-8. Defaults to ``True``.
     """
+
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
 

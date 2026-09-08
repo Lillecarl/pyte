@@ -5,6 +5,7 @@ A pane cannot serve the clipboard, a desktop notification or the shape
 of the pointer. Only the terminal of the user can. Those sequences
 therefore leave the pane through `osc_func`.
 """
+
 import pytest
 
 from pyte.osc import FORWARDED_OSC
