@@ -23,12 +23,24 @@ from enum import StrEnum
 from typing import Iterable, Sequence, Union
 
 from .control import CSI as _CSI
+from .control import ESC as _ESC
+from .escape import DECALN as _DECALN
 from .escape import NEL as _NEL
 from .escape import RM as _RM
 from .escape import SM as _SM
 from .modes import AnsiMode, PrivateMode
 
-__all__ = ("Escape", "Csi", "csi", "set_mode", "reset_mode")
+__all__ = (
+    "Escape",
+    "Csi",
+    "Sharp",
+    "announce",
+    "csi",
+    "esc",
+    "reset_mode",
+    "set_mode",
+    "sharp",
+)
 
 
 class Escape(StrEnum):
@@ -74,6 +86,41 @@ class Escape(StrEnum):
 
     #: Normal keypad, the other half of the pair. terminfo's `rmkx`.
     DECKPNM = ">"
+
+
+class Sharp(StrEnum):
+    """
+    The byte that follows "ESC #".
+
+    The "#" is an intermediate byte, so these are their own family:
+    "ESC 8" is DECRC and "ESC # 8" is DECALN, and only the "#" says
+    which.
+
+    Four of the five draw a line at twice the width or twice the
+    height on a VT100. This screen reads them and draws neither, which
+    `tests/test_line_attributes.py` says why: kitty, Ghostty and
+    Alacritty implement none of them and no recorded program sends
+    one. What has to be true is that the bytes go away.
+    Lillecarl/pymux#141.
+    """
+
+    #: Double height, top half.
+    DECDHL_TOP = "3"
+
+    #: Double height, bottom half. A double height line is two lines,
+    #: and a program writes the same text twice.
+    DECDHL_BOTTOM = "4"
+
+    #: Single width, which is what a line is unless something says
+    #: otherwise.
+    DECSWL = "5"
+
+    #: Double width.
+    DECDWL = "6"
+
+    #: Alignment display: fill the screen with "E". `escape.py` names
+    #: it as well, because upstream put it there.
+    DECALN = _DECALN
 
 
 class Csi(StrEnum):
@@ -201,6 +248,49 @@ class Csi(StrEnum):
 
 # ----------------------------------------------------------------------
 # Writing one. Lillecarl/pymux#165.
+
+
+def esc(final: str) -> str:
+    """
+    An escape sequence with no intermediate byte: "ESC <final>".
+
+        >>> esc(escape.RIS)
+        '\\x1bc'
+        >>> esc(Escape.DECID)
+        '\\x1bZ'
+
+    `escape.py` names the ones a VT100 and a VT220 send, and `Escape`
+    names the rest.
+    """
+    return _ESC + final
+
+
+def sharp(final: str) -> str:
+    """
+    "ESC # <final>", which is the line attributes and DECALN.
+
+        >>> sharp(Sharp.DECDWL)
+        '\\x1b#6'
+
+    The "#" is why this is not `esc`: "ESC 8" is DECRC and
+    "ESC # 8" is DECALN, and the intermediate byte is the whole
+    difference.
+    """
+    return _ESC + "#" + final
+
+
+def announce(final: str) -> str:
+    """
+    "ESC SP <final>", which ECMA-48 calls an announcer.
+
+        >>> announce(escape.S7C1T)
+        '\\x1b F'
+
+    The space is an intermediate byte, so a stream that does not read
+    it puts the final byte on the screen as text. `streams.py` eats
+    the announcers it has no handler for, for that reason.
+    """
+    return _ESC + " " + final
 
 #: One parameter of a sequence. `None` is an empty parameter, which is
 #: how a program asks for the default of that position rather than for

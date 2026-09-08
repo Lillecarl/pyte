@@ -21,7 +21,17 @@ import pytest
 
 from pyte import escape
 from pyte.modes import AnsiMode, PrivateMode
-from pyte.sequences import Csi, csi, reset_mode, set_mode
+from pyte.sequences import (
+    Csi,
+    Escape,
+    Sharp,
+    announce,
+    csi,
+    esc,
+    reset_mode,
+    set_mode,
+    sharp,
+)
 
 
 def test_a_sequence_with_no_parameters():
@@ -69,6 +79,37 @@ def test_the_private_marker_goes_before_the_parameters():
     assert csi(escape.DA, 62, 1, 6, private="?") == "\x1b[?62;1;6c"
     assert csi(escape.SGR, 4, 2, private=">") == "\x1b[>4;2m"
     assert csi(Csi.KITTY_KEYBOARD, 1, private=">") == "\x1b[>1u"
+
+
+# ----------------------------------------------------------------------
+# The sequences that are ESC and one or two more bytes.
+
+
+def test_an_escape_sequence_with_no_intermediate_byte():
+    assert esc(escape.RIS) == "\x1bc"
+    assert esc(escape.RI) == "\x1bM"
+    assert esc(Escape.DECID) == "\x1bZ"
+
+
+def test_the_sharp_family():
+    assert sharp(Sharp.DECDWL) == "\x1b#6"
+    assert sharp(Sharp.DECDHL_TOP) == "\x1b#3"
+    assert sharp(Sharp.DECSWL) == "\x1b#5"
+
+
+def test_the_intermediate_byte_is_the_whole_difference():
+    """
+    "ESC 8" restores the cursor and "ESC # 8" fills the screen with
+    "E". The final byte is the same, and only the "#" says which.
+    """
+    assert esc(escape.DECRC) == "\x1b8"
+    assert sharp(Sharp.DECALN) == "\x1b#8"
+
+
+def test_an_announcer():
+    "ECMA-48's name for 'ESC SP <final>'."
+    assert announce(escape.S7C1T) == "\x1b F"
+    assert announce(escape.S8C1T) == "\x1b G"
 
 
 def test_a_mode_says_its_own_marker():
