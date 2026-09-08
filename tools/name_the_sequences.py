@@ -58,7 +58,7 @@ sys.path.insert(0, str(REPOSITORY / "pyte"))
 from pyte import escape  # noqa: E402
 from pyte.control import CSI  # noqa: E402
 from pyte.modes import AnsiMode, PrivateMode  # noqa: E402
-from pyte.sequences import MARKERS, Csi  # noqa: E402
+from pyte.sequences import MARKERS, Csi, Escape, Sharp  # noqa: E402
 
 #: The suites that judge a writer. Their literals are the answer, so
 #: writing them through a builder would ask the writer to mark its own
@@ -119,6 +119,45 @@ CSI_NAMES = (
 #: What each final byte is called, so that a rewrite names it.
 _ESCAPE_NAMES = {getattr(escape, name): name for name in CSI_NAMES}
 
+#: The escape sequences with no intermediate byte, by final byte.
+#:
+#: The same care as `CSI_NAMES`: `escape.py` mixes the two kinds, so
+#: only the names that really are "ESC <final>" belong here. Nothing
+#: is inferred, because "D" and "c" mean one thing here and another
+#: after a CSI.
+ESC_NAMES = {
+    escape.RIS: "escape.RIS",
+    escape.IND: "escape.IND",
+    escape.NEL: "escape.NEL",
+    escape.HTS: "escape.HTS",
+    escape.RI: "escape.RI",
+    escape.DECSC: "escape.DECSC",
+    escape.DECRC: "escape.DECRC",
+    Escape.DECBI: "Escape.DECBI",
+    Escape.DECFI: "Escape.DECFI",
+    Escape.SPA: "Escape.SPA",
+    Escape.EPA: "Escape.EPA",
+    Escape.DECID: "Escape.DECID",
+    Escape.DECKPAM: "Escape.DECKPAM",
+    Escape.DECKPNM: "Escape.DECKPNM",
+}
+
+#: "ESC # <final>": the line attributes, and DECALN.
+SHARP_NAMES = {member.value: "Sharp.%s" % member.name for member in Sharp}
+
+#: "ESC SP <final>": the announcers with a handler.
+ANNOUNCE_NAMES = {
+    escape.S7C1T: "escape.S7C1T",
+    escape.S8C1T: "escape.S8C1T",
+}
+
+#: Which builder writes which family, by the intermediate byte.
+_ESC_FAMILIES = (
+    ("", "esc", ESC_NAMES),
+    ("#", "sharp", SHARP_NAMES),
+    (" ", "announce", ANNOUNCE_NAMES),
+)
+
 
 class Rewrite(NamedTuple):
     "One string, and the expression that writes it instead."
@@ -144,7 +183,7 @@ def an_expression_for(text: str) -> Rewrite | Skipped:
     if text.count("\x1b") != 1:
         return Skipped(text, "not one sequence")
     if not text.startswith(CSI):
-        return Skipped(text, "not CSI")
+        return _an_escape_sequence(text)
 
     match = A_CSI_SEQUENCE.match(text)
     if match is None:
@@ -174,6 +213,26 @@ def an_expression_for(text: str) -> Rewrite | Skipped:
     if private:
         arguments.append("private=%r" % (private,))
     return Rewrite(text, "csi(%s)" % ", ".join(arguments))
+
+
+def _an_escape_sequence(text: str) -> Rewrite | Skipped:
+    """
+    The call for a sequence that is ESC and one or two more bytes.
+
+    There are three families and the intermediate byte says which:
+    nothing at all, "#", or a space. A byte that no family names is
+    left alone, which is what keeps the prefixes out: "ESC O" starts
+    an SS3 form and "ESC P" a DCS, and neither is a whole sequence.
+    """
+    for intermediate, call, names in _ESC_FAMILIES:
+        head = "\x1b" + intermediate
+        if not text.startswith(head):
+            continue
+        final = text[len(head):]
+        if final in names:
+            return Rewrite(text, "%s(%s)" % (call, names[final]))
+
+    return Skipped(text, "not CSI")
 
 
 def _values_of(params: str) -> List[int | None]:
@@ -440,6 +499,11 @@ def _that_fit(
 _IMPORTS = {
     "csi": "pyte.sequences",
     "Csi": "pyte.sequences",
+    "esc": "pyte.sequences",
+    "Escape": "pyte.sequences",
+    "sharp": "pyte.sequences",
+    "Sharp": "pyte.sequences",
+    "announce": "pyte.sequences",
     "set_mode": "pyte.sequences",
     "reset_mode": "pyte.sequences",
     "escape": "pyte",
@@ -549,15 +613,18 @@ def _proven(changes: List[Change], where: Path) -> None:
     and a run stops here rather than writing a file it cannot vouch
     for.
     """
+    import pyte.sequences
+
     scope = {
-        "csi": __import__("pyte.sequences", fromlist=["csi"]).csi,
+        "csi": pyte.sequences.csi,
+        "esc": pyte.sequences.esc,
+        "sharp": pyte.sequences.sharp,
+        "announce": pyte.sequences.announce,
+        "set_mode": pyte.sequences.set_mode,
+        "reset_mode": pyte.sequences.reset_mode,
         "Csi": Csi,
-        "set_mode": __import__(
-            "pyte.sequences", fromlist=["set_mode"]
-        ).set_mode,
-        "reset_mode": __import__(
-            "pyte.sequences", fromlist=["reset_mode"]
-        ).reset_mode,
+        "Escape": Escape,
+        "Sharp": Sharp,
         "escape": escape,
         "AnsiMode": AnsiMode,
         "PrivateMode": PrivateMode,

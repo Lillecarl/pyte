@@ -97,6 +97,33 @@ def test_the_name_of_a_final_byte_is_the_csi_one():
     assert rewritten("\x1b[c") == "csi(escape.DA)"
 
 
+def test_an_escape_sequence_with_no_intermediate_byte():
+    assert rewritten("\x1bc") == "esc(escape.RIS)"
+    assert rewritten("\x1bM") == "esc(escape.RI)"
+    assert rewritten("\x1bZ") == "esc(Escape.DECID)"
+
+
+def test_the_sharp_and_the_announcer_families():
+    assert rewritten("\x1b#6") == "sharp(Sharp.DECDWL)"
+    assert rewritten("\x1b F") == "announce(escape.S7C1T)"
+
+
+def test_the_intermediate_byte_picks_the_family():
+    "'ESC 8' is DECRC and 'ESC # 8' is DECALN."
+    assert rewritten("\x1b8") == "esc(escape.DECRC)"
+    assert rewritten("\x1b#8") == "sharp(Sharp.DECALN)"
+
+
+def test_a_prefix_is_not_an_escape_sequence():
+    """
+    "ESC O" starts an SS3 form and "ESC P" a DCS. Neither is whole, so
+    neither is named, and a byte no family names is left alone.
+    """
+    assert reason("\x1bO") == "not CSI"
+    assert reason("\x1bP") == "not CSI"
+    assert reason("\x1b") == "not CSI"
+
+
 # ----------------------------------------------------------------------
 # What it refuses.
 
