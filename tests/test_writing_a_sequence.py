@@ -21,13 +21,19 @@ import pytest
 
 from pyte import escape
 from pyte.modes import AnsiMode, PrivateMode
+from pyte.osc import Osc
 from pyte.sequences import (
     Csi,
     Escape,
     Sharp,
+    Terminator,
     announce,
+    apc,
     csi,
+    dcs,
+    decrqss,
     esc,
+    osc,
     reset_mode,
     set_mode,
     sharp,
@@ -110,6 +116,52 @@ def test_an_announcer():
     "ECMA-48's name for 'ESC SP <final>'."
     assert announce(escape.S7C1T) == "\x1b F"
     assert announce(escape.S8C1T) == "\x1b G"
+
+
+# ----------------------------------------------------------------------
+# The ones that carry a payload rather than parameters.
+
+
+def test_an_operating_system_command():
+    assert osc(Osc.PALETTE_COLOR, "3", "#aabbcc") == "\x1b]4;3;#aabbcc\x1b\\"
+    assert osc("0", "a title") == "\x1b]0;a title\x1b\\"
+
+
+def test_a_code_with_no_payload():
+    assert osc(Osc.RESET_PALETTE_COLOR) == "\x1b]104\x1b\\"
+
+
+def test_an_empty_field_is_still_a_field():
+    "A hyperlink with no parameters and no target closes the last one."
+    assert osc(Osc.HYPERLINK, "", "") == "\x1b]8;;\x1b\\"
+
+
+def test_the_bell_ends_an_osc_as_well():
+    """
+    Two spellings, and a terminal reads both. Enough programs send the
+    bell that a terminal which refused it would look broken.
+    """
+    assert osc("11", "?", end=Terminator.BEL) == "\x1b]11;?\x07"
+    assert osc("11", "?") == "\x1b]11;?\x1b\\"
+
+
+def test_a_device_control_string():
+    assert dcs("1$r0m") == "\x1bP1$r0m\x1b\\"
+
+
+def test_asking_a_setting_back():
+    """
+    DECRQSS takes the name of the sequence that would set the thing,
+    so it takes the same members `csi` does.
+    """
+    assert decrqss(escape.SGR) == "\x1bP$qm\x1b\\"
+    assert decrqss(Csi.DECSCUSR) == "\x1bP$q q\x1b\\"
+    assert decrqss(Csi.DECSCL) == '\x1bP$q"p\x1b\\'
+
+
+def test_an_application_programming_command():
+    "The kitty graphics protocol is the only one here that uses it."
+    assert apc("Gi=31;OK") == "\x1b_Gi=31;OK\x1b\\"
 
 
 def test_a_mode_says_its_own_marker():
