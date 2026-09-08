@@ -24,12 +24,13 @@ from pyte.terminfo import TERMINAL_VERSION
 from pyte.streams import Stream
 from pyte import escape
 from pyte.sequences import Csi, csi
+from pyte.sequences import announce, esc
 
 #: "ESC SP G", which turns eight bit controls on.
-S8C1T = "\x1b G"
+S8C1T = announce(escape.S8C1T)
 
 #: "ESC SP F", which turns them off again.
-S7C1T = "\x1b F"
+S7C1T = announce(escape.S7C1T)
 
 
 def make_screen(lines=24, columns=80):
@@ -84,7 +85,7 @@ def test_an_announcer_draws_nothing():
 
 def test_a_reset_puts_seven_bit_controls_back():
     screen, stream, _answers = make_screen()
-    stream.feed(S8C1T + "\x1bc")
+    stream.feed(S8C1T + esc(escape.RIS))
     assert screen.seven_bit_controls is True
 
 

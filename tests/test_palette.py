@@ -18,6 +18,8 @@ from pyte.colors import DEFAULT_COLORS, PALETTE, Color, parse_color
 from pyte.osc import FIRST_SPECIAL_COLOR, SPECIAL_COLOR_NAMES
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte import escape
+from pyte.sequences import esc
 
 
 @pytest.fixture
@@ -331,6 +333,6 @@ def test_a_hard_reset_puts_every_colour_back(pane):
     screen, stream, _responses = pane
     stream.feed("\x1b]4;3;#aabbcc\x1b\\")
     stream.feed("\x1b]10;#ddeeff\x1b\\")
-    stream.feed("\x1bc")
+    stream.feed(esc(escape.RIS))
     assert screen.colors.by_index == {}
     assert screen.colors.by_code == {}

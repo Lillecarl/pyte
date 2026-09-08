@@ -9,6 +9,7 @@ from pyte.streams import Stream
 from pyte import escape
 from pyte.modes import PrivateMode
 from pyte.sequences import csi, reset_mode, set_mode
+from pyte.sequences import esc
 
 
 def make_screen():
@@ -331,7 +332,7 @@ def test_reverse_index_moves_placements_down():
     stream.feed(csi(escape.CUP, 5, 1))
     place(screen, stream, 1)
     stream.feed(csi(escape.CUP, 1, 1))  # Top of the region.
-    stream.feed("\x1bM")  # Reverse index: the region scrolls down.
+    stream.feed(esc(escape.RI))  # Reverse index: the region scrolls down.
     assert placement_rows(screen) == [(1, 5)]
 
 

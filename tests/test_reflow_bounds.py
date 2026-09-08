@@ -28,6 +28,7 @@ from pyte.screen import Screen
 from pyte.streams import Stream
 
 from test_row_versions import a_chunk
+from pyte.sequences import Sharp, sharp
 
 
 class EagerScreen(Screen):
@@ -157,7 +158,7 @@ def test_a_narrowing_puts_the_rows_it_gains_above_the_screen():
     screen when its character went with it.
     """
     screen = a_screen(columns=10, lines=6)
-    Stream(screen).feed("\x1b#8")
+    Stream(screen).feed(sharp(Sharp.DECALN))
 
     screen.resize(6, 4)
     data_buffer = screen.page.data_buffer

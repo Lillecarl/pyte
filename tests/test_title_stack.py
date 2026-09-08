@@ -8,6 +8,8 @@ title of its own. A pane has both, so it answers all four.
 from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte.sequences import Csi, csi
+from pyte import escape
+from pyte.sequences import esc
 
 
 def _screen(lines=5, columns=10):
@@ -151,5 +153,5 @@ def test_a_reset_empties_the_stack():
     screen, stream, _answers = _screen()
     _titles(stream, "window", "icon")
     stream.feed(csi(Csi.XTWINOPS, 22, 0))
-    stream.feed("\x1bc")  # RIS.
+    stream.feed(esc(escape.RIS))  # RIS.
     assert screen.titles.stack == []

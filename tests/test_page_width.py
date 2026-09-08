@@ -13,6 +13,8 @@ from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte.modes import PrivateMode
 from pyte.sequences import Csi, csi, reset_mode, set_mode
+from pyte import escape
+from pyte.sequences import esc
 
 ALLOW = set_mode(PrivateMode.ALLOW_80_TO_132)
 DENY = reset_mode(PrivateMode.ALLOW_80_TO_132)
@@ -184,7 +186,7 @@ def test_the_embedder_does_not_gate_the_other_page_modes():
 # RIS.
 
 
-RIS = "\x1bc"
+RIS = esc(escape.RIS)
 
 
 def test_a_reset_gives_the_narrow_page_back():

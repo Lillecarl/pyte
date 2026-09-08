@@ -7,6 +7,8 @@ from pyte.screen import Screen
 
 from a_screen import a_screen, display
 from pyte import charsets as cs, control as ctrl, escape as esc
+from pyte import escape
+from pyte.sequences import announce
 
 
 class counter:
@@ -296,11 +298,11 @@ def test_the_space_of_an_announcer_is_an_intermediate_byte():
     screen = a_screen(3, 3)
     handler = screen.draw = argcheck()
     stream = pyte.Stream(screen)
-    stream.feed("\x1b G")
+    stream.feed(announce(escape.S8C1T))
     assert handler.count == 0
     assert screen.seven_bit_controls is False
 
-    stream.feed("\x1b F")
+    stream.feed(announce(escape.S7C1T))
     assert handler.count == 0
     assert screen.seven_bit_controls is True
 

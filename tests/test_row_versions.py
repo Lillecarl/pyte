@@ -36,6 +36,7 @@ from pyte.streams import Stream
 from pyte import escape
 from pyte.modes import PrivateMode
 from pyte.sequences import Csi, csi, reset_mode, set_mode
+from pyte.sequences import Escape, Sharp, esc, sharp
 
 
 def cells_of(screen, row_number: int):
@@ -165,8 +166,8 @@ MOVERS = [
 #: The sequences that take no number at all.
 PLAIN = [
     "\n", "\r", "\x1bD", "\x1bM", "\x1bE", "\x1b7", "\x1b8",
-    "\x1b#8",           # DECALN: fill the screen with E.
-    "\x1bc",            # RIS: a full reset.
+    sharp(Sharp.DECALN),           # DECALN: fill the screen with E.
+    esc(escape.RIS),            # RIS: a full reset.
     csi(Csi.DECSTR),          # DECSTR: a soft reset.
     "\x1b[?1049h", "\x1b[?1049l",   # The other page, and back.
     "\x1b[?69h", "\x1b[?69l",       # Left and right margins.
@@ -175,7 +176,7 @@ PLAIN = [
     "\x1b[?3h", "\x1b[?3l",         # DECCOLM: 132 columns, and back.
     csi(escape.SGR, 0), csi(escape.SGR, 7), csi(escape.SGR, 31, 44),
     csi(Csi.DECSCA, 1), csi(Csi.DECSCA, 0),         # DECSCA: mark what an erase leaves.
-    "\x1bV", "\x1bW",               # SPA and EPA, the other mark.
+    esc(Escape.SPA), esc(Escape.EPA),               # SPA and EPA, the other mark.
     "text", "wider text that wraps around the end of a short row",
 ]
 

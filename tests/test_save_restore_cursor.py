@@ -22,10 +22,11 @@ from pyte.colors import SgrColor
 from pyte import escape
 from pyte.modes import PrivateMode
 from pyte.sequences import Csi, csi, reset_mode, set_mode
+from pyte.sequences import esc
 
 #: The three ways to save, and to bring back what was saved.
 PAIRS = [
-    ("\x1b7", "\x1b8"),
+    (esc(escape.DECSC), esc(escape.DECRC)),
     (csi(Csi.DECSLRM), csi(Csi.KITTY_KEYBOARD)),
     (set_mode(PrivateMode.SAVE_CURSOR), reset_mode(PrivateMode.SAVE_CURSOR)),
 ]
@@ -179,7 +180,7 @@ def test_a_reset_forgets_the_saved_cursor(save, restore):
     list and RIS did not, which is the wrong way round.
     """
     screen, stream = _screen()
-    stream.feed(csi(escape.CUP, 3, 5) + save + "\x1bc" + restore)
+    stream.feed(csi(escape.CUP, 3, 5) + save + esc(escape.RIS) + restore)
     assert _position(screen) == (0, 0)
 
 

@@ -34,6 +34,8 @@ from pyte.cells import PLAIN_APPEARANCE, WrittenCell
 from pyte.streams import Stream
 
 from test_row_versions import a_chunk
+from pyte import escape
+from pyte.sequences import esc
 
 
 def _trimmed(cells):
@@ -133,7 +135,7 @@ def test_a_cursor_waiting_to_wrap_invents_no_blank():
     space longer. Lillecarl/pymux#143.
     """
     screen = a_screen(columns=10, lines=6)
-    Stream(screen).feed("text" * 4 + "\x1bM" + "text")
+    Stream(screen).feed("text" * 4 + esc(escape.RI) + "text")
 
     before = logical_lines(screen)
     screen.resize(6, 4)

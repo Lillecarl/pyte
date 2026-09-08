@@ -21,6 +21,7 @@ from pyte.streams import Stream
 from pyte import escape
 from pyte.modes import PrivateMode
 from pyte.sequences import csi, set_mode
+from pyte.sequences import esc
 
 #: A screen small enough to read, and wide enough to wrap on purpose.
 LINES, COLUMNS = 6, 10
@@ -101,7 +102,7 @@ def test_the_inline_mode_stays_after_a_line_feed(pane):
     # "ESC E" moves to the next line without wrapping, so the line
     # below was not reached by typing and the backspace stops.
     screen, stream = pane
-    stream.feed(AUTOWRAP + INLINE + csi(escape.CUP, 1, 1) + "\x1bE" + BACKSPACE)
+    stream.feed(AUTOWRAP + INLINE + csi(escape.CUP, 1, 1) + esc(escape.NEL) + BACKSPACE)
     assert at(screen) == (0, 1)
 
 

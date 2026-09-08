@@ -17,6 +17,7 @@ from pyte.terminfo import (
 from pyte.streams import Stream
 from pyte import escape
 from pyte.sequences import csi
+from pyte.sequences import Escape, esc
 
 
 @pytest.fixture
@@ -90,7 +91,7 @@ def test_decid_answers_the_way_da_answers(pane):
     `DECIDTests.test_DECID_Basic`.
     """
     _screen, stream, responses = pane
-    stream.feed("\x1bZ")
+    stream.feed(esc(Escape.DECID))
     first = responses[:]
     responses.clear()
     stream.feed(csi(escape.DA))

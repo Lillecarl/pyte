@@ -16,6 +16,8 @@ from pyte.parameters import TitleMode
 from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte.sequences import Csi, csi
+from pyte import escape
+from pyte.sequences import esc
 
 #: "CSI > Ps t": set a title mode. "CSI > Ps T": take it away.
 SET = "\x1b[>%st"
@@ -77,7 +79,7 @@ def test_a_number_that_no_mode_has_is_ignored():
 def test_a_reset_takes_every_title_mode_away():
     screen, stream, _answers = make_screen()
     stream.feed(SET % "0;1")
-    stream.feed("\x1bc")  # RIS.
+    stream.feed(esc(escape.RIS))  # RIS.
     assert screen.titles.modes == set()
 
 
