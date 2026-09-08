@@ -10,6 +10,7 @@ from pyte import escape
 from pyte.modes import PrivateMode
 from pyte.sequences import csi, reset_mode, set_mode
 from pyte.sequences import esc
+from pyte.sequences import apc
 
 
 def make_screen():
@@ -267,7 +268,7 @@ def test_alternate_screen_has_independent_graphics():
 
 def test_non_graphics_apc_is_ignored():
     screen, stream, responses = make_screen()
-    stream.feed("\x1b_bogus-protocol\x1b\\")
+    stream.feed(apc("bogus-protocol"))
     assert responses == []
     assert screen.graphics.placements == []
 

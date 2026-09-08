@@ -20,6 +20,8 @@ from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte import escape
 from pyte.sequences import esc
+from pyte.osc import Osc
+from pyte.sequences import osc
 
 
 @pytest.fixture
@@ -149,14 +151,14 @@ def test_a_colour_writes_the_two_forms_that_a_terminal_sends():
 
 def test_a_query_answers_the_default_before_anything_sets_it(pane):
     _screen, stream, responses = pane
-    stream.feed("\x1b]4;1;?\x1b\\")
+    stream.feed(osc(Osc.PALETTE_COLOR, "1", "?"))
     assert responses == ["\x1b]4;1;%s\x1b\\" % PALETTE[1].spec]
 
 
 def test_an_entry_reads_back_as_what_was_set(pane):
     _screen, stream, responses = pane
-    stream.feed("\x1b]4;0;rgb:f0f0/f0f0/f0f0\x1b\\")
-    stream.feed("\x1b]4;0;?\x1b\\")
+    stream.feed(osc(Osc.PALETTE_COLOR, "0", "rgb:f0f0/f0f0/f0f0"))
+    stream.feed(osc(Osc.PALETTE_COLOR, "0", "?"))
     assert responses == ["\x1b]4;0;rgb:f0f0/f0f0/f0f0\x1b\\"]
 
 
@@ -165,8 +167,8 @@ def test_two_queries_come_back_as_two_answers(pane):
     # one sequence leaves it reading the second answer as part of the
     # first, and every answer after that lands one place out of step.
     _screen, stream, responses = pane
-    stream.feed("\x1b]4;0;rgb:f0f0/f0f0/f0f0;1;rgb:f0f0/0000/0000\x1b\\")
-    stream.feed("\x1b]4;0;?;1;?\x1b\\")
+    stream.feed(osc(Osc.PALETTE_COLOR, "0", "rgb:f0f0/f0f0/f0f0", "1", "rgb:f0f0/0000/0000"))
+    stream.feed(osc(Osc.PALETTE_COLOR, "0", "?", "1", "?"))
     assert responses == [
         "\x1b]4;0;rgb:f0f0/f0f0/f0f0\x1b\\",
         "\x1b]4;1;rgb:f0f0/0000/0000\x1b\\",
@@ -175,8 +177,8 @@ def test_two_queries_come_back_as_two_answers(pane):
 
 def test_a_spec_that_does_not_read_leaves_the_entry_alone(pane):
     _screen, stream, responses = pane
-    stream.feed("\x1b]4;0;bogus\x1b\\")
-    stream.feed("\x1b]4;0;?\x1b\\")
+    stream.feed(osc(Osc.PALETTE_COLOR, "0", "bogus"))
+    stream.feed(osc(Osc.PALETTE_COLOR, "0", "?"))
     assert responses == ["\x1b]4;0;%s\x1b\\" % PALETTE[0].spec]
 
 
@@ -184,7 +186,7 @@ def test_an_index_past_the_table_answers_nothing(pane):
     # Nothing to answer, and no answer at all. A wrong answer would
     # put every answer after it one place out of step.
     _screen, stream, responses = pane
-    stream.feed("\x1b]4;999;?\x1b\\")
+    stream.feed(osc(Osc.PALETTE_COLOR, "999", "?"))
     assert responses == []
 
 
@@ -194,25 +196,25 @@ def test_an_index_past_the_table_answers_nothing(pane):
 
 def test_a_reset_names_the_entry_to_put_back(pane):
     screen, stream, responses = pane
-    stream.feed("\x1b]4;3;#aabbcc\x1b\\")
-    stream.feed("\x1b]104;3\x1b\\")
-    stream.feed("\x1b]4;3;?\x1b\\")
+    stream.feed(osc(Osc.PALETTE_COLOR, "3", "#aabbcc"))
+    stream.feed(osc(Osc.RESET_PALETTE_COLOR, "3"))
+    stream.feed(osc(Osc.PALETTE_COLOR, "3", "?"))
     assert responses == ["\x1b]4;3;%s\x1b\\" % PALETTE[3].spec]
     assert screen.colors.by_index == {}
 
 
 def test_a_reset_with_no_payload_puts_the_whole_palette_back(pane):
     screen, stream, _responses = pane
-    stream.feed("\x1b]4;3;#aabbcc;9;#ddeeff\x1b\\")
+    stream.feed(osc(Osc.PALETTE_COLOR, "3", "#aabbcc", "9", "#ddeeff"))
     assert len(screen.colors.by_index) == 2
-    stream.feed("\x1b]104\x1b\\")
+    stream.feed(osc(Osc.RESET_PALETTE_COLOR))
     assert screen.colors.by_index == {}
 
 
 def test_a_reset_of_the_palette_leaves_the_special_colours(pane):
     screen, stream, _responses = pane
-    stream.feed("\x1b]5;0;#aabbcc\x1b\\")
-    stream.feed("\x1b]104\x1b\\")
+    stream.feed(osc(Osc.SPECIAL_COLOR, "0", "#aabbcc"))
+    stream.feed(osc(Osc.RESET_PALETTE_COLOR))
     assert screen.colors.by_index == {FIRST_SPECIAL_COLOR: Color(0xAA, 0xBB, 0xCC)}
 
 
@@ -222,8 +224,8 @@ def test_a_reset_of_the_palette_leaves_the_special_colours(pane):
 
 def test_a_special_colour_answers_under_both_codes(pane):
     _screen, stream, responses = pane
-    stream.feed("\x1b]5;0;rgb:8080/0000/0000\x1b\\")
-    stream.feed("\x1b]5;0;?\x1b\\")
+    stream.feed(osc(Osc.SPECIAL_COLOR, "0", "rgb:8080/0000/0000"))
+    stream.feed(osc(Osc.SPECIAL_COLOR, "0", "?"))
     stream.feed("\x1b]4;%i;?\x1b\\" % FIRST_SPECIAL_COLOR)
     assert responses == [
         "\x1b]5;0;rgb:8080/0000/0000\x1b\\",
@@ -234,13 +236,13 @@ def test_a_special_colour_answers_under_both_codes(pane):
 def test_the_two_codes_reach_the_same_colour(pane):
     _screen, stream, responses = pane
     stream.feed("\x1b]4;%i;#aabbcc\x1b\\" % FIRST_SPECIAL_COLOR)
-    stream.feed("\x1b]5;0;?\x1b\\")
+    stream.feed(osc(Osc.SPECIAL_COLOR, "0", "?"))
     assert responses == ["\x1b]5;0;rgb:aaaa/bbbb/cccc\x1b\\"]
 
 
 def test_a_special_colour_that_nobody_set_answers_the_text_colour(pane):
     _screen, stream, responses = pane
-    stream.feed("\x1b]5;0;?\x1b\\")
+    stream.feed(osc(Osc.SPECIAL_COLOR, "0", "?"))
     assert responses == ["\x1b]5;0;%s\x1b\\" % DEFAULT_COLORS["foreground"].spec]
 
 
@@ -254,8 +256,8 @@ def test_a_special_colour_that_nobody_set_follows_the_text_colour(pane):
     default. Lillecarl/pymux#19.
     """
     _screen, stream, responses = pane
-    stream.feed("\x1b]10;#aabbcc\x1b\\")
-    stream.feed("\x1b]5;0;?\x1b\\")
+    stream.feed(osc("10", "#aabbcc"))
+    stream.feed(osc(Osc.SPECIAL_COLOR, "0", "?"))
     assert responses == ["\x1b]5;0;rgb:aaaa/bbbb/cccc\x1b\\"]
 
 
@@ -267,8 +269,8 @@ def test_a_special_colour_past_the_last_one_answers_nothing(pane):
 
 def test_a_special_reset_puts_one_colour_back(pane):
     screen, stream, _responses = pane
-    stream.feed("\x1b]5;0;#aabbcc;1;#ddeeff\x1b\\")
-    stream.feed("\x1b]105;0\x1b\\")
+    stream.feed(osc(Osc.SPECIAL_COLOR, "0", "#aabbcc", "1", "#ddeeff"))
+    stream.feed(osc(Osc.RESET_SPECIAL_COLOR, "0"))
     assert screen.colors.by_index == {
         FIRST_SPECIAL_COLOR + 1: Color(0xDD, 0xEE, 0xFF)
     }
@@ -276,9 +278,9 @@ def test_a_special_reset_puts_one_colour_back(pane):
 
 def test_a_special_reset_with_no_payload_puts_them_all_back(pane):
     screen, stream, _responses = pane
-    stream.feed("\x1b]4;3;#aabbcc\x1b\\")
-    stream.feed("\x1b]5;0;#ddeeff\x1b\\")
-    stream.feed("\x1b]105\x1b\\")
+    stream.feed(osc(Osc.PALETTE_COLOR, "3", "#aabbcc"))
+    stream.feed(osc(Osc.SPECIAL_COLOR, "0", "#ddeeff"))
+    stream.feed(osc(Osc.RESET_SPECIAL_COLOR))
     # The palette entry stays: "OSC 105" covers the special colours.
     assert screen.colors.by_index == {3: Color(0xAA, 0xBB, 0xCC)}
 
@@ -289,16 +291,16 @@ def test_a_special_reset_with_no_payload_puts_them_all_back(pane):
 
 def test_a_dynamic_colour_reads_back_as_what_was_set(pane):
     _screen, stream, responses = pane
-    stream.feed("\x1b]10;rgb:8080/8080/8080\x1b\\")
-    stream.feed("\x1b]10;?\x1b\\")
+    stream.feed(osc("10", "rgb:8080/8080/8080"))
+    stream.feed(osc("10", "?"))
     assert responses == ["\x1b]10;rgb:8080/8080/8080\x1b\\"]
 
 
 def test_a_payload_with_two_values_walks_up_the_codes(pane):
     # "OSC 10" with two specs sets the foreground and the background.
     _screen, stream, responses = pane
-    stream.feed("\x1b]10;rgb:f0f0/f0f0/f0f0;rgb:f0f0/0000/0000\x1b\\")
-    stream.feed("\x1b]10;?;?\x1b\\")
+    stream.feed(osc("10", "rgb:f0f0/f0f0/f0f0", "rgb:f0f0/0000/0000"))
+    stream.feed(osc("10", "?", "?"))
     assert responses == [
         "\x1b]10;rgb:f0f0/f0f0/f0f0\x1b\\",
         "\x1b]11;rgb:f0f0/0000/0000\x1b\\",
@@ -307,9 +309,9 @@ def test_a_payload_with_two_values_walks_up_the_codes(pane):
 
 def test_a_dynamic_reset_puts_the_colour_back(pane):
     _screen, stream, responses = pane
-    stream.feed("\x1b]10;#aabbcc\x1b\\")
-    stream.feed("\x1b]110\x1b\\")
-    stream.feed("\x1b]10;?\x1b\\")
+    stream.feed(osc("10", "#aabbcc"))
+    stream.feed(osc("110"))
+    stream.feed(osc("10", "?"))
     assert responses == ["\x1b]10;%s\x1b\\" % DEFAULT_COLORS["foreground"].spec]
 
 
@@ -317,9 +319,9 @@ def test_the_kitty_query_reads_the_colour_that_was_set(pane):
     # One colour, two protocols. A program that sets with the xterm
     # sequence and reads with the kitty one gets what it set.
     _screen, stream, responses = pane
-    stream.feed("\x1b]10;#aabbcc\x1b\\")
-    stream.feed("\x1b]4;1;#ddeeff\x1b\\")
-    stream.feed("\x1b]21;foreground=?;1=?\x1b\\")
+    stream.feed(osc("10", "#aabbcc"))
+    stream.feed(osc(Osc.PALETTE_COLOR, "1", "#ddeeff"))
+    stream.feed(osc(Osc.KITTY_COLORS, "foreground=?", "1=?"))
     assert responses == [
         "\x1b]21;foreground=rgb:aaaa/bbbb/cccc;1=rgb:dddd/eeee/ffff\x1b\\"
     ]
@@ -331,8 +333,8 @@ def test_the_kitty_query_reads_the_colour_that_was_set(pane):
 
 def test_a_hard_reset_puts_every_colour_back(pane):
     screen, stream, _responses = pane
-    stream.feed("\x1b]4;3;#aabbcc\x1b\\")
-    stream.feed("\x1b]10;#ddeeff\x1b\\")
+    stream.feed(osc(Osc.PALETTE_COLOR, "3", "#aabbcc"))
+    stream.feed(osc("10", "#ddeeff"))
     stream.feed(esc(escape.RIS))
     assert screen.colors.by_index == {}
     assert screen.colors.by_code == {}

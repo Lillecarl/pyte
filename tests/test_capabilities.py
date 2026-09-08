@@ -16,6 +16,7 @@ import pytest
 from pyte.screen import Screen
 from pyte.terminfo import CAPABILITIES, TERMINAL_NAME
 from pyte.streams import Stream
+from pyte.sequences import dcs
 
 
 def ask(names):
@@ -75,7 +76,7 @@ def test_a_name_that_is_not_hexadecimal():
     answers = []
     screen = Screen(2, 10, write_process_input=answers.append)
     stream = Stream(screen)
-    stream.feed("\x1bP+qzzzz\x1b\\")
+    stream.feed(dcs("+qzzzz"))
     assert answers == ["\x1bP0+rzzzz\x1b\\"]
 
 

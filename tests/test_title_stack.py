@@ -10,6 +10,7 @@ from pyte.streams import Stream
 from pyte.sequences import Csi, csi
 from pyte import escape
 from pyte.sequences import esc
+from pyte.sequences import osc
 
 
 def _screen(lines=5, columns=10):
@@ -29,14 +30,14 @@ def _titles(stream, window, icon):
 
 def test_the_window_title_is_reported():
     _screen_, stream, answers = _screen()
-    stream.feed("\x1b]2;a window\x1b\\")
+    stream.feed(osc("2", "a window"))
     stream.feed(csi(Csi.XTWINOPS, 21))
     assert answers == ["\x1b]la window\x1b\\"]
 
 
 def test_the_icon_label_is_reported():
     _screen_, stream, answers = _screen()
-    stream.feed("\x1b]1;an icon\x1b\\")
+    stream.feed(osc("1", "an icon"))
     stream.feed(csi(Csi.XTWINOPS, 20))
     assert answers == ["\x1b]Lan icon\x1b\\"]
 
@@ -50,7 +51,7 @@ def test_a_title_that_was_never_set_is_reported_empty():
 def test_one_sequence_sets_both():
     "OSC 0 names the window title and the icon label together."
     _screen_, stream, answers = _screen()
-    stream.feed("\x1b]0;both\x1b\\")
+    stream.feed(osc("0", "both"))
     stream.feed(csi(Csi.XTWINOPS, 20) + csi(Csi.XTWINOPS, 21))
     assert answers == ["\x1b]Lboth\x1b\\", "\x1b]lboth\x1b\\"]
 
@@ -112,9 +113,9 @@ def test_a_push_remembers_both_titles_whichever_it_names():
 
 def test_two_pushes_come_back_in_order():
     screen, stream, _answers = _screen()
-    stream.feed("\x1b]1;first\x1b\\\x1b[22;1t")
-    stream.feed("\x1b]1;second\x1b\\\x1b[22;1t")
-    stream.feed("\x1b]1;now\x1b\\")
+    stream.feed(osc("1", "first") + csi(Csi.XTWINOPS, 22, 1))
+    stream.feed(osc("1", "second") + csi(Csi.XTWINOPS, 22, 1))
+    stream.feed(osc("1", "now"))
 
     stream.feed(csi(Csi.XTWINOPS, 23, 1))
     assert screen.titles.icon == "second"

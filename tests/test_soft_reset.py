@@ -11,6 +11,7 @@ from pyte.streams import Stream
 from pyte import escape
 from pyte.sequences import Csi, csi, reset_mode, set_mode
 from pyte.sequences import esc
+from pyte.sequences import decrqss
 
 
 def _screen(lines=5, columns=10):
@@ -95,7 +96,7 @@ def test_the_saved_cursor_goes_home():
 def test_the_rendition_goes_back_to_plain():
     _screen_, stream, answers = _screen()
     stream.feed(csi(escape.SGR, 1, 4, 31) + csi(Csi.DECSTR))
-    stream.feed("\x1bP$qm\x1b\\")
+    stream.feed(decrqss(escape.SGR))
     assert answers == ["\x1bP1$r0m\x1b\\"]
 
 

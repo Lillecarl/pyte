@@ -7,6 +7,7 @@ from pyte.sixel import DEFAULT_PALETTE, decode_sixel
 from pyte.streams import Stream
 from pyte import escape
 from pyte.sequences import csi
+from pyte.sequences import apc, decrqss
 
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
@@ -226,7 +227,7 @@ def test_the_image_covers_its_cells():
 def test_a_sixel_image_does_not_take_a_kitty_image_id():
     screen, stream, _ = make_screen()
     # A kitty image claims id 1 first.
-    stream.feed("\x1b_Ga=t,f=24,s=1,v=1,i=1;AAAA\x1b\\")
+    stream.feed(apc("Ga=t,f=24,s=1,v=1,i=1;AAAA"))
     stream.feed(sixel(DEFINE_RED + RED_ + "~"))
 
     ids = sorted(screen.graphics.images_by_id)
@@ -237,7 +238,7 @@ def test_a_sixel_image_does_not_take_a_kitty_image_id():
 
 def test_a_non_sixel_dcs_is_consumed():
     screen, stream, _ = make_screen()
-    stream.feed("\x1bP$qm\x1b\\")
+    stream.feed(decrqss(escape.SGR))
     stream.feed("hello")
     assert screen.graphics.placements == []
     row = screen.page.data_buffer[0]

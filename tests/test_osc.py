@@ -8,6 +8,8 @@ from pyte.colors import DEFAULT_COLORS, PALETTE, Color
 from pyte.osc import parse_kitty_color_query
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte.osc import Osc
+from pyte.sequences import Terminator, osc
 
 BLACK = "rgb:0000/0000/0000"
 WHITE = "rgb:ffff/ffff/ffff"
@@ -60,26 +62,26 @@ def test_reading_a_kitty_colour_query():
 def test_the_background_query():
     # yazi asks this on startup.
     _screen, stream, responses = make_screen()
-    stream.feed("\x1b]11;?\x07")
+    stream.feed(osc("11", "?", end=Terminator.BEL))
     assert responses == ["\x1b]11;%s\x1b\\" % BLACK]
 
 
 def test_the_foreground_query():
     _screen, stream, responses = make_screen()
-    stream.feed("\x1b]10;?\x07")
+    stream.feed(osc("10", "?", end=Terminator.BEL))
     assert responses == ["\x1b]10;%s\x1b\\" % WHITE]
 
 
 def test_the_cursor_colour_query():
     _screen, stream, responses = make_screen()
-    stream.feed("\x1b]12;?\x1b\\")
+    stream.feed(osc("12", "?"))
     assert responses == ["\x1b]12;%s\x1b\\" % WHITE]
 
 
 def test_the_selection_colour_queries():
     _screen, stream, responses = make_screen()
-    stream.feed("\x1b]17;?\x07")
-    stream.feed("\x1b]19;?\x07")
+    stream.feed(osc("17", "?", end=Terminator.BEL))
+    stream.feed(osc("19", "?", end=Terminator.BEL))
     assert responses == [
         "\x1b]17;%s\x1b\\" % DEFAULT_COLORS["selection_background"].spec,
         "\x1b]19;%s\x1b\\" % DEFAULT_COLORS["selection_foreground"].spec,
@@ -90,9 +92,9 @@ def test_setting_a_colour_answers_nothing_and_holds_it():
     # A set is not a query, so it gets no answer. The pane keeps the
     # colour, and the next query reads it back.
     _screen, stream, responses = make_screen()
-    stream.feed("\x1b]11;rgb:ff/00/00\x07")
+    stream.feed(osc("11", "rgb:ff/00/00", end=Terminator.BEL))
     assert responses == []
-    stream.feed("\x1b]11;?\x07")
+    stream.feed(osc("11", "?", end=Terminator.BEL))
     assert responses == ["\x1b]11;rgb:ffff/0000/0000\x1b\\"]
 
 
@@ -102,7 +104,7 @@ def test_setting_a_colour_answers_nothing_and_holds_it():
 
 def test_a_palette_query():
     _screen, stream, responses = make_screen()
-    stream.feed("\x1b]4;1;?\x07")
+    stream.feed(osc(Osc.PALETTE_COLOR, "1", "?", end=Terminator.BEL))
     assert responses == ["\x1b]4;1;rgb:cdcd/0000/0000\x1b\\"]
 
 
@@ -112,7 +114,7 @@ def test_several_palette_entries_at_once():
     # each query it sent. Joining them leaves it reading the second
     # answer as part of the first.
     _screen, stream, responses = make_screen()
-    stream.feed("\x1b]4;0;?;15;?\x07")
+    stream.feed(osc(Osc.PALETTE_COLOR, "0", "?", "15", "?", end=Terminator.BEL))
     assert responses == [
         "\x1b]4;0;%s\x1b\\" % BLACK,
         "\x1b]4;15;%s\x1b\\" % WHITE,
@@ -121,13 +123,13 @@ def test_several_palette_entries_at_once():
 
 def test_a_palette_entry_that_does_not_exist():
     _screen, stream, responses = make_screen()
-    stream.feed("\x1b]4;999;?\x07")
+    stream.feed(osc(Osc.PALETTE_COLOR, "999", "?", end=Terminator.BEL))
     assert responses == []
 
 
 def test_setting_a_palette_entry_is_ignored():
     _screen, stream, responses = make_screen()
-    stream.feed("\x1b]4;1;rgb:00/ff/00\x07")
+    stream.feed(osc(Osc.PALETTE_COLOR, "1", "rgb:00/ff/00", end=Terminator.BEL))
     assert responses == []
 
 
@@ -137,13 +139,13 @@ def test_setting_a_palette_entry_is_ignored():
 
 def test_a_kitty_colour_query():
     _screen, stream, responses = make_screen()
-    stream.feed("\x1b]21;background=?\x1b\\")
+    stream.feed(osc(Osc.KITTY_COLORS, "background=?"))
     assert responses == ["\x1b]21;background=%s\x1b\\" % BLACK]
 
 
 def test_several_kitty_keys_at_once():
     _screen, stream, responses = make_screen()
-    stream.feed("\x1b]21;foreground=?;background=?\x1b\\")
+    stream.feed(osc(Osc.KITTY_COLORS, "foreground=?", "background=?"))
     assert responses == [
         "\x1b]21;foreground=%s;background=%s\x1b\\" % (WHITE, BLACK)
     ]
@@ -151,20 +153,20 @@ def test_several_kitty_keys_at_once():
 
 def test_a_kitty_query_for_a_palette_entry():
     _screen, stream, responses = make_screen()
-    stream.feed("\x1b]21;3=?\x1b\\")
+    stream.feed(osc(Osc.KITTY_COLORS, "3=?"))
     assert responses == ["\x1b]21;3=rgb:cdcd/cdcd/0000\x1b\\"]
 
 
 def test_a_kitty_query_for_a_colour_we_do_not_hold():
     # An empty value is how a terminal says "not set".
     _screen, stream, responses = make_screen()
-    stream.feed("\x1b]21;visual_bell=?\x1b\\")
+    stream.feed(osc(Osc.KITTY_COLORS, "visual_bell=?"))
     assert responses == ["\x1b]21;visual_bell=\x1b\\"]
 
 
 def test_a_kitty_colour_set_is_ignored():
     _screen, stream, responses = make_screen()
-    stream.feed("\x1b]21;background=green\x1b\\")
+    stream.feed(osc(Osc.KITTY_COLORS, "background=green"))
     assert responses == []
 
 
@@ -174,21 +176,21 @@ def test_a_kitty_colour_set_is_ignored():
 
 def test_the_title_still_works():
     screen, stream, responses = make_screen()
-    stream.feed("\x1b]2;a title\x07")
+    stream.feed(osc("2", "a title", end=Terminator.BEL))
     assert screen.titles.window == "a title"
     assert responses == []
 
 
 def test_the_icon_name_still_works():
     screen, stream, responses = make_screen()
-    stream.feed("\x1b]1;an icon\x07")
+    stream.feed(osc("1", "an icon", end=Terminator.BEL))
     assert screen.titles.icon == "an icon"
 
 
 def test_an_unknown_sequence_is_consumed():
     screen, stream, responses = make_screen()
-    stream.feed("\x1b]52;c;aGVsbG8=\x07")
-    stream.feed("\x1b]99;i=1;body\x1b\\")
+    stream.feed(osc(Osc.CLIPBOARD, "c", "aGVsbG8=", end=Terminator.BEL))
+    stream.feed(osc(Osc.NOTIFICATION, "i=1", "body"))
     stream.feed("hello")
     assert responses == []
     row = screen.page.data_buffer[0]
@@ -197,6 +199,10 @@ def test_an_unknown_sequence_is_consumed():
 
 def test_a_hyperlink_does_not_reach_the_screen():
     screen, stream, responses = make_screen()
-    stream.feed("\x1b]8;;https://example.com\x1b\\link\x1b]8;;\x1b\\")
+    stream.feed(
+        osc(Osc.HYPERLINK, "", "https://example.com")
+        + "link"
+        + osc(Osc.HYPERLINK, "", "")
+    )
     row = screen.page.data_buffer[0]
     assert "".join(row[i].char for i in range(4)) == "link"

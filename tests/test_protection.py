@@ -15,6 +15,7 @@ from pyte.sequences import Csi, csi
 from pyte import escape
 from pyte.sequences import esc
 from pyte.sequences import Escape
+from pyte.sequences import decrqss
 
 
 def _screen(lines=4, columns=10):
@@ -247,9 +248,9 @@ def test_a_soft_reset_takes_the_mark_off_what_comes_next():
 
 def test_the_mark_is_reported():
     _screen_, stream, answers = _screen()
-    stream.feed('\x1bP$q"q\x1b\\')
+    stream.feed(decrqss(Csi.DECSCA))
     stream.feed(csi(Csi.DECSCA, 1))
-    stream.feed('\x1bP$q"q\x1b\\')
+    stream.feed(decrqss(Csi.DECSCA))
     assert answers == ['\x1bP1$r0"q\x1b\\', '\x1bP1$r1"q\x1b\\']
 
 

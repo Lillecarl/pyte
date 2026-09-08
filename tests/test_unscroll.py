@@ -9,6 +9,7 @@ from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte import escape
 from pyte.sequences import Csi, csi
+from pyte.sequences import apc
 
 LINES = 5
 
@@ -120,7 +121,7 @@ def test_a_placement_that_falls_off_the_bottom_goes_away():
     fill(stream, 10)
     # Place an image on the last row of the screen.
     stream.feed(csi(escape.CUP, 5, 1))
-    stream.feed("\x1b_Ga=T,f=24,s=1,v=1,c=1,r=1,C=1,i=1;AAAA\x1b\\")
+    stream.feed(apc("Ga=T,f=24,s=1,v=1,c=1,r=1,C=1,i=1;AAAA"))
     assert len(screen.graphics.placements) == 1
 
     stream.feed(csi(Csi.KITTY_UNSCROLL, 3))
@@ -131,7 +132,7 @@ def test_a_placement_above_the_screen_stays():
     screen, stream = make_screen(lines=5)
     fill(stream, 10)
     stream.feed(csi(escape.CUP, 1, 1))
-    stream.feed("\x1b_Ga=T,f=24,s=1,v=1,c=1,r=1,C=1,i=1;AAAA\x1b\\")
+    stream.feed(apc("Ga=T,f=24,s=1,v=1,c=1,r=1,C=1,i=1;AAAA"))
     placement = screen.graphics.placements[0]
     row = placement.y
 

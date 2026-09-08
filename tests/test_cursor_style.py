@@ -14,6 +14,7 @@ from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte.modes import PrivateMode
 from pyte.sequences import Csi, csi, reset_mode, set_mode
+from pyte.sequences import decrqss
 
 
 def make_screen():
@@ -99,5 +100,5 @@ def test_decrqss_reports_the_shape():
     screen, stream, responses = make_screen()
     stream.feed(set_mode(PrivateMode.CURSOR_BLINK))
     responses.clear()
-    stream.feed("\x1bP$q q\x1b\\")
+    stream.feed(decrqss(Csi.DECSCUSR))
     assert responses == ["\x1bP1$r1 q\x1b\\"]

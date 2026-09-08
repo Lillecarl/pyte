@@ -12,6 +12,7 @@ from pyte.sequences import Csi, csi, set_mode
 from pyte import escape
 from pyte.modes import AnsiMode
 from pyte.sequences import esc, reset_mode
+from pyte.sequences import decrqss
 
 
 def _screen(lines=5, columns=10):
@@ -96,9 +97,9 @@ def test_a_resize_takes_the_margins_away():
 
 def test_the_margins_are_reported():
     _screen_, stream, answers = _screen()
-    stream.feed("\x1bP$qs\x1b\\")
+    stream.feed(decrqss(Csi.DECSLRM))
     stream.feed(set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 3, 7))
-    stream.feed("\x1bP$qs\x1b\\")
+    stream.feed(decrqss(Csi.DECSLRM))
     assert answers == ["\x1bP1$r1;10s\x1b\\", "\x1bP1$r3;7s\x1b\\"]
 
 

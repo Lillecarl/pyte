@@ -25,6 +25,7 @@ from pyte.streams import Stream
 from pyte import escape
 from pyte.sequences import Csi, csi
 from pyte.sequences import announce, esc
+from pyte.sequences import decrqss, osc
 
 #: "ESC SP G", which turns eight bit controls on.
 S8C1T = announce(escape.S8C1T)
@@ -123,8 +124,14 @@ def test_decscl_with_no_second_parameter_changes_nothing():
 
 def test_decrqss_reports_the_form_that_is_on():
     "The report names 1 for seven bit and 2 for eight."
-    assert answered('\x1b[62;1"p\x1bP$q"p\x1b\\') == b'\x1bP1$r62;1"p\x1b\\'
-    assert answered('\x1b[62;0"p\x1bP$q"p\x1b\\') == b'\x901$r62;2"p\x9c'
+    assert answered(
+        csi(Csi.DECSCL, 62, 1)
+        + decrqss(Csi.DECSCL)
+    ) == b'\x1bP1$r62;1"p\x1b\\'
+    assert answered(
+        csi(Csi.DECSCL, 62, 0)
+        + decrqss(Csi.DECSCL)
+    ) == b'\x901$r62;2"p\x9c'
 
 
 # ----------------------------------------------------------------------
@@ -148,7 +155,7 @@ def test_a_device_control_string_carries_two_bytes():
 
 def test_an_operating_system_command_carries_two_bytes():
     "The window title, which OSC asks for and ST closes."
-    assert answered(S8C1T + "\x1b]0;hi\x1b\\\x1b[21t") == b"\x9dlhi\x9c"
+    assert answered(S8C1T + osc("0", "hi") + csi(Csi.XTWINOPS, 21)) == b"\x9dlhi\x9c"
 
 
 def test_the_answer_of_a_table_carries_one_byte():

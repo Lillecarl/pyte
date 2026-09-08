@@ -10,6 +10,8 @@ import pytest
 from pyte.osc import FORWARDED_OSC
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte.osc import Osc
+from pyte.sequences import osc
 
 
 def make_screen():
@@ -94,8 +96,8 @@ def test_another_sequence_does_not_leave_the_pane(code, param):
 def test_the_title_does_not_leave_the_pane():
     "The title belongs to the pane. pymux draws it itself."
     stream, forwarded, _answers = make_screen()
-    stream.feed("\x1b]0;a title\x1b\\")
-    stream.feed("\x1b]2;a title\x1b\\")
+    stream.feed(osc("0", "a title"))
+    stream.feed(osc("2", "a title"))
     assert forwarded == []
 
 
@@ -108,15 +110,15 @@ def test_a_screen_without_a_function_consumes_the_sequence():
     answers = []
     screen = Screen(24, 80, write_process_input=answers.append)
     stream = Stream(screen)
-    stream.feed("\x1b]52;c;aGVsbG8=\x1b\\")
-    stream.feed("\x1b]99;i=1;done\x1b\\")
+    stream.feed(osc(Osc.CLIPBOARD, "c", "aGVsbG8="))
+    stream.feed(osc(Osc.NOTIFICATION, "i=1", "done"))
     assert answers == []
 
 
 def test_the_screen_content_survives_a_forwarded_sequence():
     stream, forwarded, _answers = make_screen()
     screen = stream.listener
-    stream.feed("before\x1b]52;c;aGVsbG8=\x1b\\after")
+    stream.feed("before" + osc(Osc.CLIPBOARD, "c", "aGVsbG8=") + "after")
     line = screen.page.data_buffer[0]
     text = "".join(line[x].char for x in range(len("beforeafter")))
     assert text == "beforeafter"
