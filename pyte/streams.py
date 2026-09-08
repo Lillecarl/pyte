@@ -139,6 +139,8 @@ class Stream:
         Escape.SPA: "start_protected_area",
         Escape.EPA: "end_protected_area",
         Escape.DECID: "report_device_attributes",
+        Escape.DECKPAM: "set_application_keypad",
+        Escape.DECKPNM: "reset_application_keypad",
     }
 
     #: "sharp" escape sequences -- ``ESC # <N>``.

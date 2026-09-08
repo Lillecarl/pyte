@@ -720,6 +720,58 @@ _KEYPAD_TO_NORMAL = {
 }
 
 
+#: The bytes that introduce a single shift three. The application
+#: keypad and the application cursor keys both write one.
+SS3 = "\x1bO"
+
+#: What each keypad key sends once a pane turns the application keypad
+#: on: the final byte of an SS3 sequence.
+#:
+#: The table is xterm's, read out of `kypd_num` and `kypd_apl` in its
+#: `input.c`. Both are indexed by the keysym less `XK_KP_Space`, so
+#: the pair says what one key sends in each of the two modes:
+#: "*+,-./0123456789" and "=" against "jklmnopqrstuvwxy" and "X".
+#:
+#: Tab and Enter are in the same pair, at "I" and "M".
+#:
+#: **A legacy keyboard cannot reach this.** Such a terminal folds the
+#: keypad onto the main keyboard before it sends anything, so nothing
+#: downstream can tell a keypad 0 from the 0 above the letters. It
+#: works because pymux asks every terminal to disambiguate, and a
+#: terminal that does stops folding. Lillecarl/pymux#175.
+_KEYPAD_APPLICATION = {
+    **{
+        FunctionalKey.KP_0 + n: chr(ord("p") + n) for n in range(10)
+    },
+    FunctionalKey.KP_MULTIPLY: "j",
+    FunctionalKey.KP_ADD: "k",
+    FunctionalKey.KP_SEPARATOR: "l",
+    FunctionalKey.KP_SUBTRACT: "m",
+    FunctionalKey.KP_DECIMAL: "n",
+    FunctionalKey.KP_DIVIDE: "o",
+    FunctionalKey.KP_EQUAL: "X",
+    FunctionalKey.KP_ENTER: "M",
+}
+
+
+def _application_keypad_form(event: KeyEvent, flags: int) -> str | None:
+    """
+    What this key sends to a pane that turned the application keypad
+    on, or None when the mode does not reach it.
+
+    It belongs to the legacy mode, the way the SS3 form of an arrow
+    does: a pane that pushed a kitty flag reads the number of the key.
+    A modifier takes it out too, because xterm gives a modified keypad
+    key to `modifyKeypadKeys` and this screen has no such resource.
+    """
+    if not _legacy_mode(flags):
+        return None
+    if event.mods or event.event != EventType.PRESS or event.final != "u":
+        return None
+    final = _KEYPAD_APPLICATION.get(event.code)
+    return None if final is None else SS3 + final
+
+
 def _folded(event: KeyEvent, flags: int) -> KeyEvent | None:
     """
     The key event as a pane in the legacy encoding reads it.
@@ -757,8 +809,13 @@ def _encode_event(
     flags: int,
     application_mode: bool,
     modify_other_keys: int = ModifyOtherKeys.OFF,
+    application_keypad: bool = False,
 ) -> str:
     "Encode a key event for a pane with the given protocol flags."
+    if application_keypad:
+        keypad = _application_keypad_form(event, flags)
+        if keypad is not None:
+            return keypad
     plain = _folded(event, flags)
     if plain is None:
         return ""
@@ -880,10 +937,16 @@ def translate_key_data(
     source_flags: int = 0,
     synthesize: bool = True,
     modify_other_keys: int = ModifyOtherKeys.OFF,
+    application_keypad: bool = False,
 ) -> str:
     """
     Translate raw key data into the encoding for a pane with the given
     keyboard protocol flags.
+
+    `application_keypad` is DECKPAM, the other half of what terminfo's
+    `smkx` turns on. With it a keypad key sends an SS3 form instead of
+    a digit, so a program can tell the keypad from the row of numbers
+    above the letters.
 
     `modify_other_keys` is the other way a pane asks for more than the
     legacy encoding: XTMODKEYS resource 4, which xterm has and the
@@ -916,7 +979,13 @@ def translate_key_data(
             parts.append(item)
             continue
         parts.append(
-            _encode_event(item, flags, application_mode, modify_other_keys)
+            _encode_event(
+                item,
+                flags,
+                application_mode,
+                modify_other_keys,
+                application_keypad,
+            )
         )
         if double and item.event == EventType.PRESS:
             parts.append(

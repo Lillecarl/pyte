@@ -365,7 +365,29 @@ class Screen:
             source_flags=self.keyboard_source_flags,
             synthesize=self.synthesize_key_events,
             modify_other_keys=self.modify_other_keys,
+            application_keypad=self.in_application_keypad,
         )
+
+    @property
+    def in_application_keypad(self) -> bool:
+        """
+        The keypad sends SS3 forms rather than digits.
+
+        A program turns it on so it can tell the keypad from the row
+        of numbers above the letters. terminfo's `smkx` is usually
+        "\\E[?1h\\E=", which asks for the application cursor keys and
+        this in one string, so a screen that acts on one and not the
+        other is in a state no real terminal is ever in.
+        """
+        return PrivateMode.APPLICATION_KEYPAD.flag in self.mode
+
+    def set_application_keypad(self) -> None:
+        'DECKPAM ("ESC ="): the keypad sends SS3 forms.'
+        self.set_mode(PrivateMode.APPLICATION_KEYPAD, private=True)
+
+    def reset_application_keypad(self) -> None:
+        'DECKPNM ("ESC >"): the keypad sends digits again.'
+        self.reset_mode(PrivateMode.APPLICATION_KEYPAD, private=True)
 
     @property
     def modify_other_keys(self) -> int:

@@ -48,6 +48,17 @@ class Escape(StrEnum):
     #: it, so a program written for one still gets an answer.
     DECID = "Z"
 
+    #: Application keypad. The keypad stops sending digits and sends
+    #: SS3 forms, so a program can tell the keypad from the row of
+    #: numbers above the letters. Private mode 66 (DECNKM) is the
+    #: newer spelling of the same thing, and this is the one that
+    #: programs send: terminfo's `smkx` is usually "\\E[?1h\\E=", which
+    #: turns on the application cursor keys and this in one string.
+    DECKPAM = "="
+
+    #: Normal keypad, the other half of the pair. terminfo's `rmkx`.
+    DECKPNM = ">"
+
 
 class Csi(StrEnum):
     """
