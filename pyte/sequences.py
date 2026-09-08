@@ -7,12 +7,28 @@ what xterm added after them, and what kitty added after that.
 
 `streams.Stream` reads them all from one table, so nothing here decides
 anything. A name and a byte, and that is all.
+
+`csi` is the other direction: a byte from a name. It builds the
+sequence that these names describe, so that a caller writes what it
+means instead of a hand-typed string. Lillecarl/pymux#165.
+
+**It is not an encoder.** `Screen.encode_key` writes the keys of a
+pane and `Screen` answers the queries; those are the writers, there is
+one of each, and a test that judges one has to hold the bytes it
+expects as a literal. This is for the other side: the sequences a test
+feeds a parser, and the replies a test makes a terminal give. Getting
+one of those wrong is a passing test that asserts the wrong thing.
 """
 from enum import StrEnum
+from typing import Iterable, Sequence, Union
 
+from .control import CSI as _CSI
 from .escape import NEL as _NEL
+from .escape import RM as _RM
+from .escape import SM as _SM
+from .modes import AnsiMode, PrivateMode
 
-__all__ = ("Escape", "Csi")
+__all__ = ("Escape", "Csi", "csi", "set_mode", "reset_mode")
 
 
 class Escape(StrEnum):
@@ -182,3 +198,118 @@ class Csi(StrEnum):
     #: answered.
     XTWINOPS = "t"
 
+
+# ----------------------------------------------------------------------
+# Writing one. Lillecarl/pymux#165.
+
+#: One parameter of a sequence. `None` is an empty parameter, which is
+#: how a program asks for the default of that position rather than for
+#: zero. A sequence of them is a parameter with subparameters, which
+#: the colons join.
+Parameter = Union[int, None, Sequence[Union[int, None]]]
+
+#: The markers that go between the "[" and the parameters. The marker
+#: is the whole difference between some sequences that share a final
+#: byte, so it is named and never spelled into the final byte.
+MARKERS = ("?", ">", "<", "=")
+
+
+def csi(final: str, *params: Parameter, private: str = "") -> str:
+    """
+    A CSI sequence, from the name of its final byte.
+
+    `final` is a member of `Csi`, or one of the plain names in
+    `escape.py`. Both are strings, and both carry their intermediate
+    bytes, which go after the parameters:
+
+        >>> csi(Csi.SD, 2)
+        '\\x1b[2T'
+        >>> csi(Csi.DECSCUSR, 4)
+        '\\x1b[4 q'
+
+    A parameter of `None` is written as nothing at all, which is how a
+    program asks for the default of that position rather than for
+    zero:
+
+        >>> csi(escape.CUP, None, 5)
+        '\\x1b[;5H'
+
+    A parameter that is a sequence carries subparameters, joined by
+    colons the way the kitty keyboard protocol and the colon form of
+    SGR write them:
+
+        >>> csi(escape.SGR, 38, (2, 1, 2, 3))
+        '\\x1b[38;2:1:2:3m'
+
+    `private` is the marker between the "[" and the parameters: "?",
+    ">", "<" or "=". The marker is the whole difference between some
+    sequences that share a final byte, so it is named and not spelled
+    into `final`.
+    """
+    return "%s%s%s%s" % (_CSI, private, _joined(params), final)
+
+
+def _joined(params: Iterable[Parameter]) -> str:
+    "The parameters of a sequence, with the separators between them."
+    return ";".join(
+        # An `IntEnum` is an `int`, so only a real sequence of
+        # subparameters reaches the colons.
+        _one(value)
+        if isinstance(value, (int, type(None)))
+        else ":".join(_one(part) for part in value)
+        for value in params
+    )
+
+
+def _one(value: Union[int, None]) -> str:
+    "One parameter. Nothing at all is how an empty one is written."
+    return "" if value is None else str(int(value))
+
+
+#: A mode, by its name. A bare number is not one, on purpose: the
+#: marker says whether a mode is private, the number does not, and a
+#: builder that guessed would write "CSI 1049 h" for a mode that only
+#: exists as "CSI ? 1049 h". `modes.py` names the modes a pane acts on;
+#: for any other number, write `csi(escape.SM, 2026, private="?")` and
+#: say the marker out loud.
+Mode = Union[AnsiMode, PrivateMode]
+
+
+def set_mode(*modes: Mode) -> str:
+    "SM: turn these modes on. `modes.py` names them."
+    return csi(_SM, *modes, private=_marker_of(modes))
+
+
+def reset_mode(*modes: Mode) -> str:
+    "RM: turn these modes off."
+    return csi(_RM, *modes, private=_marker_of(modes))
+
+
+def _marker_of(modes: Sequence[Mode]) -> str:
+    """
+    The marker that these modes are written with.
+
+    A private mode carries "?" and a mode of the ANSI standard carries
+    nothing, and one sequence cannot hold both: the marker belongs to
+    the sequence and not to the parameter. A caller that mixes them is
+    asking for a sequence no terminal reads.
+
+    A bare number is refused for the same reason. It says nothing
+    about the marker, so a builder that took one would have to guess,
+    and guessing wrong writes a sequence that reads as another mode
+    entirely.
+    """
+    unnamed = [mode for mode in modes if not isinstance(mode, (AnsiMode, PrivateMode))]
+    if unnamed or not modes:
+        raise ValueError(
+            "name each mode with AnsiMode or PrivateMode, because the "
+            "number does not say which marker it takes: %r" % (modes,)
+        )
+
+    private = [isinstance(mode, PrivateMode) for mode in modes]
+    if any(private) and not all(private):
+        raise ValueError(
+            "a private mode and an ANSI mode cannot go in one sequence: %r"
+            % (modes,)
+        )
+    return "?" if any(private) else ""
