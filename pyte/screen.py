@@ -1168,7 +1168,15 @@ class Screen:
             # is the last rows of it, and the cursor is held inside the
             # screen rather than the screen held to the cursor.
             # Lillecarl/pymux#146.
-            self._reflow(bottom)
+            #
+            # The alternate screen is cut down instead. A full-screen
+            # program owns that screen and redraws it, and five of the
+            # seven judges of the panel do the same. `_clip` says the
+            # rest. Lillecarl/pymux#192.
+            if self.in_alternate_screen:
+                self._clip()
+            else:
+                self._reflow(bottom)
 
             # A program that asked for it learns the new size in band.
             self.notify_of_resize()
@@ -4116,7 +4124,15 @@ class Screen:
         # the rows that just arrived may be laid out at another width,
         # and this is the one path that brings such a row back onto the
         # screen. Lay them out again. Lillecarl/pymux#135.
-        if self.line_offset < self.reflow_floor:
+        #
+        # **Not on the alternate screen**, which does not reflow at all
+        # (Lillecarl/pymux#192). There is no history above it to slide
+        # over, so there is nothing here to lay out again -- but
+        # `reflow_floor` belongs to the screen and not to the page, so
+        # it still carries the number the primary page left, and
+        # without this the alternate page would be reflowed by the back
+        # door.
+        if not self.in_alternate_screen and self.line_offset < self.reflow_floor:
             # The height did not change here, so the last row of the
             # screen is the one the buffer was written into.
             self._reflow(self.line_offset + self.lines - 1)
@@ -5099,6 +5115,98 @@ class Screen:
                 return lowest
 
         return lowest
+
+    def _clip(self) -> None:
+        """
+        Cut the alternate screen down, instead of laying it out again.
+
+        **The alternate screen does not reflow.** It is the screen a
+        full-screen program owns and redraws, and a resize is the
+        signal that tells it to. So the cells that no longer fit are
+        taken off and nothing moves.
+
+        Five of the seven judges of `ptterm/tests/panel.py` do exactly
+        this -- alacritty, Ghostty, kitty, WezTerm and xterm.js all show
+        the screen cut down, with nothing re-wrapped.
+        Lillecarl/pymux#192.
+
+        **kitty is the one to read, because kitty changed to it.** Its
+        `resize_screen_buffer_without_rewrap` in `kitty/resize.c` is
+        used for the alternate buffer alone, while the primary one goes
+        through `resize_screen_buffers` and rewraps. Commit 6db24b66f,
+        on 2025-11-26, added it: "Dont rewrap text in the alternate
+        screen buffer. Avoids flicker during live resize with no
+        resize_debounce_time." The report behind it is discussion 9142,
+        which says the case plainly: "Fullscreen apps are generally
+        left to do wrapping themselves, and if they don't update fast
+        enough during live resizing the screen is simply clipped."
+
+        So this is not five emulators that happen to agree. It is one
+        that reflowed, was told it was alone in doing so, and stopped.
+        pyte was where kitty was before that commit.
+
+        libvterm still reflows, and that is not its opinion: reflow is
+        one flag on the whole screen (`screen->reflow` in `src/screen.c`),
+        `resize_buffer` is called for both buffers with it, and nothing
+        in the library asks about the alternate screen. It is on here
+        because `vterm_oracle.py` calls `vterm_screen_enable_reflow`.
+
+        Reflowing is also what let the screen hold more rows than it
+        can show. The pane drew the last screenful and copy mode read
+        the whole buffer, so the two disagreed about what was on
+        screen. A screen that never grows past itself cannot do that.
+
+        The cost is real: a program that does not redraw loses what was
+        clipped. That is the trade all five make, and the alternate
+        screen is where it is right, because a program there gets
+        SIGWINCH and owns the redraw. kitty's reason adds a second one:
+        a reflow on every step of a live resize is work that shows.
+
+        The height needs nothing here. `line_offset` is the last
+        `lines` rows up to `max_y`, so a shorter screen keeps the
+        bottom of itself already, which is what six of the seven judges
+        do. kitty keeps the top instead, and that looks incidental
+        rather than argued: the loop in the function above copies rows
+        `0` upward, and its commit is about rewrapping and says nothing
+        about which end to keep.
+        """
+        data_buffer = self.page.data_buffer
+        width = self.columns
+
+        # **The alternate screen keeps nothing above itself**, the way
+        # Lillecarl/pymux#132 says. A row that a shorter screen leaves
+        # behind is not scrollback, because no scrollback reaches this
+        # screen: it is a row nobody can read.
+        line_offset = self.line_offset
+        for row in [row for row in data_buffer if row < line_offset]:
+            data_buffer.pop(row, None)
+            self._forget(row)
+        self.history_floor = max(self.history_floor, line_offset)
+
+        # **Every row is a line of its own now.** A clip that left the
+        # wrap marks would leave a run of rows that is still one logical
+        # line, and a reader that lays a line out again -- copy mode
+        # does -- would make more rows out of it than the screen has.
+        # That is the very fault this fixes, so the mark has to go with
+        # the reflow.
+        self._forget_the_wrap_marks(list(data_buffer))
+
+        # The cells past the last column. They are dropped and not kept
+        # aside: a later widening leaves blanks, which is what a screen
+        # that was cut down holds.
+        for row in data_buffer.values():
+            for column in [column for column in row if column >= width]:
+                row.pop(column, None)
+
+        # Nothing was laid out again, so no row below the screen is at
+        # this width. The floor is the screen itself.
+        self.reflow_floor = line_offset
+
+        self.ensure_bounds()
+
+        # Every row a reader holds may have lost cells, and no row moved
+        # to say so.
+        self.touch_everything()
 
     def _reflow(self, bottom: int) -> None:
         """

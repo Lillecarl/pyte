@@ -19,6 +19,15 @@ What it is not: a round trip. `_reflow` trims the erased cells off the
 end of a line on purpose (Lillecarl/pymux#56), so a buffer is not equal
 to itself across a resize. The content is.
 
+**The alternate screen is outside this, and it has to be.** It does not
+reflow at all: a resize cuts it down and the cells that no longer fit
+are gone, which is what five of the seven judges of the panel do and
+what Lillecarl/pymux#192 landed. Losing content is the whole of that
+trade, so a property saying a resize loses none cannot describe it. The
+generated chunks can turn the alternate screen on, so the two property
+tests below say `assume` and leave those examples to
+`ptterm/tests/test_the_alternate_screen_reflow.py`.
+
 **The very first resize counts.** These held the lines from after one
 resize for a while, because a reflow read the cell the cursor stood on
 and the read made it, so a cursor parked past the end of a line gave
@@ -27,7 +36,7 @@ and no read makes a cell, so the lines after the first resize are the
 lines before it. Lillecarl/pymux#143.
 """
 
-from hypothesis import HealthCheck, example, given, settings
+from hypothesis import HealthCheck, assume, example, given, settings
 from hypothesis import strategies as st
 
 from a_screen import a_screen
@@ -157,6 +166,7 @@ def test_a_column_change_keeps_every_line(chunks, widths):
     """
     screen = a_screen(columns=10, lines=6)
     Stream(screen).feed("".join(chunks))
+    assume(not screen.in_alternate_screen)
 
     before = logical_lines(screen)
     for width in widths:
@@ -231,6 +241,7 @@ def test_a_column_change_keeps_every_line_with_a_short_history(chunks, widths):
     """
     screen = a_screen(columns=10, lines=6, history=5)
     Stream(screen).feed("".join(chunks))
+    assume(not screen.in_alternate_screen)
 
     before = logical_lines(screen)
     for width in widths:
