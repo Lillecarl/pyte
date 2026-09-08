@@ -43,6 +43,11 @@ from typing import List, NamedTuple, Sequence, Tuple
 
 __all__ = [
     "translate_key_data",
+    "parse_key_data",
+    "KeyEvent",
+    "KeyCode",
+    "FunctionalKey",
+    "FIRST_FUNCTIONAL_KEY",
     "current_flags",
     "deliverable_flags",
     "pushed",
@@ -474,8 +479,20 @@ def _parse_ss3(data: str, start: int) -> Tuple[_Item, int]:
     return data[start : start + 3], 3
 
 
-def _parse_key_data(data: str) -> List[_Item]:
-    "Decode raw key data into key events and verbatim pass-throughs."
+def parse_key_data(data: str) -> List[_Item]:
+    """
+    Decode raw key data into key events and verbatim pass-throughs.
+
+    This is the reader of every mode a keyboard can be in: the legacy
+    encoding, the "CSI code ; mods u" form that fixterms named and
+    kitty extended, and xterm's "CSI 27 ; mods ; code ~". A caller
+    gets `KeyEvent`s and the strings that are not keys, and writes
+    them out again in whatever form it owes.
+
+    Two callers, and they owe different things. `translate_key_data`
+    below writes bytes for a pane. pymux writes a prompt_toolkit key
+    press, because a binding has to be able to name it.
+    """
     items: List[_Item] = []
     i = 0
     length = len(data)
@@ -766,7 +783,7 @@ def translate_key_data(
     )
 
     parts = []
-    for item in _parse_key_data(data):
+    for item in parse_key_data(data):
         if not isinstance(item, KeyEvent):
             parts.append(item)
             continue
