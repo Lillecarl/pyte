@@ -26,7 +26,7 @@ that line a blank nobody wrote. The cursor travels as an offset now
 and no read makes a cell, so the lines after the first resize are the
 lines before it. Lillecarl/pymux#143.
 """
-from hypothesis import HealthCheck, given, settings
+from hypothesis import HealthCheck, example, given, settings
 from hypothesis import strategies as st
 
 from a_screen import a_screen
@@ -176,6 +176,26 @@ SIZES = st.lists(
     max_examples=300,
     deadline=None,
     suppress_health_check=[HealthCheck.too_slow],
+)
+# The corpus, and today it holds one.
+#
+# **A drawn example is not remembered.** The gate draws the same
+# examples every run now (Lillecarl/pymux#180), which is what makes it
+# a gate, and it also means a case outside that draw is a case nobody
+# sees again. A database would not help: a nix sandbox throws its
+# `.hypothesis` directory away. So an example that once failed is
+# written down here, where both profiles run it and a reader can see
+# what it is.
+#
+# This one is a scroll down inside a region. The buffer leaves the
+# blank row it made absent, a reflow makes the row, and the resize
+# reads as a line that was not there before. It failed about one run
+# in eight. Lillecarl/pymux#179 holds the part of it that is still
+# open: the oracle stopped counting a blank line, and the two ends
+# still do not agree about whether the row is real.
+@example(
+    chunks=["wider text that wraps around the end of a short row\n\x1b[0T"],
+    sizes=[(1, 4)],
 )
 def test_a_size_change_keeps_every_line(chunks, sizes):
     """
