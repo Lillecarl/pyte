@@ -484,6 +484,55 @@ def test_a_real_tilde_key_is_not_a_modify_other_keys_key():
     assert translate_key_data("\x1b[15;5;97~", flags=0) == "\x1b[15;5~"
 
 
+def test_shift_and_tab_is_the_back_tab_in_the_legacy_encoding():
+    """
+    The legacy encoding has a sequence for this one key with a
+    modifier, and it is what a shell and a readline prompt read to
+    cycle a completion backwards. Without it the shift was dropped and
+    the pane read a plain Tab. Lillecarl/pymux#174.
+    """
+    assert translate_key_data("\x1b[9;2u", flags=0) == "\x1b[Z"
+    assert translate_key_data("\x1b[27;2;9~", flags=0) == "\x1b[Z"
+    # Ctrl has no legacy form on this key, and kitty loses it too.
+    assert translate_key_data("\x1b[9;6u", flags=0) == "\x1b[Z"
+
+
+def test_alt_and_the_back_tab_take_a_second_escape():
+    """
+    It is the only key whose alt form doubles the escape, because
+    "CSI Z" already begins with one. kitty writes it the same way.
+    """
+    assert translate_key_data("\x1b[9;4u", flags=0) == "\x1b\x1b[Z"
+
+
+def test_the_back_tab_belongs_to_the_legacy_mode_alone():
+    """
+    A pane that asked for more reads the number of the key.
+
+    The event types are in here because kitty counts them in its
+    legacy mode as well. A pane that asked for those and nothing else
+    reads a press and a release, so the release is left off to keep
+    the case about the form and not about the synthesis.
+    """
+    for flags in (DISAMBIGUATE, REPORT_ALL):
+        assert translate_key_data("\x1b[9;2u", flags=flags) == "\x1b[9;2u"
+    assert translate_key_data(
+        "\x1b[9;2u", flags=EVENT_TYPES, synthesize=False
+    ) == "\x1b[9;2u"
+
+
+def test_a_back_tab_from_a_legacy_keyboard_passes_through():
+    "Nothing reads `CSI Z` as a key, so nothing can spoil it."
+    for flags in (0, DISAMBIGUATE, REPORT_ALL):
+        assert translate_key_data("\x1b[Z", flags=flags) == "\x1b[Z"
+
+
+def test_a_plain_tab_is_not_a_back_tab():
+    assert translate_key_data("\t", flags=0) == "\t"
+    assert translate_key_data("\x1b[9;5u", flags=0) == "\t"
+    assert translate_key_data("\x1b[9;3u", flags=0) == "\x1b\t"
+
+
 def test_a_folded_keypad_key_follows_the_cursor_key_mode():
     "The fold gives a normal key, and a normal arrow reads DECCKM."
     assert translate_key_data(

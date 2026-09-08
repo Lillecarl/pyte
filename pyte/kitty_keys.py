@@ -129,6 +129,26 @@ _CTRL_TAKES_OFF_A_LETTER = ord("a") - 1
 #: and ctrl+backslash is 28.
 _CTRL_TAKES_OFF_A_SYMBOL = ord("\\") - 28
 
+#: What shift and Tab send in the legacy encoding, after the escape.
+#: CBT by its other name.
+BACK_TAB = "[Z"
+
+
+def _legacy_mode(flags: int) -> bool:
+    """
+    Whether the pane is in what kitty calls the legacy mode.
+
+    kitty reads it off three flags
+    (`legacy_mode` in `encode_function_key`, `kitty/key_encoding.c`),
+    and the forms that belong to it are the SS3 spelling of an arrow
+    or of F1 to F4, and the back tab.
+    """
+    return not flags & (
+        KeyboardFlag.DISAMBIGUATE
+        | KeyboardFlag.REPORT_EVENT_TYPES
+        | KeyboardFlag.REPORT_ALL_KEYS
+    )
+
 
 class FunctionalKey(IntEnum):
     """
@@ -638,10 +658,16 @@ def _encode_event(event: KeyEvent, flags: int, application_mode: bool) -> str:
         # It goes out as an escape code whatever else is asked for,
         # because `chr` of it is a character no keyboard has.
         no_legacy_form = code >= FIRST_FUNCTIONAL_KEY
+        # Back tab is the one key with a modifier that the legacy
+        # encoding writes, and it belongs to the legacy mode alone. A
+        # pane that asked for more reads the number of the key, the
+        # way it does for every other modified key.
+        back_tab = code == KeyCode.TAB and bool(mods & Modifier.SHIFT)
         if (
             flags & KeyboardFlag.REPORT_ALL_KEYS
             or (flags & KeyboardFlag.DISAMBIGUATE and ambiguous)
             or no_legacy_form
+            or (back_tab and not _legacy_mode(flags))
             or kind != EventType.PRESS
             or alternates
             or embedded
@@ -651,6 +677,15 @@ def _encode_event(event: KeyEvent, flags: int, application_mode: bool) -> str:
             )
 
         # Legacy form.
+        if back_tab:
+            # The one key whose alt form takes a second escape,
+            # because "CSI Z" already begins with one. kitty writes it
+            # the same way, in
+            # `legacy_functional_key_encoding_with_modifiers`. Ctrl
+            # has no legacy form here and is lost, as it is there.
+            # Lillecarl/pymux#174.
+            prefix = "\x1b\x1b" if mods & Modifier.ALT else "\x1b"
+            return prefix + BACK_TAB
         if text and not mods & (Modifier.CTRL | Modifier.ALT):
             # The reported text accounts for shift and the layout.
             return text
@@ -690,12 +725,7 @@ def _encode_event(event: KeyEvent, flags: int, application_mode: bool) -> str:
     # Functional keys with a letter final byte.
     if mods == 0 and kind == EventType.PRESS and not embedded:
         # The SS3 form belongs to a pane that pushed no flag at all.
-        # kitty calls that the legacy mode, and reads it off the same
-        # three flags.
-        legacy = not flags & (
-            KeyboardFlag.DISAMBIGUATE | KeyboardFlag.REPORT_EVENT_TYPES | KeyboardFlag.REPORT_ALL_KEYS
-        )
-        if legacy:
+        if _legacy_mode(flags):
             if application_mode and final in "ABCD":
                 return "\x1bO" + final
             if final in "PQRS":
