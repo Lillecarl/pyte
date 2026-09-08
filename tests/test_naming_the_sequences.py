@@ -115,14 +115,67 @@ def test_the_intermediate_byte_picks_the_family():
     assert rewritten("\x1b#8") == "sharp(Sharp.DECALN)"
 
 
+def test_an_operating_system_command():
+    assert rewritten("\x1b]4;3;#aabbcc\x1b\\") == (
+        'osc(Osc.PALETTE_COLOR, "3", "#aabbcc")'
+    )
+    assert rewritten("\x1b]104\x1b\\") == "osc(Osc.RESET_PALETTE_COLOR)"
+    assert rewritten("\x1b]8;;\x1b\\") == 'osc(Osc.HYPERLINK, "", "")'
+
+
+def test_a_code_that_osc_py_does_not_name_stays_a_string():
+    "The dynamic colours are 10 to 19, and a member each gains nothing."
+    assert rewritten("\x1b]10;?\x1b\\") == 'osc("10", "?")'
+
+
+def test_the_terminator_is_named():
+    assert rewritten("\x1b]11;?\x07") == (
+        'osc("11", "?", end=Terminator.BEL)'
+    )
+
+
+def test_a_device_control_string_and_an_application_one():
+    assert rewritten("\x1bP1$r0m\x1b\\") == 'dcs("1$r0m")'
+    assert rewritten("\x1b_Gi=31;OK\x1b\\") == 'apc("Gi=31;OK")'
+
+
+def test_a_dcs_that_asks_a_setting_back_says_which():
+    """
+    "$q" asks a setting back and what follows names the sequence that
+    would set it, so it takes the name `csi` gives that sequence.
+    """
+    assert rewritten("\x1bP$qm\x1b\\") == "decrqss(escape.SGR)"
+    assert rewritten("\x1bP$q q\x1b\\") == "decrqss(Csi.DECSCUSR)"
+    assert rewritten('\x1bP$q"p\x1b\\') == "decrqss(Csi.DECSCL)"
+
+
+def test_a_dcs_that_is_an_answer_is_carried_across_whole():
+    "'$r' answers and '+q' reads a capability. Neither is a setting."
+    assert rewritten("\x1bP+qzzzz\x1b\\") == 'dcs("+qzzzz")'
+
+
+def test_a_string_sequence_with_no_terminator_is_left_alone():
+    """
+    A prefix and not a sequence. A test that feeds one is checking
+    what the parser does with an unfinished sequence, so it has to
+    stay unfinished.
+    """
+    assert reason("\x1bP") == "no terminator"
+    assert reason("\x1b]11;?") == "no terminator"
+
+
+def test_a_payload_that_is_a_template_is_left_alone():
+    assert reason("\x1b]22;%s\x1b\\") == "a format template"
+
+
 def test_a_prefix_is_not_an_escape_sequence():
     """
-    "ESC O" starts an SS3 form and "ESC P" a DCS. Neither is whole, so
-    neither is named, and a byte no family names is left alone.
+    "ESC O" starts an SS3 form, and a byte no family names is left
+    alone. A bare ESC is a key and not a sequence at all.
     """
     assert reason("\x1bO") == "not CSI"
-    assert reason("\x1bP") == "not CSI"
     assert reason("\x1b") == "not CSI"
+    assert reason("\x1b(0") == "not CSI"
 
 
 # ----------------------------------------------------------------------
@@ -161,12 +214,17 @@ def test_a_string_is_named_whole_or_not_at_all():
     the first ESC with no rule gives up on all of it, even the parts
     that had one.
     """
-    assert rewritten("\x1b[2J\x1b]0;title\x07") is None
-    assert reason("\x1b[2J\x1b]0;title\x07") == "not CSI"
+    assert rewritten("\x1b[2J\x1b(0") is None
+    assert reason("\x1b[2J\x1b(0") == "not CSI"
 
 
-def test_a_sequence_that_is_not_csi_is_left_alone():
-    assert reason("\x1b]0;title\x07") == "not CSI"
+def test_a_charset_designation_is_left_alone():
+    """
+    "ESC ( 0" picks the line drawing set. It is a family of its own,
+    with the set in the byte after the "(", and nothing names it yet.
+    """
+    assert reason("\x1b(0") == "not CSI"
+    assert reason("\x1b(B") == "not CSI"
 
 
 def test_a_piece_of_a_sequence_is_left_alone():
@@ -404,7 +462,23 @@ def test_every_rewrite_writes_the_string_it_replaces():
     """
     from pyte import escape  # noqa: F401
     from pyte.modes import AnsiMode, PrivateMode  # noqa: F401
-    from pyte.sequences import Csi, csi, reset_mode, set_mode  # noqa: F401
+    from pyte.osc import Osc  # noqa: F401
+    from pyte.sequences import (  # noqa: F401
+        Csi,
+        Escape,
+        Sharp,
+        Terminator,
+        announce,
+        apc,
+        csi,
+        dcs,
+        decrqss,
+        esc,
+        osc,
+        reset_mode,
+        set_mode,
+        sharp,
+    )
 
     for text in (
         "\x1b[2T",
@@ -419,6 +493,18 @@ def test_every_rewrite_writes_the_string_it_replaces():
         "\x1b[3D",
         "\x1b[c",
         "\x1b[J",
+        "\x1bc",
+        "\x1b#6",
+        "\x1b F",
+        "\x1b]4;3;#aabbcc\x1b\\",
+        "\x1b]104\x1b\\",
+        "\x1b]11;?\x07",
+        "\x1b]8;;\x1b\\",
+        "\x1bP$qm\x1b\\",
+        "\x1bP1$r0m\x1b\\",
+        "\x1b_Gi=31;OK\x1b\\",
+        "\x1b[2J\x1b[H",
+        "\x1b[42mhi\x1b[K",
     ):
         expression = rewritten(text)
         assert expression is not None, text

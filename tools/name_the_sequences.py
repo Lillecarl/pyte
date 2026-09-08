@@ -58,6 +58,7 @@ sys.path.insert(0, str(REPOSITORY / "pyte"))
 from pyte import escape  # noqa: E402
 from pyte.control import CSI  # noqa: E402
 from pyte.modes import AnsiMode, PrivateMode  # noqa: E402
+from pyte.osc import Osc  # noqa: E402
 from pyte.sequences import MARKERS, Csi, Escape, Sharp  # noqa: E402
 
 #: The suites that judge a writer. Their literals are the answer, so
@@ -164,6 +165,26 @@ _ESC_FAMILIES = (
     (" ", "announce", ANNOUNCE_NAMES),
 )
 
+#: The sequences that carry a payload rather than parameters, by the
+#: byte after ESC. Each runs to a terminator instead of to a final
+#: byte, so they are scanned rather than matched.
+_STRING_FAMILIES = {
+    "]": "osc",
+    "P": "dcs",
+    "_": "apc",
+}
+
+#: What ends one, and what to call each ending.
+TERMINATORS = {
+    "\x1b\\": "Terminator.ST",
+    "\x07": "Terminator.BEL",
+}
+
+#: What `osc.py` calls each code it names. A code it does not name is
+#: written as the string it is: the dynamic colours are "10" through
+#: "19" and nothing is gained by a member for each of them.
+OSC_NAMES = {member.value: "Osc.%s" % member.name for member in Osc}
+
 
 class Rewrite(NamedTuple):
     """
@@ -258,7 +279,83 @@ def _a_sequence_at(text: str, at: int) -> "Tuple[str, int] | str":
     """
     if text.startswith(CSI, at):
         return _a_csi_at(text, at)
+
+    after = text[at + 1: at + 2]
+    if after in _STRING_FAMILIES:
+        return _a_string_sequence_at(text, at, _STRING_FAMILIES[after])
+
     return _an_escape_at(text, at)
+
+
+def _a_string_sequence_at(
+    text: str, at: int, call: str
+) -> "Tuple[str, int] | str":
+    """
+    The OSC, DCS or APC that starts at `at`, and how long it is.
+
+    These run to a terminator rather than to a final byte, so the
+    scan looks for one. Without a terminator the sequence is a prefix
+    and not a sequence: a test that feeds `"\\x1bP"` on its own is
+    checking what the parser does with an unfinished one.
+
+    The payload is carried across whole. What is inside it belongs to
+    the code that named it, and nothing here reads that: `osc.py` says
+    what an OSC payload means, `images.py` what an APC one does.
+    """
+    start = at + 2
+    for terminator, name in TERMINATORS.items():
+        end = text.find(terminator, start)
+        if end < 0:
+            continue
+        payload = text[start:end]
+        if "\x1b" in payload:
+            # The terminator that was found is a later sequence's, so
+            # this one has none of its own.
+            continue
+        if "%" in payload:
+            return "a format template"
+
+        length = end + len(terminator) - at
+        ending = "" if name == "Terminator.ST" else ", end=%s" % name
+        if call == "osc":
+            return _an_osc(payload, ending), length
+        if call == "dcs":
+            return _a_dcs(payload, ending), length
+        return "%s(%s%s)" % (call, _as_written(payload), ending), length
+
+    return "no terminator"
+
+
+def _a_dcs(payload: str, ending: str) -> str:
+    """
+    A device control string, named where the payload says what it is.
+
+    "$q" asks a setting back, and what follows is the name of the
+    sequence that would set it, so `decrqss` writes it and the setting
+    gets the name `csi` would give it. Everything else is carried
+    across whole: "$r" is an answer and "+q" reads a capability, and
+    both take a value that only their own reader understands.
+    """
+    if payload.startswith("$q"):
+        name = _a_name_for(payload[2:])
+        if name is not None:
+            return "decrqss(%s%s)" % (name, ending)
+    return "dcs(%s%s)" % (_as_written(payload), ending)
+
+
+def _an_osc(payload: str, ending: str) -> str:
+    """
+    An OSC, whose payload is a code and then the fields of that code.
+
+    The semicolons are all the structure an OSC has, so the fields go
+    in one at a time and the builder puts them back. Joining them
+    again writes the payload it started from, whatever was in them.
+    """
+    code, _, rest = payload.partition(";")
+    fields = rest.split(";") if rest or ";" in payload else []
+    named = OSC_NAMES.get(code, _as_written(code))
+    written = ", ".join([named] + [_as_written(one) for one in fields])
+    return "osc(%s%s)" % (written, ending)
 
 
 def _a_csi_at(text: str, at: int) -> "Tuple[str, int] | str":
@@ -554,9 +651,15 @@ _IMPORTS = {
     "announce": "pyte.sequences",
     "set_mode": "pyte.sequences",
     "reset_mode": "pyte.sequences",
+    "osc": "pyte.sequences",
+    "dcs": "pyte.sequences",
+    "decrqss": "pyte.sequences",
+    "apc": "pyte.sequences",
+    "Terminator": "pyte.sequences",
     "escape": "pyte",
     "AnsiMode": "pyte.modes",
     "PrivateMode": "pyte.modes",
+    "Osc": "pyte.osc",
 }
 
 
@@ -762,6 +865,12 @@ def _proven(changes: List[Change], where: Path) -> None:
 
     scope = {
         "csi": pyte.sequences.csi,
+        "osc": pyte.sequences.osc,
+        "dcs": pyte.sequences.dcs,
+        "decrqss": pyte.sequences.decrqss,
+        "apc": pyte.sequences.apc,
+        "Terminator": pyte.sequences.Terminator,
+        "Osc": Osc,
         "esc": pyte.sequences.esc,
         "sharp": pyte.sequences.sharp,
         "announce": pyte.sequences.announce,
