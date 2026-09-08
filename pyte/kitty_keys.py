@@ -121,6 +121,15 @@ class KeyCode(IntEnum):
     BACKSPACE = 127
 
 
+#: What ctrl takes off a letter to make its control code: "a" is 97 and
+#: ctrl+a is 1.
+_CTRL_TAKES_OFF_A_LETTER = ord("a") - 1
+
+#: The same for the four symbols that have a control code. "\\" is 92
+#: and ctrl+backslash is 28.
+_CTRL_TAKES_OFF_A_SYMBOL = ord("\\") - 28
+
+
 class FunctionalKey(IntEnum):
     """
     The number of a keypad key, in the Private Use Area.
@@ -320,17 +329,17 @@ def _control_or_text_event(char: str) -> KeyEvent:
     """
     code = ord(char)
     if char == "\r":
-        return KeyEvent(13, 0, "u")
+        return KeyEvent(KeyCode.ENTER, 0, "u")
     if char == "\t":
-        return KeyEvent(9, 0, "u")
+        return KeyEvent(KeyCode.TAB, 0, "u")
     if char == "\x7f":
-        return KeyEvent(127, 0, "u")
+        return KeyEvent(KeyCode.BACKSPACE, 0, "u")
     if 1 <= code <= 26:  # ctrl+a .. ctrl+z (and \n = ctrl+j)
-        return KeyEvent(code + 96, Modifier.CTRL, "u")
+        return KeyEvent(code + _CTRL_TAKES_OFF_A_LETTER, Modifier.CTRL, "u")
     if code == 0:  # ctrl+@
-        return KeyEvent(64, Modifier.CTRL, "u")
+        return KeyEvent(ord("@"), Modifier.CTRL, "u")
     if 28 <= code <= 31:  # ctrl+\ ^ _
-        return KeyEvent(code + 64, Modifier.CTRL, "u")
+        return KeyEvent(code + _CTRL_TAKES_OFF_A_SYMBOL, Modifier.CTRL, "u")
     # A printable character is the text of its own key event. A pane
     # that asks for the text of a key gets it that way, also from a
     # terminal that speaks the legacy encoding only.
@@ -648,19 +657,19 @@ def _encode_event(event: KeyEvent, flags: int, application_mode: bool) -> str:
         if mods & (Modifier.CTRL | Modifier.ALT):
             result = "\x1b" if mods & Modifier.ALT else ""
             if mods & Modifier.CTRL:
-                if code == 13:
+                if code == KeyCode.ENTER:
                     result += "\n"
-                elif code == 9:
+                elif code == KeyCode.TAB:
                     result += "\t"
-                elif code == 127:
+                elif code == KeyCode.BACKSPACE:
                     result += "\x08"
-                elif 97 <= code <= 122:
-                    result += chr(code - 96)
-                elif code == 64:
+                elif ord("a") <= code <= ord("z"):
+                    result += chr(code - _CTRL_TAKES_OFF_A_LETTER)
+                elif code == ord("@"):
                     result += "\x00"
-                elif 92 <= code <= 95:
-                    result += chr(code - 64)
-                elif code == 27:
+                elif ord("\\") <= code <= ord("_"):
+                    result += chr(code - _CTRL_TAKES_OFF_A_SYMBOL)
+                elif code == KeyCode.ESCAPE:
                     result += "\x1b"
                 else:
                     result += chr(code)
