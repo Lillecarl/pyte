@@ -1,5 +1,8 @@
 """
-Which group a test file belongs to, and why the groups exist.
+What every run of this suite shares: the group a file belongs to, and
+the examples a property test draws.
+
+# The groups
 
 The suite is one thing to a reader and two things to a build. Nearly
 every file here needs nothing but python. One needs an X server and the
@@ -27,10 +30,20 @@ source.
 
 `ptterm/tests/conftest.py` is the same file with a third group, for the
 suites that judge what a widget draws.
+
+# The profiles
+
+A property test with no seed is a different test every run. This one
+was: `test_a_size_change_keeps_every_line` failed about one run in
+eight, and a gate that is red by luck teaches everybody to run it
+again instead of to look. So there are two profiles and the gate takes
+the pinned one. Lillecarl/pymux#180.
 """
 import os
 import re
 from pathlib import Path
+
+from hypothesis import HealthCheck, settings
 
 #: The module that reads a colour with the real Xlib.
 XCMS_ORACLES = ("xlib_oracle",)
@@ -40,6 +53,51 @@ XCMS_ORACLES = ("xlib_oracle",)
 GROUP = os.environ.get("PYTE_GROUP", "")
 
 GROUPS = ("unit", "xcms")
+
+
+# ----------------------------------------------------------------------
+# The examples a property test draws.
+
+# The gate. `derandomize` seeds each property test from its own source,
+# so a run draws the examples the run before it drew, and a green gate
+# means the same thing twice.
+#
+# This is hypothesis's own `ci` profile, which it loads by itself when
+# it recognises the runner. A nix sandbox is not one it recognises, so
+# the profile is named and loaded here.
+settings.register_profile(
+    "pinned",
+    derandomize=True,
+    print_blob=True,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow],
+)
+
+# The hunt. Fresh examples, which is what finds the case nobody has
+# written down. `checks.pyte-roaming` runs it and is not a gate.
+#
+# `database=None` on purpose. A sandbox throws its `.hypothesis`
+# directory away, so a database there only pretends to remember. What
+# this suite remembers is the `@example` decorators on the property
+# tests, and those run under both profiles.
+settings.register_profile(
+    "roaming",
+    derandomize=False,
+    database=None,
+    print_blob=True,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow],
+)
+
+# **Here, and not in a fixture.** A `@settings(...)` decorator reads
+# the profile that is loaded when the decorator runs, which is when
+# pytest imports the test module. pytest imports a conftest before
+# that, and calls a fixture long after it.
+#
+# `--hypothesis-profile=roaming` picks the other one. pytest loads it
+# in `pytest_configure`, which is after this line and still before any
+# test module.
+settings.load_profile("pinned")
 
 
 def _imports(source: str, names) -> bool:
