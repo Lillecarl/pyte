@@ -866,6 +866,7 @@ def _encode_event(
     modify_other_keys: int = ModifyOtherKeys.OFF,
     application_keypad: bool = False,
     format_other_keys: int = FormatOtherKeys.TILDE,
+    backarrow_sends_backspace: bool = False,
 ) -> str:
     "Encode a key event for a pane with the given protocol flags."
     if application_keypad:
@@ -939,6 +940,12 @@ def _encode_event(
             # Lillecarl/pymux#174.
             prefix = "\x1b\x1b" if mods & Modifier.ALT else "\x1b"
             return prefix + BACK_TAB
+        if code == KeyCode.BACKSPACE and backarrow_sends_backspace:
+            # DECBKM: "Backarrow key sends backspace". Without it the
+            # key sends a delete, which is what a fresh pty reports as
+            # the erase character. Lillecarl/pymux#184.
+            prefix = "\x1b" if mods & Modifier.ALT else ""
+            return prefix + ("\x7f" if mods & Modifier.CTRL else "\x08")
         if text and not mods & (Modifier.CTRL | Modifier.ALT):
             # The reported text accounts for shift and the layout.
             return text
@@ -996,6 +1003,7 @@ def translate_key_data(
     modify_other_keys: int = ModifyOtherKeys.OFF,
     application_keypad: bool = False,
     format_other_keys: int = FormatOtherKeys.TILDE,
+    backarrow_sends_backspace: bool = False,
 ) -> str:
     """
     Translate raw key data into the encoding for a pane with the given
@@ -1044,6 +1052,7 @@ def translate_key_data(
                 modify_other_keys,
                 application_keypad,
                 format_other_keys,
+                backarrow_sends_backspace,
             )
         )
         if double and item.event == EventType.PRESS:

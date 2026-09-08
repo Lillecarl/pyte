@@ -387,7 +387,19 @@ class Screen:
             modify_other_keys=self.modify_other_keys,
             application_keypad=self.in_application_keypad,
             format_other_keys=self.format_other_keys,
+            backarrow_sends_backspace=self.backarrow_sends_backspace,
         )
+
+    @property
+    def backarrow_sends_backspace(self) -> bool:
+        """
+        DECBKM: the backarrow key sends a backspace, not a delete.
+
+        Off is the right default and the pty agrees: `stty` on a fresh
+        one reports "erase = ^?", which is the delete. A program that
+        wants the other one asks for it.
+        """
+        return PrivateMode.BACKARROW_IS_BACKSPACE.flag in self.mode
 
     @property
     def in_application_keypad(self) -> bool:
@@ -4232,7 +4244,13 @@ class Screen:
             PrivateMode.SLOW_SCROLL,
             PrivateMode.PRINT_FORM_FEED,
             PrivateMode.PRINT_EXTENT,
-            # These three name real behaviour. :todo: act on them.
+            # These two name real behaviour. :todo: act on them.
+            #
+            # The application keypad and DECBKM were here as well, and
+            # both are acted on now: `Screen.encode_key` reads them.
+            # They stay in the set because the set is what `report_mode`
+            # answers from, and a mode that is acted on is a mode a
+            # program may ask about.
             PrivateMode.HEBREW_KEYBOARD,
             PrivateMode.NATIONAL_CHARSETS,
             PrivateMode.APPLICATION_KEYPAD,

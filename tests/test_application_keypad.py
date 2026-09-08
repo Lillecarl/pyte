@@ -162,3 +162,68 @@ def test_a_reset_puts_the_keypad_back():
     stream.feed("\x1bc")
 
     assert not screen.in_application_keypad
+
+
+# ----------------------------------------------------------------------
+# DECBKM, which is the other keyboard mode on the same list.
+
+
+def test_the_backarrow_sends_a_delete_to_begin_with():
+    """
+    Which is what a pty reports as its erase character: `stty` on a
+    fresh one says "erase = ^?". A pane that sent the backspace would
+    be a pane where the key does not erase in bash, in python, or
+    anywhere else that reads a line.
+    """
+    screen, _ = a_screen()
+    assert not screen.backarrow_sends_backspace
+    assert screen.encode_key("\x7f") == "\x7f"
+
+
+def test_decbkm_makes_it_a_backspace():
+    "DECBKM, private mode 67. Lillecarl/pymux#184."
+    screen, stream = a_screen()
+
+    stream.feed("\x1b[?67h")
+
+    assert screen.backarrow_sends_backspace
+    assert screen.encode_key("\x7f") == "\x08"
+
+
+def test_ctrl_swaps_the_two_and_decbkm_swaps_them_again():
+    "kitty writes the first half of that, and xterm both."
+    screen, stream = a_screen()
+    assert screen.encode_key("\x1b[127;5u") == "\x08"
+
+    stream.feed("\x1b[?67h")
+
+    assert screen.encode_key("\x1b[127;5u") == "\x7f"
+
+
+def test_alt_still_puts_an_escape_in_front():
+    screen, stream = a_screen()
+    assert screen.encode_key("\x1b\x7f") == "\x1b\x7f"
+
+    stream.feed("\x1b[?67h")
+
+    assert screen.encode_key("\x1b\x7f") == "\x1b\x08"
+
+
+def test_resetting_decbkm_puts_the_delete_back():
+    screen, stream = a_screen()
+    stream.feed("\x1b[?67h")
+
+    stream.feed("\x1b[?67l")
+
+    assert screen.encode_key("\x7f") == "\x7f"
+
+
+def test_a_pane_that_asked_to_disambiguate_still_reads_it():
+    """
+    The backspace is one of the three keys that keep their legacy
+    bytes under that flag, and DECBKM says what those bytes are.
+    """
+    screen, stream = a_screen()
+    stream.feed("\x1b[?67h\x1b[>1u")
+
+    assert screen.encode_key("\x7f") == "\x08"
