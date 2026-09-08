@@ -15,6 +15,7 @@ import pytest
 from pyte.parameters import TitleMode
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte.sequences import Csi, csi
 
 #: "CSI > Ps t": set a title mode. "CSI > Ps T": take it away.
 SET = "\x1b[>%st"
@@ -25,8 +26,8 @@ TITLE = "\x1b]2;%s\x1b\\"
 ICON = "\x1b]1;%s\x1b\\"
 
 #: "CSI 21 t": report the window title. "CSI 20 t": the icon name.
-ASK_FOR_TITLE = "\x1b[21t"
-ASK_FOR_ICON = "\x1b[20t"
+ASK_FOR_TITLE = csi(Csi.XTWINOPS, 21)
+ASK_FOR_ICON = csi(Csi.XTWINOPS, 20)
 
 
 def make_screen():
@@ -96,7 +97,7 @@ def test_the_marker_is_what_makes_it_a_title_mode():
         resize_func=lambda lines, columns: asks.append((lines, columns)),
     )
     stream = Stream(screen)
-    stream.feed("\x1b[>4t")
+    stream.feed(csi(Csi.XTWINOPS, 4, private='>'))
     assert asks == []
     assert screen.titles.modes == set()
 
@@ -104,7 +105,7 @@ def test_the_marker_is_what_makes_it_a_title_mode():
 def test_a_plain_scroll_down_still_scrolls():
     screen, stream, _answers = make_screen()
     stream.feed("one\r\ntwo")
-    stream.feed("\x1b[1T")
+    stream.feed(csi(Csi.SD, 1))
     assert screen.data_buffer[1][0].char == "o"
 
 

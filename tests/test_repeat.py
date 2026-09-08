@@ -9,6 +9,8 @@ import pytest
 
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte import escape
+from pyte.sequences import Csi, csi
 
 LINES, COLUMNS = 5, 10
 
@@ -48,7 +50,7 @@ def test_a_repeat_of_zero_draws_one(pane):
 def test_a_repeat_before_anything_is_drawn_draws_nothing(pane):
     # There is no character to repeat, and a space would be a guess.
     screen, stream = pane
-    stream.feed("\x1b[5b")
+    stream.feed(csi(Csi.REP, 5))
     assert row(screen, 0) == " " * COLUMNS
     assert screen.reported_column == 0
 
@@ -69,9 +71,9 @@ def test_a_repeat_wraps_at_the_right_margin(pane):
 
 def test_a_repeat_scrolls_at_the_bottom_margin(pane):
     screen, stream = pane
-    stream.feed("\x1b[2;4r")  # A region from row 2 to 4.
+    stream.feed(csi(escape.DECSTBM, 2, 4))  # A region from row 2 to 4.
     stream.feed("\x1b[4;%iHa" % (COLUMNS - 2))
-    stream.feed("\x1b[3b")
+    stream.feed(csi(Csi.REP, 3))
     # The row that was full moved up, and the last repeat starts the
     # row below it.
     assert row(screen, 2) == " " * (COLUMNS - 3) + "aaa"

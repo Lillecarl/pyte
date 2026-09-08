@@ -19,12 +19,15 @@ import pytest
 from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte.colors import SgrColor
+from pyte import escape
+from pyte.modes import PrivateMode
+from pyte.sequences import Csi, csi, reset_mode, set_mode
 
 #: The three ways to save, and to bring back what was saved.
 PAIRS = [
     ("\x1b7", "\x1b8"),
-    ("\x1b[s", "\x1b[u"),
-    ("\x1b[?1048h", "\x1b[?1048l"),
+    (csi(Csi.DECSLRM), csi(Csi.KITTY_KEYBOARD)),
+    (set_mode(PrivateMode.SAVE_CURSOR), reset_mode(PrivateMode.SAVE_CURSOR)),
 ]
 
 
@@ -41,14 +44,14 @@ def _position(screen):
 @pytest.mark.parametrize("save, restore", PAIRS)
 def test_a_restore_brings_the_place_back(save, restore):
     screen, stream = _screen()
-    stream.feed("\x1b[3;5H" + save + "\x1b[1;1H" + restore)
+    stream.feed(csi(escape.CUP, 3, 5) + save + csi(escape.CUP, 1, 1) + restore)
     assert _position(screen) == (4, 2)
 
 
 @pytest.mark.parametrize("save, restore", PAIRS)
 def test_a_restore_brings_the_rendition_back(save, restore):
     screen, stream = _screen()
-    stream.feed("\x1b[31m" + save + "\x1b[0m" + restore + "x")
+    stream.feed(csi(escape.SGR, 31) + save + csi(escape.SGR, 0) + restore + "x")
     cell = screen.page.data_buffer[0][0]
     assert cell.appearance.rendition.color == SgrColor(index=1)
 
@@ -56,7 +59,7 @@ def test_a_restore_brings_the_rendition_back(save, restore):
 @pytest.mark.parametrize("save, restore", PAIRS)
 def test_a_restore_brings_the_mark_of_decsca_back(save, restore):
     screen, stream = _screen()
-    stream.feed('\x1b[1"q' + save + '\x1b[0"q' + restore)
+    stream.feed(csi(Csi.DECSCA, 1) + save + csi(Csi.DECSCA, 0) + restore)
     stream.feed("a\x1b[1;1;1;1${")
     assert screen.page.data_buffer[0][0].char == "a"
 
@@ -159,7 +162,7 @@ def test_the_mode_that_saves_the_cursor_puts_it_home():
     screen, stream = _screen(lines=4, columns=8)
     stream.feed("\x1b[2;3H\x1b[?1049h")
     assert (screen.pt_cursor_position.y, screen.pt_cursor_position.x) == (0, 0)
-    stream.feed("\x1b[?1049l")
+    stream.feed(reset_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR))
     assert (screen.pt_cursor_position.y, screen.pt_cursor_position.x) == (1, 2)
 
 
@@ -176,7 +179,7 @@ def test_a_reset_forgets_the_saved_cursor(save, restore):
     list and RIS did not, which is the wrong way round.
     """
     screen, stream = _screen()
-    stream.feed("\x1b[3;5H" + save + "\x1bc" + restore)
+    stream.feed(csi(escape.CUP, 3, 5) + save + "\x1bc" + restore)
     assert _position(screen) == (0, 0)
 
 
@@ -184,7 +187,7 @@ def test_a_reset_forgets_the_saved_cursor(save, restore):
 def test_a_soft_reset_forgets_it_too(save, restore):
     "DECSTR is the weaker reset, and it has always emptied the list."
     screen, stream = _screen()
-    stream.feed("\x1b[3;5H" + save + "\x1b[!p" + restore)
+    stream.feed(csi(escape.CUP, 3, 5) + save + csi(Csi.DECSTR) + restore)
     assert _position(screen) == (0, 0)
 
 

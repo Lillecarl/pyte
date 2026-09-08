@@ -5,6 +5,8 @@ stores.
 from pyte.screen import Screen
 from pyte.sixel import DEFAULT_PALETTE, decode_sixel
 from pyte.streams import Stream
+from pyte import escape
+from pyte.sequences import csi
 
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
@@ -244,11 +246,11 @@ def test_a_non_sixel_dcs_is_consumed():
 
 def test_a_sixel_image_scrolls_with_the_text():
     screen, stream, _ = make_screen()
-    stream.feed("\x1b[1;10r")  # Margins: rows 0..9.
-    stream.feed("\x1b[5;1H")
+    stream.feed(csi(escape.DECSTBM, 1, 10))  # Margins: rows 0..9.
+    stream.feed(csi(escape.CUP, 5, 1))
     stream.feed(sixel('"1;1;30;12' + DEFINE_RED + RED_ + "~"))
     assert screen.graphics.placements[0].y == 4
 
-    stream.feed("\x1b[10;1H")
+    stream.feed(csi(escape.CUP, 10, 1))
     stream.feed("\n")
     assert screen.graphics.placements[0].y == 3

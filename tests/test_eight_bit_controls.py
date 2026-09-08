@@ -22,6 +22,8 @@ import pytest
 from pyte.screen import Screen
 from pyte.terminfo import TERMINAL_VERSION
 from pyte.streams import Stream
+from pyte import escape
+from pyte.sequences import Csi, csi
 
 #: "ESC SP G", which turns eight bit controls on.
 S8C1T = "\x1b G"
@@ -101,20 +103,20 @@ def test_decscl_asks_for_eight_bit_controls(parameter):
 def test_decscl_asks_for_seven_bit_controls():
     "1 is the DEC factory default."
     screen, stream, _answers = make_screen()
-    stream.feed(S8C1T + '\x1b[62;1"p')
+    stream.feed(S8C1T + csi(Csi.DECSCL, 62, 1))
     assert screen.seven_bit_controls is True
 
 
 def test_level_one_ignores_the_second_parameter():
     "ctlseqs.txt says the parameter is ignored in conformance level 1."
     screen, stream, _answers = make_screen()
-    stream.feed('\x1b[61;0"p')
+    stream.feed(csi(Csi.DECSCL, 61, 0))
     assert screen.seven_bit_controls is True
 
 
 def test_decscl_with_no_second_parameter_changes_nothing():
     screen, stream, _answers = make_screen()
-    stream.feed(S8C1T + '\x1b[62"p')
+    stream.feed(S8C1T + csi(Csi.DECSCL, 62))
     assert screen.seven_bit_controls is False
 
 
@@ -130,16 +132,16 @@ def test_decrqss_reports_the_form_that_is_on():
 
 def test_a_control_sequence_carries_one_byte():
     'DSR ("CSI 5 n"), which is what libvterm asks.'
-    assert answered(S8C1T + "\x1b[5n") == b"\x9b0n"
+    assert answered(S8C1T + csi(escape.DSR, 5)) == b"\x9b0n"
 
 
 def test_a_control_sequence_stays_two_bytes_without_the_mode():
-    assert answered("\x1b[5n") == b"\x1b[0n"
+    assert answered(csi(escape.DSR, 5)) == b"\x1b[0n"
 
 
 def test_a_device_control_string_carries_two_bytes():
     "DCS opens it and ST closes it, and both are C1 controls."
-    answer = answered(S8C1T + "\x1b[>q")
+    answer = answered(S8C1T + csi(Csi.XTVERSION, private='>'))
     assert answer == b"\x90>|" + TERMINAL_VERSION.encode("utf-8") + b"\x9c"
 
 
@@ -153,7 +155,7 @@ def test_the_answer_of_a_table_carries_one_byte():
     `_DEVICE_STATUS_ANSWERS` is a table of literals, and it holds the
     body of each answer without the control in front of it.
     """
-    assert answered(S8C1T + "\x1b[?15n") == b"\x9b?13n"
+    assert answered(S8C1T + csi(escape.DSR, 15, private='?')) == b"\x9b?13n"
 
 
 def test_the_position_report_carries_one_byte():
@@ -161,7 +163,7 @@ def test_the_position_report_carries_one_byte():
 
 
 def test_the_device_attributes_carry_one_byte():
-    assert answered(S8C1T + "\x1b[>c") == b"\x9b>64;383;0c"
+    assert answered(S8C1T + csi(escape.DA, private='>')) == b"\x9b>64;383;0c"
 
 
 # ----------------------------------------------------------------------
@@ -174,6 +176,6 @@ def test_the_byte_is_one_byte_and_not_two():
     surrogate is what keeps it one.
     """
     _screen, stream, answers = make_screen()
-    stream.feed(S8C1T + "\x1b[5n")
+    stream.feed(S8C1T + csi(escape.DSR, 5))
     assert len(wire(answers)) == 3
     assert "".join(answers).encode("utf-8", "replace") != b"\x9b0n"

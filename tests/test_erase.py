@@ -8,6 +8,8 @@ from pyte.colors import SgrColor
 from pyte.cells import WrittenCell
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte import escape
+from pyte.sequences import csi
 
 
 def _screen(lines=5, columns=20):
@@ -163,12 +165,12 @@ def _line(screen, y):
 def test_erasing_the_history_leaves_the_screen():
     screen, stream = _screen(lines=3)
     stream.feed("one\r\ntwo\r\nthree\r\nfour")
-    stream.feed("\x1b[3J")
+    stream.feed(csi(escape.ED, 3))
     assert [_line(screen, row) for row in range(3)] == ["two", "three", "four"]
 
 
 def test_erasing_the_history_takes_the_lines_above_the_screen():
     screen, stream = _screen(lines=3)
     stream.feed("one\r\ntwo\r\nthree\r\nfour")
-    stream.feed("\x1b[3J")
+    stream.feed(csi(escape.ED, 3))
     assert min(screen.data_buffer) >= screen.line_offset

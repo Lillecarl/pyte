@@ -13,6 +13,7 @@ ask goes nowhere.
 from pyte.images import ASSUMED_CELL_HEIGHT, ASSUMED_CELL_WIDTH
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte.sequences import Csi, csi
 
 
 def _screen(lines=24, columns=80):
@@ -29,7 +30,7 @@ def _screen(lines=24, columns=80):
 
 def test_a_page_length_asks_for_lines_and_leaves_the_columns():
     _screen_, stream, asks = _screen()
-    stream.feed("\x1b[27t")
+    stream.feed(csi(Csi.XTWINOPS, 27))
     assert asks == [(27, None)]
 
 
@@ -40,26 +41,26 @@ def test_the_lowest_page_length_is_twenty_four():
     23 pops a title, and must not ask for a page of 23 lines.
     """
     _screen_, stream, asks = _screen()
-    stream.feed("\x1b[23t")
+    stream.feed(csi(Csi.XTWINOPS, 23))
     assert asks == []
 
 
 def test_a_resize_in_cells_asks_for_both():
     _screen_, stream, asks = _screen()
-    stream.feed("\x1b[8;30;100t")
+    stream.feed(csi(Csi.XTWINOPS, 8, 30, 100))
     assert asks == [(30, 100)]
 
 
 def test_a_zero_asks_for_as_much_as_there_is():
     "The embedder cuts it down to what it really has."
     screen, stream, asks = _screen()
-    stream.feed("\x1b[8;0;100t")
+    stream.feed(csi(Csi.XTWINOPS, 8, 0, 100))
     assert asks == [(screen.MAX_LINES, 100)]
 
 
 def test_a_number_that_is_not_there_leaves_that_side_alone():
     _screen_, stream, asks = _screen()
-    stream.feed("\x1b[8;30t")
+    stream.feed(csi(Csi.XTWINOPS, 8, 30))
     assert asks == [(30, None)]
 
 
@@ -74,7 +75,7 @@ def test_a_resize_in_pixels_counts_them_in_cells():
 def test_a_resize_in_pixels_keeps_at_least_one_cell():
     "Fewer pixels than one cell still leaves a pane to draw in."
     _screen_, stream, asks = _screen()
-    stream.feed("\x1b[4;1;1t")
+    stream.feed(csi(Csi.XTWINOPS, 4, 1, 1))
     assert asks == [(1, 1)]
 
 
@@ -88,7 +89,7 @@ def test_a_pane_with_no_embedder_changes_nothing():
 def test_a_report_is_not_a_resize():
     "18 asks how big the pane is, and 8 asks it to become that big."
     _screen_, stream, asks = _screen()
-    stream.feed("\x1b[18t")
+    stream.feed(csi(Csi.XTWINOPS, 18))
     assert asks == []
 
 
@@ -108,11 +109,11 @@ def test_the_room_in_cells_is_the_size_of_the_pane():
     # A window stands on a display and can grow into it. A pane stands
     # on no display: it draws where the embedder puts it and cannot
     # take more, so the room it has is the room it fills.
-    assert _answers("\x1b[19t") == ["\x1b[9;25;80t"]
+    assert _answers(csi(Csi.XTWINOPS, 19)) == ["\x1b[9;25;80t"]
 
 
 def test_the_room_in_pixels_is_the_size_of_the_pane():
-    assert _answers("\x1b[15t") == [
+    assert _answers(csi(Csi.XTWINOPS, 15)) == [
         "\x1b[5;%i;%it" % (25 * ASSUMED_CELL_HEIGHT, 80 * ASSUMED_CELL_WIDTH)
     ]
 
@@ -121,8 +122,8 @@ def test_the_room_and_the_text_area_agree():
     # 18 reports the text area and 19 the room around it. They are the
     # same for a pane, and a program that compares them reads that it
     # is already as large as it can be.
-    room = _answers("\x1b[19t")[0].removeprefix("\x1b[9;")
-    area = _answers("\x1b[18t")[0].removeprefix("\x1b[8;")
+    room = _answers(csi(Csi.XTWINOPS, 19))[0].removeprefix("\x1b[9;")
+    area = _answers(csi(Csi.XTWINOPS, 18))[0].removeprefix("\x1b[8;")
     assert room == area
 
 

@@ -7,6 +7,7 @@ title of its own. A pane has both, so it answers all four.
 """
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte.sequences import Csi, csi
 
 
 def _screen(lines=5, columns=10):
@@ -27,14 +28,14 @@ def _titles(stream, window, icon):
 def test_the_window_title_is_reported():
     _screen_, stream, answers = _screen()
     stream.feed("\x1b]2;a window\x1b\\")
-    stream.feed("\x1b[21t")
+    stream.feed(csi(Csi.XTWINOPS, 21))
     assert answers == ["\x1b]la window\x1b\\"]
 
 
 def test_the_icon_label_is_reported():
     _screen_, stream, answers = _screen()
     stream.feed("\x1b]1;an icon\x1b\\")
-    stream.feed("\x1b[20t")
+    stream.feed(csi(Csi.XTWINOPS, 20))
     assert answers == ["\x1b]Lan icon\x1b\\"]
 
 
@@ -59,27 +60,27 @@ def test_one_sequence_sets_both():
 def test_a_push_and_a_pop_bring_both_titles_back():
     screen, stream, _answers = _screen()
     _titles(stream, "window", "icon")
-    stream.feed("\x1b[22;0t")
+    stream.feed(csi(Csi.XTWINOPS, 22, 0))
     _titles(stream, "x", "x")
-    stream.feed("\x1b[23;0t")
+    stream.feed(csi(Csi.XTWINOPS, 23, 0))
     assert (screen.titles.window, screen.titles.icon) == ("window", "icon")
 
 
 def test_a_pop_of_the_icon_leaves_the_window_title():
     screen, stream, _answers = _screen()
     _titles(stream, "window", "icon")
-    stream.feed("\x1b[22;0t")
+    stream.feed(csi(Csi.XTWINOPS, 22, 0))
     _titles(stream, "x", "x")
-    stream.feed("\x1b[23;1t")
+    stream.feed(csi(Csi.XTWINOPS, 23, 1))
     assert (screen.titles.window, screen.titles.icon) == ("x", "icon")
 
 
 def test_a_pop_of_the_window_title_leaves_the_icon():
     screen, stream, _answers = _screen()
     _titles(stream, "window", "icon")
-    stream.feed("\x1b[22;0t")
+    stream.feed(csi(Csi.XTWINOPS, 22, 0))
     _titles(stream, "x", "x")
-    stream.feed("\x1b[23;2t")
+    stream.feed(csi(Csi.XTWINOPS, 23, 2))
     assert (screen.titles.window, screen.titles.icon) == ("window", "x")
 
 
@@ -92,7 +93,7 @@ def test_a_pop_takes_one_entry_off_whichever_title_it_names():
     """
     screen, stream, _answers = _screen()
     _titles(stream, "window", "icon")
-    stream.feed("\x1b[22;0t")
+    stream.feed(csi(Csi.XTWINOPS, 22, 0))
     _titles(stream, "x", "x")
     stream.feed("\x1b[23;1t\x1b[23;2t")
     assert (screen.titles.window, screen.titles.icon) == ("x", "icon")
@@ -101,9 +102,9 @@ def test_a_pop_takes_one_entry_off_whichever_title_it_names():
 def test_a_push_remembers_both_titles_whichever_it_names():
     screen, stream, _answers = _screen()
     _titles(stream, "window", "icon")
-    stream.feed("\x1b[22;1t")  # The icon label alone.
+    stream.feed(csi(Csi.XTWINOPS, 22, 1))  # The icon label alone.
     _titles(stream, "y", "z")
-    stream.feed("\x1b[23;0t")
+    stream.feed(csi(Csi.XTWINOPS, 23, 0))
     assert (screen.titles.window, screen.titles.icon) == ("window", "icon")
 
 
@@ -113,25 +114,25 @@ def test_two_pushes_come_back_in_order():
     stream.feed("\x1b]1;second\x1b\\\x1b[22;1t")
     stream.feed("\x1b]1;now\x1b\\")
 
-    stream.feed("\x1b[23;1t")
+    stream.feed(csi(Csi.XTWINOPS, 23, 1))
     assert screen.titles.icon == "second"
-    stream.feed("\x1b[23;1t")
+    stream.feed(csi(Csi.XTWINOPS, 23, 1))
     assert screen.titles.icon == "first"
 
 
 def test_a_pop_of_an_empty_stack_changes_nothing():
     screen, stream, _answers = _screen()
     _titles(stream, "window", "icon")
-    stream.feed("\x1b[23;0t")
+    stream.feed(csi(Csi.XTWINOPS, 23, 0))
     assert (screen.titles.window, screen.titles.icon) == ("window", "icon")
 
 
 def test_a_pop_without_a_parameter_brings_both_back():
     screen, stream, _answers = _screen()
     _titles(stream, "window", "icon")
-    stream.feed("\x1b[22t")
+    stream.feed(csi(Csi.XTWINOPS, 22))
     _titles(stream, "x", "x")
-    stream.feed("\x1b[23t")
+    stream.feed(csi(Csi.XTWINOPS, 23))
     assert (screen.titles.window, screen.titles.icon) == ("window", "icon")
 
 
@@ -142,13 +143,13 @@ def test_the_stack_does_not_grow_without_end():
         stream.feed("\x1b]1;%i\x1b\\\x1b[22;1t" % number)
     assert len(screen.titles.stack) == screen.titles.STACK_LIMIT
 
-    stream.feed("\x1b[23;1t")
+    stream.feed(csi(Csi.XTWINOPS, 23, 1))
     assert screen.titles.icon == "49"
 
 
 def test_a_reset_empties_the_stack():
     screen, stream, _answers = _screen()
     _titles(stream, "window", "icon")
-    stream.feed("\x1b[22;0t")
+    stream.feed(csi(Csi.XTWINOPS, 22, 0))
     stream.feed("\x1bc")  # RIS.
     assert screen.titles.stack == []

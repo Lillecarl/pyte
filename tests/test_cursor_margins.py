@@ -7,6 +7,8 @@ else turns a move up into a move down, which is what pyte did.
 """
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte import escape
+from pyte.sequences import csi
 
 
 def _screen(lines=5, columns=8):
@@ -58,7 +60,7 @@ def test_a_move_down_inside_the_region_stops_at_the_bottom_margin():
 
 def test_a_move_down_without_margins_stops_at_the_bottom():
     screen, stream = _screen()
-    stream.feed("\x1b[9B")
+    stream.feed(csi(escape.CUD, 9))
     assert _row(screen) == 4
 
 

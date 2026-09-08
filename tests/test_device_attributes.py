@@ -15,6 +15,8 @@ from pyte.terminfo import (
     DeviceExtension,
 )
 from pyte.streams import Stream
+from pyte import escape
+from pyte.sequences import csi
 
 
 @pytest.fixture
@@ -28,7 +30,7 @@ def pane():
 # The two questions.
 
 
-@pytest.mark.parametrize("sequence", ["\x1b[c", "\x1b[0c"])
+@pytest.mark.parametrize("sequence", [csi(escape.DA), csi(escape.DA, 0)])
 def test_da_answers_the_level_and_the_extensions(pane, sequence):
     _screen, stream, responses = pane
     stream.feed(sequence)
@@ -73,7 +75,7 @@ def test_da_names_nothing_that_a_pane_cannot_do(pane):
 
 def test_a_da_with_a_parameter_that_is_not_zero_is_ignored(pane):
     _screen, stream, responses = pane
-    stream.feed("\x1b[1c")
+    stream.feed(csi(escape.DA, 1))
     assert responses == []
 
 
@@ -91,6 +93,6 @@ def test_decid_answers_the_way_da_answers(pane):
     stream.feed("\x1bZ")
     first = responses[:]
     responses.clear()
-    stream.feed("\x1b[c")
+    stream.feed(csi(escape.DA))
     assert first == responses
     assert first[0].startswith("\x1b[?")

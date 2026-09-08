@@ -11,8 +11,10 @@ unchanged.
 """
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte.modes import PrivateMode
+from pyte.sequences import reset_mode, set_mode
 
-MORE_FIX = "\x1b[?41h"
+MORE_FIX = set_mode(PrivateMode.MORE_FIX)
 
 
 def make_screen(lines=4, columns=16):
@@ -56,7 +58,7 @@ def test_the_mode_leaves_a_tab_that_is_not_at_the_edge_alone():
 
 def test_a_reset_of_the_mode_brings_the_old_tab_back():
     screen, stream = make_screen()
-    stream.feed(MORE_FIX + "\x1b[?41l")
+    stream.feed(MORE_FIX + reset_mode(PrivateMode.MORE_FIX))
     fill_the_row_and_tab(stream)
     assert screen.pt_cursor_position.y == 0
     assert screen.pt_cursor_position.x == 16
@@ -65,7 +67,7 @@ def test_a_reset_of_the_mode_brings_the_old_tab_back():
 def test_the_row_the_tab_left_counts_as_wrapped():
     "A backspace with reverse wraparound on steps back over it."
     screen, stream = make_screen()
-    stream.feed(MORE_FIX + "\x1b[?45h")
+    stream.feed(MORE_FIX + set_mode(PrivateMode.REVERSE_WRAP))
     fill_the_row_and_tab(stream)
     stream.feed("\x1b[1G\x08")
     assert screen.pt_cursor_position.y == 0

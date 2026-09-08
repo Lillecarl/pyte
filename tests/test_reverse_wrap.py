@@ -18,14 +18,17 @@ import pytest
 
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte import escape
+from pyte.modes import PrivateMode
+from pyte.sequences import csi, set_mode
 
 #: A screen small enough to read, and wide enough to wrap on purpose.
 LINES, COLUMNS = 6, 10
 
 #: The sequences under test, so a test names the mode and not a number.
-AUTOWRAP = "\x1b[?7h"
-INLINE = "\x1b[?45h"
-ANYWHERE = "\x1b[?1045h"
+AUTOWRAP = set_mode(PrivateMode.AUTOWRAP)
+INLINE = set_mode(PrivateMode.REVERSE_WRAP)
+ANYWHERE = set_mode(PrivateMode.REVERSE_WRAP_ANYWHERE)
 BACKSPACE = "\x08"
 
 
@@ -48,7 +51,7 @@ def _any_row_is_wrapped(screen) -> bool:
 
 def test_a_backspace_in_the_first_column_stays_there(pane):
     screen, stream = pane
-    stream.feed(AUTOWRAP + "\x1b[3;1H" + BACKSPACE)
+    stream.feed(AUTOWRAP + csi(escape.CUP, 3, 1) + BACKSPACE)
     assert at(screen) == (0, 2)
 
 
@@ -65,13 +68,13 @@ def test_a_backspace_needs_autowrap_to_go_back(pane):
 
 def test_the_wider_mode_goes_back_over_a_line_that_did_not_wrap(pane):
     screen, stream = pane
-    stream.feed(AUTOWRAP + ANYWHERE + "\x1b[3;1H" + BACKSPACE)
+    stream.feed(AUTOWRAP + ANYWHERE + csi(escape.CUP, 3, 1) + BACKSPACE)
     assert at(screen) == (COLUMNS - 1, 1)
 
 
 def test_the_wider_mode_goes_from_the_first_row_to_the_last(pane):
     screen, stream = pane
-    stream.feed(AUTOWRAP + ANYWHERE + "\x1b[1;1H" + BACKSPACE)
+    stream.feed(AUTOWRAP + ANYWHERE + csi(escape.CUP, 1, 1) + BACKSPACE)
     assert at(screen) == (COLUMNS - 1, LINES - 1)
 
 
@@ -86,7 +89,7 @@ def test_the_wider_mode_stays_inside_the_scrolling_region(pane):
 def test_the_wider_mode_lands_on_the_right_margin(pane):
     screen, stream = pane
     stream.feed(AUTOWRAP + ANYWHERE + "\x1b[?69h" + "\x1b[3;6s")
-    stream.feed("\x1b[3;3H" + BACKSPACE)
+    stream.feed(csi(escape.CUP, 3, 3) + BACKSPACE)
     assert at(screen) == (5, 1)
 
 
@@ -98,14 +101,14 @@ def test_the_inline_mode_stays_after_a_line_feed(pane):
     # "ESC E" moves to the next line without wrapping, so the line
     # below was not reached by typing and the backspace stops.
     screen, stream = pane
-    stream.feed(AUTOWRAP + INLINE + "\x1b[1;1H" + "\x1bE" + BACKSPACE)
+    stream.feed(AUTOWRAP + INLINE + csi(escape.CUP, 1, 1) + "\x1bE" + BACKSPACE)
     assert at(screen) == (0, 1)
 
 
 def test_the_inline_mode_goes_back_over_a_line_that_wrapped(pane):
     screen, stream = pane
     # Eleven characters on a screen ten wide: the eleventh wraps.
-    stream.feed(AUTOWRAP + INLINE + "\x1b[1;1H" + "a" * (COLUMNS + 1))
+    stream.feed(AUTOWRAP + INLINE + csi(escape.CUP, 1, 1) + "a" * (COLUMNS + 1))
     assert at(screen) == (1, 1)
     stream.feed(BACKSPACE + BACKSPACE)
     assert at(screen) == (COLUMNS - 1, 0)
@@ -116,11 +119,11 @@ def test_erasing_the_screen_forgets_that_a_line_wrapped(pane):
     # on it. Erase the text and the note has to go, or a backspace
     # walks back over a line the typing never reached.
     screen, stream = pane
-    stream.feed(AUTOWRAP + INLINE + "\x1b[1;1H" + "a" * (COLUMNS * 2))
+    stream.feed(AUTOWRAP + INLINE + csi(escape.CUP, 1, 1) + "a" * (COLUMNS * 2))
     assert _any_row_is_wrapped(screen)
-    stream.feed("\x1b[2J")
+    stream.feed(csi(escape.ED, 2))
     assert not _any_row_is_wrapped(screen)
-    stream.feed("\x1b[3;3H" + BACKSPACE * 4)
+    stream.feed(csi(escape.CUP, 3, 3) + BACKSPACE * 4)
     assert at(screen) == (0, 2)
 
 
@@ -128,7 +131,7 @@ def test_the_inline_mode_stops_where_the_typing_began(pane):
     # Two wrapped rows, then more backspaces than there are columns.
     # The cursor walks back to where the typing started and stops.
     screen, stream = pane
-    stream.feed(AUTOWRAP + INLINE + "\x1b[2;1H" + "a" * (COLUMNS * 2 + 1))
+    stream.feed(AUTOWRAP + INLINE + csi(escape.CUP, 2, 1) + "a" * (COLUMNS * 2 + 1))
     stream.feed(BACKSPACE * (COLUMNS * 4))
     assert at(screen) == (0, 1)
 

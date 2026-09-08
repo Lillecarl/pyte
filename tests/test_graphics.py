@@ -6,6 +6,9 @@ import zlib
 
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte import escape
+from pyte.modes import PrivateMode
+from pyte.sequences import csi, reset_mode, set_mode
 
 
 def make_screen():
@@ -230,7 +233,7 @@ def test_clear_screen_removes_placements():
     encoded = base64.b64encode(data).decode()
     stream.feed(apc("a=t,f=24,s=4,v=2,i=26", encoded))
     stream.feed(apc("a=p,i=26,c=1,r=1"))
-    stream.feed("\x1b[2J")
+    stream.feed(csi(escape.ED, 2))
     assert screen.graphics.placements == []
     assert 26 in screen.graphics.images_by_id
 
@@ -251,12 +254,12 @@ def test_alternate_screen_has_independent_graphics():
     encoded = base64.b64encode(data).decode()
     stream.feed(apc("a=t,f=24,s=4,v=2,i=28", encoded))
     stream.feed(apc("a=p,i=28,c=1,r=1"))
-    stream.feed("\x1b[?1049h")
+    stream.feed(set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR))
     # Fresh state on the alternate screen.
     assert screen.graphics.images_by_id == {}
     assert screen.graphics.placements == []
     # And the main screen state is restored when leaving.
-    stream.feed("\x1b[?1049l")
+    stream.feed(reset_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR))
     assert 28 in screen.graphics.images_by_id
     assert len(screen.graphics.placements) == 1
 
@@ -304,49 +307,49 @@ def test_plain_scrolling_keeps_placement_rows():
 
 def test_scroll_region_moves_placements_up():
     screen, stream, _ = make_screen()
-    stream.feed("\x1b[1;10r")  # Margins: rows 0..9.
-    stream.feed("\x1b[5;1H")  # Row 4.
+    stream.feed(csi(escape.DECSTBM, 1, 10))  # Margins: rows 0..9.
+    stream.feed(csi(escape.CUP, 5, 1))  # Row 4.
     place(screen, stream, 1)
-    stream.feed("\x1b[10;1H")  # Bottom margin; the next linefeed scrolls.
+    stream.feed(csi(escape.CUP, 10, 1))  # Bottom margin; the next linefeed scrolls.
     stream.feed("\n")
     assert placement_rows(screen) == [(1, 3)]
 
 
 def test_placement_scrolled_out_of_the_region_is_dropped():
     screen, stream, _ = make_screen()
-    stream.feed("\x1b[1;10r")
-    stream.feed("\x1b[1;1H")  # Top of the region.
+    stream.feed(csi(escape.DECSTBM, 1, 10))
+    stream.feed(csi(escape.CUP, 1, 1))  # Top of the region.
     place(screen, stream, 1)
-    stream.feed("\x1b[10;1H")
+    stream.feed(csi(escape.CUP, 10, 1))
     stream.feed("\n")
     assert placement_rows(screen) == []
 
 
 def test_reverse_index_moves_placements_down():
     screen, stream, _ = make_screen()
-    stream.feed("\x1b[1;10r")
-    stream.feed("\x1b[5;1H")
+    stream.feed(csi(escape.DECSTBM, 1, 10))
+    stream.feed(csi(escape.CUP, 5, 1))
     place(screen, stream, 1)
-    stream.feed("\x1b[1;1H")  # Top of the region.
+    stream.feed(csi(escape.CUP, 1, 1))  # Top of the region.
     stream.feed("\x1bM")  # Reverse index: the region scrolls down.
     assert placement_rows(screen) == [(1, 5)]
 
 
 def test_delete_lines_moves_placements_up():
     screen, stream, _ = make_screen()
-    stream.feed("\x1b[6;1H")  # Row 5.
+    stream.feed(csi(escape.CUP, 6, 1))  # Row 5.
     place(screen, stream, 1)
-    stream.feed("\x1b[3;1H")  # Row 2.
-    stream.feed("\x1b[2M")  # Delete two lines.
+    stream.feed(csi(escape.CUP, 3, 1))  # Row 2.
+    stream.feed(csi(escape.DL, 2))  # Delete two lines.
     assert placement_rows(screen) == [(1, 3)]
 
 
 def test_insert_lines_moves_placements_down():
     screen, stream, _ = make_screen()
-    stream.feed("\x1b[6;1H")
+    stream.feed(csi(escape.CUP, 6, 1))
     place(screen, stream, 1)
-    stream.feed("\x1b[3;1H")
-    stream.feed("\x1b[2L")  # Insert two lines.
+    stream.feed(csi(escape.CUP, 3, 1))
+    stream.feed(csi(escape.IL, 2))  # Insert two lines.
     assert placement_rows(screen) == [(1, 7)]
 
 
@@ -354,10 +357,10 @@ def test_a_torn_placement_is_dropped():
     # A placement that crosses the edge of the scrolling region cannot
     # move as a whole. It goes away instead of being torn.
     screen, stream, _ = make_screen()
-    stream.feed("\x1b[5;1H")  # Row 4.
+    stream.feed(csi(escape.CUP, 5, 1))  # Row 4.
     place(screen, stream, 1, rows=4)  # Rows 4..7.
-    stream.feed("\x1b[7;10r")  # Margins: rows 6..9.
-    stream.feed("\x1b[10;1H")
+    stream.feed(csi(escape.DECSTBM, 7, 10))  # Margins: rows 6..9.
+    stream.feed(csi(escape.CUP, 10, 1))
     stream.feed("\n")
     assert placement_rows(screen) == []
 
@@ -365,7 +368,7 @@ def test_a_torn_placement_is_dropped():
 def test_erase_saved_lines_removes_placements():
     screen, stream, _ = make_screen()
     place(screen, stream, 1)
-    stream.feed("\x1b[3J")
+    stream.feed(csi(escape.ED, 3))
     assert placement_rows(screen) == []
 
 
@@ -373,7 +376,7 @@ def test_history_trimming_drops_old_placements():
     screen, stream, _ = make_screen()
     place(screen, stream, 1)
     screen.get_history_limit = lambda: 10
-    stream.feed("\x1b[100;1H")
+    stream.feed(csi(escape.CUP, 100, 1))
     screen._remove_old_lines_from_history()
     assert placement_rows(screen) == []
 

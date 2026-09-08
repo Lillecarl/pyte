@@ -24,6 +24,8 @@ from hypothesis import strategies as st
 from pyte.screen import Screen
 from pyte.streams import Stream
 from test_row_versions import a_chunk
+from pyte.modes import PrivateMode
+from pyte.sequences import Csi, csi, reset_mode, set_mode
 
 #: How deep the history goes in this file. It is tiny so that a prune
 #: happens over and over in a short run, where two thousand rows would
@@ -135,9 +137,9 @@ def test_the_other_page_has_a_floor_of_its_own():
     deep = screen.history_floor
     assert deep > 0
 
-    stream.feed("\x1b[?1049h")
+    stream.feed(set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR))
     assert screen.history_floor == 0
-    stream.feed("\x1b[?1049l")
+    stream.feed(reset_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR))
     assert screen.history_floor == deep
 
 
@@ -157,11 +159,11 @@ def test_unscroll_brings_the_floor_down_with_the_screen():
     screen._remove_old_lines_from_history()
     assert screen.history_floor > 0
 
-    stream.feed("\x1b[1 D")
+    stream.feed(csi(Csi.KITTY_UNSCROLL, 1))
     assert screen.history_floor <= screen.line_offset
 
     # The row at the new top of the screen is written on, and it is not
     # under the floor.
-    stream.feed("\x1b[0;0;0;0$z")
+    stream.feed(csi(Csi.DECERA, 0, 0, 0, 0))
     buffer = screen.page.data_buffer
     assert min(buffer) >= screen.history_floor

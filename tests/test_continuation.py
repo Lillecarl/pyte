@@ -14,6 +14,9 @@ through a resize. Lillecarl/pymux#58.
 """
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte import escape
+from pyte.modes import PrivateMode
+from pyte.sequences import Csi, csi, set_mode
 
 COLUMNS = 8
 
@@ -76,7 +79,7 @@ def test_erasing_the_display_to_the_end_ends_every_wrap():
 
 
 def test_erasing_the_whole_display_ends_every_wrap():
-    screen = _screen("a" * 20 + "\x1b[2J")
+    screen = _screen("a" * 20 + csi(escape.ED, 2))
     assert not _any_row_is_wrapped(screen)
 
 
@@ -117,7 +120,7 @@ def test_a_rectangle_erase_leaves_the_marks():
     can leave a row that holds nothing and still says it continues the
     row above. Lillecarl/pymux#142.
     """
-    screen = _screen("a" * 20 + "\x1b[0;0;0;0$z")
+    screen = _screen("a" * 20 + csi(Csi.DECERA, 0, 0, 0, 0))
     assert _continues(screen, 1)
     assert _continues(screen, 2)
 
@@ -144,7 +147,7 @@ def test_a_scroll_down_ends_the_wrap_under_the_blank_row():
     second reading, and a blank line appeared out of nothing.
     Lillecarl/pymux#179.
     """
-    screen = _screen("a" * 32 + "\x1b[2;4r" + "\x1b[T")
+    screen = _screen("a" * 32 + csi(escape.DECSTBM, 2, 4) + csi(Csi.SD))
 
     assert _continues(screen, 1) is False
     assert not _continues(screen, 2)
@@ -157,7 +160,7 @@ def test_a_scroll_up_ends_the_wrap_under_the_blank_row():
     row under the region is the one that continued a line the scroll
     took away.
     """
-    screen = _screen("a" * 32 + "\x1b[2;3r" + "\x1b[3;1H\x1b[S")
+    screen = _screen("a" * 32 + csi(escape.DECSTBM, 2, 3) + "\x1b[3;1H\x1b[S")
 
     assert _continues(screen, 1)
     assert not _continues(screen, 3)
@@ -176,7 +179,7 @@ def test_a_scroll_that_moves_a_whole_line_keeps_the_mark():
     The rows of one line move together, so nothing about them
     changed. Only the row that lands under a blank one loses its mark.
     """
-    screen = _screen("a" * 20 + "\x1b[T")
+    screen = _screen("a" * 20 + csi(Csi.SD))
 
     assert not _continues(screen, 1)
     assert _continues(screen, 2)
@@ -197,5 +200,5 @@ def test_the_alternate_screen_gives_the_mark_back():
 
 
 def test_the_alternate_screen_starts_with_no_mark():
-    screen = _screen("a" * 12 + "\x1b[?1049h")
+    screen = _screen("a" * 12 + set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR))
     assert not _any_row_is_wrapped(screen)

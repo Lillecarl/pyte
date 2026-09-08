@@ -11,6 +11,7 @@ programs that came before DECSCA.
 """
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte.sequences import Csi, csi
 
 
 def _screen(lines=4, columns=10):
@@ -157,7 +158,7 @@ def test_a_soft_reset_takes_the_mark_off_what_comes_next():
 def test_the_mark_is_reported():
     _screen_, stream, answers = _screen()
     stream.feed('\x1bP$q"q\x1b\\')
-    stream.feed('\x1b[1"q')
+    stream.feed(csi(Csi.DECSCA, 1))
     stream.feed('\x1bP$q"q\x1b\\')
     assert answers == ['\x1bP1$r0"q\x1b\\', '\x1bP1$r1"q\x1b\\']
 

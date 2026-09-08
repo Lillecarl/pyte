@@ -10,6 +10,7 @@ import re
 
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte.sequences import Csi, csi
 
 
 def make_screen(lines=24, columns=80):
@@ -41,7 +42,7 @@ def test_one_cell():
 def test_a_rectangle_sums_its_cells():
     screen, stream, responses = make_screen()
     stream.feed("abc")
-    identifier, total = checksum(stream, responses, "\x1b[1;0;1;1;1;3*y")
+    identifier, total = checksum(stream, responses, csi(Csi.DECRQCRA, 1, 0, 1, 1, 1, 3))
     assert (identifier, total) == (1, ord("a") + ord("b") + ord("c"))
 
 
@@ -64,7 +65,7 @@ def test_the_rectangle_is_clamped_to_the_screen():
 def test_the_default_is_the_whole_screen():
     screen, stream, responses = make_screen(lines=2, columns=3)
     stream.feed("ab")
-    identifier, total = checksum(stream, responses, "\x1b[1;0*y")
+    identifier, total = checksum(stream, responses, csi(Csi.DECRQCRA, 1, 0))
     assert total == ord("a") + ord("b") + 4 * ord(" ")
 
 
@@ -73,7 +74,7 @@ def test_it_reads_the_lines_the_user_sees():
     # the first line of the screen.
     screen, stream, responses = make_screen(lines=2, columns=4)
     stream.feed("a\r\nb\r\nc")
-    identifier, total = checksum(stream, responses, "\x1b[1;0;1;1;1;1*y")
+    identifier, total = checksum(stream, responses, csi(Csi.DECRQCRA, 1, 0, 1, 1, 1, 1))
     assert total == ord("b")
 
 
@@ -116,4 +117,4 @@ def test_a_missing_corner_is_a_margin_in_origin_mode():
     stream.feed("\x1b[5;7r\x1b[?69h\x1b[5;7s\x1b[?6h")
     stream.feed("\x1b[1;1HABC\x1b[3;1HDEF")
     total = sum(ord(one) for one in "ABCDEF") + ord(" ") * 3
-    assert checksum(stream, responses, "\x1b[7*y") == (7, total)
+    assert checksum(stream, responses, csi(Csi.DECRQCRA, 7)) == (7, total)

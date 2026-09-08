@@ -7,6 +7,8 @@ line for everything that draws or moves the cursor along it.
 """
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte.modes import PrivateMode
+from pyte.sequences import Csi, csi, set_mode
 
 
 def _screen(lines=5, columns=10):
@@ -42,7 +44,7 @@ def test_the_mode_holds_the_margins():
 def test_the_margins_need_the_mode():
     "Without DECLRMM the same sequence names SCOSC, which is not this."
     screen, stream, _answers = _screen()
-    stream.feed("\x1b[3;7s")
+    stream.feed(csi(Csi.DECSLRM, 3, 7))
     assert screen.horizontal_margins is None
 
 
@@ -91,9 +93,9 @@ def test_the_margins_are_reported():
 
 def test_the_mode_is_answered_by_a_mode_query():
     _screen_, stream, answers = _screen()
-    stream.feed("\x1b[?69$p")
-    stream.feed("\x1b[?69h")
-    stream.feed("\x1b[?69$p")
+    stream.feed(csi(Csi.DECRQM, 69, private='?'))
+    stream.feed(set_mode(PrivateMode.LEFT_RIGHT_MARGIN))
+    stream.feed(csi(Csi.DECRQM, 69, private='?'))
     assert answers == ["\x1b[?69;2$y", "\x1b[?69;1$y"]
 
 

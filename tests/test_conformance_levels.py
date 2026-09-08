@@ -13,12 +13,13 @@ import pytest
 
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte.sequences import Csi, csi
 
 #: DECSCL for each terminal, with seven bit controls.
-VT200 = '\x1b[62;1"p'
-VT300 = '\x1b[63;1"p'
-VT400 = '\x1b[64;1"p'
-VT500 = '\x1b[65;1"p'
+VT200 = csi(Csi.DECSCL, 62, 1)
+VT300 = csi(Csi.DECSCL, 63, 1)
+VT400 = csi(Csi.DECSCL, 64, 1)
+VT500 = csi(Csi.DECSCL, 65, 1)
 
 
 def make_screen(lines=4, columns=10):
@@ -35,19 +36,19 @@ def make_screen(lines=4, columns=10):
 @pytest.mark.parametrize("level", [VT300, VT400, VT500])
 def test_decrqm_answers_from_the_terminal_that_brought_it(level):
     screen, stream, answers = make_screen()
-    stream.feed(level + "\x1b[4$p")
+    stream.feed(level + csi(Csi.DECRQM, 4))
     assert answers == ["\x1b[4;2$y"]
 
 
 def test_decrqm_says_nothing_on_an_earlier_terminal():
     screen, stream, answers = make_screen()
-    stream.feed(VT200 + "\x1b[4$p")
+    stream.feed(VT200 + csi(Csi.DECRQM, 4))
     assert answers == []
 
 
 def test_decrqm_comes_back_with_the_level():
     screen, stream, answers = make_screen()
-    stream.feed(VT200 + "\x1b[4$p" + VT500 + "\x1b[4$p")
+    stream.feed(VT200 + csi(Csi.DECRQM, 4) + VT500 + csi(Csi.DECRQM, 4))
     assert answers == ["\x1b[4;2$y"]
 
 

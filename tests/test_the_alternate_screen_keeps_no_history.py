@@ -19,6 +19,8 @@ Lillecarl/pymux#132.
 """
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte.modes import PrivateMode
+from pyte.sequences import reset_mode, set_mode
 
 LINES = 5
 COLUMNS = 10
@@ -36,7 +38,7 @@ def an_alternate_screen(lines: int = LINES, columns: int = COLUMNS):
         write_process_input=lambda data: None,
         get_history_limit=lambda: HISTORY,
     )
-    Stream(screen).feed("\x1b[?1049h")
+    Stream(screen).feed(set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR))
     return screen
 
 
@@ -104,9 +106,9 @@ def test_the_first_screen_keeps_its_history_through_the_visit():
     stream.feed("".join("shell %d\r\n" % number for number in range(20)))
     before = lowest_row(screen)
 
-    stream.feed("\x1b[?1049h")
+    stream.feed(set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR))
     stream.feed("".join("program %d\r\n" % number for number in range(60)))
-    stream.feed("\x1b[?1049l")
+    stream.feed(reset_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR))
 
     assert lowest_row(screen) == before
     assert text_of(screen, before) == "shell 0"

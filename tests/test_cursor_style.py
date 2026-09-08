@@ -12,6 +12,8 @@ the user.
 """
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte.modes import PrivateMode
+from pyte.sequences import Csi, csi, reset_mode, set_mode
 
 
 def make_screen():
@@ -31,11 +33,11 @@ def test_a_terminal_starts_with_a_blinking_block():
 def test_decscusr_names_the_shape():
     screen, stream, responses = make_screen()
     for request, style in (
-        ("\x1b[2 q", 2),
-        ("\x1b[3 q", 3),
-        ("\x1b[4 q", 4),
-        ("\x1b[5 q", 5),
-        ("\x1b[6 q", 6),
+        (csi(Csi.DECSCUSR, 2), 2),
+        (csi(Csi.DECSCUSR, 3), 3),
+        (csi(Csi.DECSCUSR, 4), 4),
+        (csi(Csi.DECSCUSR, 5), 5),
+        (csi(Csi.DECSCUSR, 6), 6),
     ):
         stream.feed(request)
         assert screen.cursor_style == style
@@ -43,59 +45,59 @@ def test_decscusr_names_the_shape():
 
 def test_zero_means_the_shape_a_terminal_starts_with():
     screen, stream, responses = make_screen()
-    stream.feed("\x1b[6 q")
-    stream.feed("\x1b[0 q")
+    stream.feed(csi(Csi.DECSCUSR, 6))
+    stream.feed(csi(Csi.DECSCUSR, 0))
     assert screen.cursor_style == 1
 
 
 def test_a_shape_that_nobody_knows_is_left_alone():
     screen, stream, responses = make_screen()
-    stream.feed("\x1b[6 q")
-    stream.feed("\x1b[9 q")
+    stream.feed(csi(Csi.DECSCUSR, 6))
+    stream.feed(csi(Csi.DECSCUSR, 9))
     assert screen.cursor_style == 6
 
 
 def test_mode_12_turns_the_blinking_on_and_off():
     screen, stream, responses = make_screen()
-    stream.feed("\x1b[6 q")  # A bar that does not blink.
-    stream.feed("\x1b[?12h")
+    stream.feed(csi(Csi.DECSCUSR, 6))  # A bar that does not blink.
+    stream.feed(set_mode(PrivateMode.CURSOR_BLINK))
     assert (screen.cursor_style, screen.cursor_blinks) == (5, True)
-    stream.feed("\x1b[?12l")
+    stream.feed(reset_mode(PrivateMode.CURSOR_BLINK))
     assert (screen.cursor_style, screen.cursor_blinks) == (6, False)
 
 
 def test_mode_12_keeps_the_shape():
     screen, stream, responses = make_screen()
-    stream.feed("\x1b[4 q")  # An underline that does not blink.
-    stream.feed("\x1b[?12h")
+    stream.feed(csi(Csi.DECSCUSR, 4))  # An underline that does not blink.
+    stream.feed(set_mode(PrivateMode.CURSOR_BLINK))
     assert screen.cursor_style == 3  # An underline that blinks.
 
 
 def test_setting_the_blinking_twice_changes_nothing():
     screen, stream, responses = make_screen()
-    stream.feed("\x1b[2 q")
-    stream.feed("\x1b[?12h")
-    stream.feed("\x1b[?12h")
+    stream.feed(csi(Csi.DECSCUSR, 2))
+    stream.feed(set_mode(PrivateMode.CURSOR_BLINK))
+    stream.feed(set_mode(PrivateMode.CURSOR_BLINK))
     assert screen.cursor_style == 1
 
 
 def test_decrqm_answers_for_the_blinking():
     # The answer comes from the shape, because DECSCUSR writes it too.
     screen, stream, responses = make_screen()
-    stream.feed("\x1b[6 q")
+    stream.feed(csi(Csi.DECSCUSR, 6))
     responses.clear()
-    stream.feed("\x1b[?12$p")
+    stream.feed(csi(Csi.DECRQM, 12, private='?'))
     assert responses == ["\x1b[?12;2$y"]  # Reset.
 
-    stream.feed("\x1b[5 q")
+    stream.feed(csi(Csi.DECSCUSR, 5))
     responses.clear()
-    stream.feed("\x1b[?12$p")
+    stream.feed(csi(Csi.DECRQM, 12, private='?'))
     assert responses == ["\x1b[?12;1$y"]  # Set.
 
 
 def test_decrqss_reports_the_shape():
     screen, stream, responses = make_screen()
-    stream.feed("\x1b[?12h")
+    stream.feed(set_mode(PrivateMode.CURSOR_BLINK))
     responses.clear()
     stream.feed("\x1bP$q q\x1b\\")
     assert responses == ["\x1bP1$r1 q\x1b\\"]

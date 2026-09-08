@@ -15,6 +15,8 @@ import pytest
 
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte import escape
+from pyte.sequences import csi
 
 
 def _screen(lines=8, columns=20):
@@ -28,22 +30,22 @@ def _screen(lines=8, columns=20):
     "query, answer",
     [
         # DSRPrinterPort: no printer.
-        ("\x1b[?15n", "\x1b[?13n"),
+        (csi(escape.DSR, 15, private='?'), csi(escape.DSR, 13, private='?')),
         # DSRUDKLocked: the user defined keys are unlocked.
-        ("\x1b[?25n", "\x1b[?20n"),
+        (csi(escape.DSR, 25, private='?'), csi(escape.DSR, 20, private='?')),
         # DSRKeyboard: North American, ready, a PC keyboard.
-        ("\x1b[?26n", "\x1b[?27;1;0;5n"),
+        (csi(escape.DSR, 26, private='?'), csi(escape.DSR, 27, 1, 0, 5, private='?')),
         # DSRLocatorStatus: no locator.
-        ("\x1b[?55n", "\x1b[?50n"),
+        (csi(escape.DSR, 55, private='?'), csi(escape.DSR, 50, private='?')),
         # DSRLocatorId: the kind of locator is not known.
-        ("\x1b[?56n", "\x1b[?57;0n"),
+        (csi(escape.DSR, 56, private='?'), csi(escape.DSR, 57, 0, private='?')),
         # DECMSR: no room for a macro. This answer carries no private
         # marker, and ends with "* {".
-        ("\x1b[?62n", "\x1b[0*{"),
+        (csi(escape.DSR, 62, private='?'), "\x1b[0*{"),
         # DSRDataIntegrity: no error since the last report.
-        ("\x1b[?75n", "\x1b[?70n"),
+        (csi(escape.DSR, 75, private='?'), csi(escape.DSR, 70, private='?')),
         # DSRMultipleSessionStatus: one session.
-        ("\x1b[?85n", "\x1b[?83n"),
+        (csi(escape.DSR, 85, private='?'), csi(escape.DSR, 83, private='?')),
     ],
 )
 def test_a_part_that_is_not_here_still_answers(query, answer):
@@ -55,13 +57,13 @@ def test_a_part_that_is_not_here_still_answers(query, answer):
 def test_the_checksum_of_the_macros_is_zero():
     "DECCKSR carries the number of the request back with the answer."
     _screen_, stream, answers = _screen()
-    stream.feed("\x1b[?63;123n")
+    stream.feed(csi(escape.DSR, 63, 123, private='?'))
     assert answers == ["\x1bP123!~0000\x1b\\"]
 
 
 def test_the_terminal_says_it_is_well():
     _screen_, stream, answers = _screen()
-    stream.feed("\x1b[5n")
+    stream.feed(csi(escape.DSR, 5))
     assert answers == ["\x1b[0n"]
 
 
@@ -81,5 +83,5 @@ def test_the_page_number_follows_the_position():
 def test_a_report_nobody_knows_is_left_alone():
     "An answer to a question pyte does not know would be a wrong answer."
     _screen_, stream, answers = _screen()
-    stream.feed("\x1b[?4242n")
+    stream.feed(csi(escape.DSR, 4242, private='?'))
     assert answers == []

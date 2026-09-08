@@ -33,6 +33,9 @@ from hypothesis import strategies as st
 
 from a_screen import a_screen
 from pyte.streams import Stream
+from pyte import escape
+from pyte.modes import PrivateMode
+from pyte.sequences import Csi, csi, reset_mode, set_mode
 
 
 def cells_of(screen, row_number: int):
@@ -164,14 +167,14 @@ PLAIN = [
     "\n", "\r", "\x1bD", "\x1bM", "\x1bE", "\x1b7", "\x1b8",
     "\x1b#8",           # DECALN: fill the screen with E.
     "\x1bc",            # RIS: a full reset.
-    "\x1b[!p",          # DECSTR: a soft reset.
+    csi(Csi.DECSTR),          # DECSTR: a soft reset.
     "\x1b[?1049h", "\x1b[?1049l",   # The other page, and back.
     "\x1b[?69h", "\x1b[?69l",       # Left and right margins.
-    "\x1b[?6h", "\x1b[?6l",         # Origin mode.
+    set_mode(PrivateMode.ORIGIN), reset_mode(PrivateMode.ORIGIN),         # Origin mode.
     "\x1b[?7h", "\x1b[?7l",         # Autowrap.
     "\x1b[?3h", "\x1b[?3l",         # DECCOLM: 132 columns, and back.
-    "\x1b[0m", "\x1b[7m", "\x1b[31;44m",
-    '\x1b[1"q', '\x1b[0"q',         # DECSCA: mark what an erase leaves.
+    csi(escape.SGR, 0), csi(escape.SGR, 7), csi(escape.SGR, 31, 44),
+    csi(Csi.DECSCA, 1), csi(Csi.DECSCA, 0),         # DECSCA: mark what an erase leaves.
     "\x1bV", "\x1bW",               # SPA and EPA, the other mark.
     "text", "wider text that wraps around the end of a short row",
 ]

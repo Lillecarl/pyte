@@ -14,6 +14,8 @@ from pyte.colors import Color, SgrColor
 from pyte.placeholders import DIACRITICS, PLACEHOLDER, foreground_id
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte import escape
+from pyte.sequences import csi
 
 
 def make_screen(lines=24, columns=80):
@@ -39,7 +41,7 @@ def cells(image_id, row, columns, marks=True):
         text += PLACEHOLDER
         if marks:
             text += mark(row) + mark(column)
-    return text + "\x1b[0m"
+    return text + csi(escape.SGR, 0)
 
 
 def rgb_image(width, height):
@@ -99,8 +101,8 @@ def test_a_cell_without_marks_follows_the_one_to_its_left():
     "A program may write the marks on the first cell only."
     screen, stream, _r = make_screen()
     transmit_virtual(stream, 5, 40, 40)
-    stream.feed("\x1b[38;2;0;0;5m" + PLACEHOLDER + mark(2) + mark(0))
-    stream.feed(PLACEHOLDER + PLACEHOLDER + "\x1b[0m")
+    stream.feed(csi(escape.SGR, 38, 2, 0, 0, 5) + PLACEHOLDER + mark(2) + mark(0))
+    stream.feed(PLACEHOLDER + PLACEHOLDER + csi(escape.SGR, 0))
     runs = screen.placeholder_runs(0, 0)
     assert len(runs) == 1
     run = runs[0]
@@ -123,10 +125,10 @@ def test_a_gap_in_the_columns_breaks_the_run():
     "The columns of a run count up, one by one."
     screen, stream, _r = make_screen()
     transmit_virtual(stream, 5, 40, 40)
-    stream.feed("\x1b[38;2;0;0;5m")
+    stream.feed(csi(escape.SGR, 38, 2, 0, 0, 5))
     stream.feed(PLACEHOLDER + mark(0) + mark(0))
     stream.feed(PLACEHOLDER + mark(0) + mark(5))
-    stream.feed("\x1b[0m")
+    stream.feed(csi(escape.SGR, 0))
     runs = screen.placeholder_runs(0, 0)
     assert [(run.column, run.columns, run.image_column) for run in runs] == [
         (0, 1, 0),
@@ -144,7 +146,7 @@ def test_the_third_mark_carries_the_top_of_the_id():
         image_id & 0xFF,
     )
     text += PLACEHOLDER + mark(0) + mark(0) + mark(3)
-    stream.feed(text + "\x1b[0m")
+    stream.feed(text + csi(escape.SGR, 0))
     runs = screen.placeholder_runs(0, 0)
     assert [run.image_id for run in runs] == [image_id]
 
