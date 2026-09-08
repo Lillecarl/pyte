@@ -166,10 +166,21 @@ _ESC_FAMILIES = (
 
 
 class Rewrite(NamedTuple):
-    "One string, and the expression that writes it instead."
+    """
+    One string, and the expression that writes it instead.
+
+    `pieces` are the parts that the expression adds together, kept
+    apart so that a long one can be wrapped at the joins. Splitting
+    the expression again on " + " would cut a piece of plain text
+    that has a plus in it.
+    """
 
     text: str
-    expression: str
+    pieces: List[str]
+
+    @property
+    def expression(self) -> str:
+        return " + ".join(self.pieces)
 
 
 class Skipped(NamedTuple):
@@ -220,7 +231,7 @@ def an_expression_for(text: str) -> Rewrite | Skipped:
 
     if not pieces:
         return Skipped(text, "nothing in it")
-    return Rewrite(text, " + ".join(pieces))
+    return Rewrite(text, pieces)
 
 
 def _as_written(text: str) -> str:
@@ -527,59 +538,7 @@ def changes_in(source: str) -> Tuple[List[Change], List[Skipped]]:
             )
         )
 
-    return _that_fit(source, changes, skipped)
-
-
-#: How long a line this tool will write. The longest line in the tests
-#: today is ninety three, so a rewrite that goes past this is making
-#: the file harder to read and not easier.
-ROOM_ON_A_LINE = 88
-
-
-def _that_fit(
-    source: str, changes: List[Change], skipped: List[Skipped]
-) -> Tuple[List[Change], List[Skipped]]:
-    """
-    The changes that leave a line somebody can read.
-
-    A name is longer than the bytes it names, and on a line that was
-    already nearly full the rewrite runs off the end. Wrapping it is a
-    decision about how the line should read, which is a person's and
-    not this tool's. So the line stays as it was and the count says
-    how many are waiting.
-
-    A line is judged whole, because two rewrites on one line are one
-    line. A rewrite that makes an over-long line shorter is kept: the
-    limit is on what this tool adds, not on what it found.
-    """
-    lines = source.splitlines()
-    kept: List[Change] = []
-
-    by_line: dict = {}
-    for change in changes:
-        by_line.setdefault(change.start[0], []).append(change)
-
-    for number, on_this_line in sorted(by_line.items()):
-        was = lines[number - 1]
-        now = was
-        for change in sorted(on_this_line, key=lambda one: one.start,
-                             reverse=True):
-            now = _spliced(
-                now,
-                change.start[1],
-                change.end[1],
-                change.rewrite.expression,
-            )
-        # Counted in characters, because a line is read and not parsed.
-        if len(now) <= max(ROOM_ON_A_LINE, len(was)):
-            kept.extend(on_this_line)
-        else:
-            skipped.extend(
-                Skipped(change.rewrite.text, "no room on the line")
-                for change in on_this_line
-            )
-
-    return kept, skipped
+    return changes, skipped
 
 
 #: Where each name a rewrite can reach for comes from. Only the names
@@ -601,14 +560,33 @@ _IMPORTS = {
 }
 
 
+#: How long a line this tool writes before it wraps one.
+#:
+#: **Length is not a reason to leave a sequence unnamed.** A name is
+#: longer than the bytes it names and that is the trade: the point is
+#: that a person, or an agent reading the code, sees what the sequence
+#: is without decoding it. This is only where the expression goes onto
+#: more than one line, which is what somebody writing it by hand would
+#: do.
+ROOM_ON_A_LINE = 88
+
+
 def applied(source: str, changes: List[Change]) -> str:
     """
     The module with every change spliced in.
 
     The splice runs backwards, so a change never moves the position of
-    the one before it.
+    the one before it. That also means a change that grows into
+    several lines is safe: everything to its left keeps the columns it
+    had.
     """
     lines = source.splitlines(keepends=True)
+    was_long = {number for number, line in enumerate(lines, 1)
+                if len(line.rstrip("\n")) > ROOM_ON_A_LINE}
+
+    on_this_line: dict = {}
+    for change in changes:
+        on_this_line.setdefault(change.start[0], []).append(change)
 
     for change in sorted(changes, key=lambda one: one.start, reverse=True):
         (first_line, first_column) = change.start
@@ -617,14 +595,75 @@ def applied(source: str, changes: List[Change]) -> str:
             # An implicitly joined string over several lines. The
             # splice would have to decide what to do with the join.
             continue
-        lines[first_line - 1] = _spliced(
-            lines[first_line - 1],
-            first_column,
-            last_column,
-            change.rewrite.expression,
+
+        line = lines[first_line - 1]
+        written = _spliced(
+            line, first_column, last_column, change.rewrite.expression
         )
 
+        # One rewrite to a line, or the wraps would have to be laid out
+        # around each other. Two on one line stay on it.
+        alone = len(on_this_line[first_line]) == 1
+        if (
+            alone
+            and len(written.rstrip("\n")) > ROOM_ON_A_LINE
+            and first_line not in was_long
+            and len(change.rewrite.pieces) > 1
+        ):
+            written = _spliced(
+                line,
+                first_column,
+                last_column,
+                _wrapped(
+                    change.rewrite.pieces,
+                    _indent_of(line),
+                    brackets=_brackets_around(line, first_column, last_column),
+                ),
+            )
+
+        lines[first_line - 1] = written
+
     return "".join(lines) if lines else source
+
+
+def _indent_of(line: str) -> str:
+    "The whitespace a line starts with."
+    return line[: len(line) - len(line.lstrip())]
+
+
+def _brackets_around(line: str, start: int, end: int) -> bool:
+    """
+    Whether the string is the only thing inside a bracket pair.
+
+    `stream.feed("...")` is the common shape, and there the call's own
+    parentheses already hold the expression, so a second pair around
+    it says nothing.
+    """
+    raw = line.encode("utf-8")
+    before = raw[start - 1: start]
+    after = raw[end: end + 1]
+    return (before, after) in ((b"(", b")"), (b"[", b"]"))
+
+
+def _wrapped(pieces: List[str], indent: str, brackets: bool = False) -> str:
+    """
+    The pieces over several lines.
+
+    Parentheses of its own, unless a bracket already holds it, because
+    the expression has to stay one expression wherever it sits: an
+    argument, the right of an assignment, an element of a list. Inside
+    a bracket a newline continues the line, which is what makes the
+    layout legal at all.
+
+    The joins lead their lines. Reading down the left edge then says
+    what the sequence is made of, which is the whole reason for
+    wrapping rather than letting the line run.
+    """
+    inside = indent + "    "
+    body = ("\n" + inside + "+ ").join(pieces)
+    if brackets:
+        return "\n%s%s\n%s" % (inside, body, indent)
+    return "(\n%s%s\n%s)" % (inside, body, indent)
 
 
 def _spliced(line: str, start: int, end: int, expression: str) -> str:

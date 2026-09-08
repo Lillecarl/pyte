@@ -263,19 +263,74 @@ def test_a_part_of_an_f_string_is_left_alone():
     assert changes == []
 
 
-def test_a_line_with_no_room_is_left_alone():
+def test_a_long_line_is_wrapped_and_not_left_alone():
     """
-    A name is longer than the bytes it names. Wrapping the line is a
-    decision about how it should read, which is a person's.
-    """
-    short = 'def t():\n    feed("\\x1b[1;1H")\n'
-    assert len(changes_in(short)[0]) == 1
+    A name is longer than the bytes it names, and that is the trade.
 
-    padded = "x" * 70
-    long = 'def t():\n    feed("\\x1b[1;1H", "%s")\n' % padded
-    changes, skipped = changes_in(long)
-    assert changes == []
-    assert [one.reason for one in skipped] == ["no room on the line"]
+    The point of the rewrite is that a person, or an agent reading the
+    code, sees what a sequence is without decoding it. Length is not a
+    reason to leave one as bytes, so a line that grows past the room
+    on it goes onto several lines, the way somebody writing it by hand
+    would do.
+    """
+    source = (
+        'def t():\n'
+        '    feed("\\x1b[5;7r\\x1b[?69h\\x1b[5;7s\\x1b[?6h")\n'
+    )
+    changes, skipped = changes_in(source)
+    assert len(changes) == 1
+    assert skipped == []
+
+    written = applied(source, changes)
+    assert written == (
+        "def t():\n"
+        "    feed(\n"
+        "        csi(escape.DECSTBM, 5, 7)\n"
+        "        + set_mode(PrivateMode.LEFT_RIGHT_MARGIN)\n"
+        "        + csi(Csi.DECSLRM, 5, 7)\n"
+        "        + set_mode(PrivateMode.ORIGIN)\n"
+        "    )\n"
+    )
+    ast.parse(written)
+
+
+def test_a_line_that_fits_stays_on_one_line():
+    source = 'def t():\n    feed("\\x1b[1;1H")\n'
+    written = applied(source, changes_in(source)[0])
+
+    assert written == "def t():\n    feed(csi(escape.CUP, 1, 1))\n"
+
+
+def test_a_wrap_reuses_the_brackets_that_are_there():
+    """
+    `feed("...")` already has parentheses around the expression, and a
+    second pair inside them says nothing. Where there is no bracket,
+    the wrap brings its own, because the expression has to stay one
+    expression.
+    """
+    inside = 'def t():\n    feed("\\x1b[5;7r\\x1b[?69h\\x1b[5;7s\\x1b[?6h")\n'
+    assert "((" not in applied(inside, changes_in(inside)[0])
+
+    bare = 'WHAT = "\\x1b[5;7r\\x1b[?69h\\x1b[5;7s\\x1b[?6h"\n'
+    written = applied(bare, changes_in(bare)[0])
+    assert written.startswith("WHAT = (\n")
+    ast.parse(written)
+
+
+def test_two_rewrites_on_one_line_are_not_wrapped():
+    """
+    One wrap to a line. Two would have to be laid out around each
+    other, and that is a judgement about the whole line rather than
+    about one string in it.
+    """
+    source = (
+        'def t():\n'
+        '    feed("\\x1b[5;7r\\x1b[?69h\\x1b[5;7s", "\\x1b[5;7r\\x1b[?69h")\n'
+    )
+    written = applied(source, changes_in(source)[0])
+
+    assert "\n" not in written.splitlines()[1]
+    ast.parse(written)
 
 
 # ----------------------------------------------------------------------
