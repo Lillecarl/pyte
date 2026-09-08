@@ -147,6 +147,57 @@ def test_the_rows_of_a_text_line_unwrap_to_its_cells():
         assert "".join(cell.char for cell in lines[0].cells) == shown.text
 
 
+# ----------------------------------------------------------------------
+# Where a row and a column of the buffer sit in a line's text.
+# Lillecarl/pymux#189.
+
+
+def test_the_offset_of_a_cursor_on_the_first_row_of_a_line():
+    page = _a_page("one", "|two", "three")
+    line = page.text_lines(0, 1)[0]
+
+    assert page.offset_in_line(line, 0, 0) == 0
+    assert page.offset_in_line(line, 0, 2) == 2
+
+
+def test_the_offset_of_a_cursor_on_a_row_a_wrap_made():
+    "The rows before it in the line count for what they hold."
+    page = _a_page("one", "|two", "three")
+    line = page.text_lines(0, 1)[0]
+
+    assert line.text == "onetwo"
+    assert page.offset_in_line(line, 1, 0) == 3
+    assert page.offset_in_line(line, 1, 2) == 5
+
+
+def test_a_cursor_past_the_end_of_its_row_stops_at_the_end():
+    """
+    A cursor stands where the next character goes, so on a row a
+    program moved onto and did not write it stands past every cell.
+    The text has nowhere further to go.
+    """
+    page = _a_page("one")
+    line = page.text_lines(0, 0)[0]
+
+    assert page.offset_in_line(line, 0, 40) == 3
+
+
+def test_a_row_the_buffer_does_not_hold_gives_no_offset():
+    "The same rule `text_lines` joins by: an absent row has no cells."
+    page = _a_page("one", "|two")
+    line = page.text_lines(0, 1)[0]
+    del page.data_buffer[0]
+
+    assert page.offset_in_line(line, 1, 1) == 1
+
+
+def test_the_offset_never_runs_past_the_line():
+    page = _a_page("one", "|two")
+    line = page.text_lines(0, 1)[0]
+
+    assert page.offset_in_line(line, 5, 5) <= len(line.text)
+
+
 def test_nothing_is_written_by_reading():
     """
     The buffer makes a row for a number it does not hold, so a

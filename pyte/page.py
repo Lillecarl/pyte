@@ -246,6 +246,40 @@ class Page:
         lines.append(TextLine(text, start, last))
         return lines
 
+    def offset_in_line(self, line: TextLine, row: int, column: int) -> int:
+        """
+        Where a row and a column of the buffer sit in a line's text.
+
+        `text_lines` joins the rows of a line into one string, so a
+        reader that shows that string and wants to put a cursor on it
+        has to know how far along the cursor's own row starts. This
+        answers that, and it counts the rows the way `text_lines`
+        joined them: a row gives the cells it holds, and a row the
+        buffer does not hold gives none.
+
+        **Here and not in the reader.** A reader that counted the
+        rows itself would be a second copy of that rule, and the two
+        would go out of step the first time one of them changed.
+        Lillecarl/pymux#189.
+
+        The answer never runs past the end of the text. A cursor
+        stands where the next character goes, so on a row that a
+        program moved onto and did not write it stands past every cell
+        the row holds.
+        """
+        data_buffer = self.data_buffer
+        offset = 0
+
+        for number in range(line.first, min(row, line.last) + 1):
+            held = data_buffer.get(number)
+            width = 0 if not held else max(held) + 1
+            if number == row:
+                offset += min(column, width)
+            else:
+                offset += width
+
+        return min(offset, len(line.text))
+
     def unwrap(
         self, first: int, last: int, cursor: "Tuple[int, int] | None" = None
     ) -> "Tuple[List[LogicalLine], Tuple[int, int] | None]":
