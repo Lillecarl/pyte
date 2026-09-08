@@ -1153,6 +1153,15 @@ class Screen:
             # screen moves that row down past rows the buffer holds.
             bottom = self.line_offset + self.lines - 1
 
+            # The same row for the page nobody is looking at, worked out
+            # before the height changes for the same reason. It cannot
+            # be read off `line_offset`, which answers for the page that
+            # is showing. Lillecarl/pymux#203.
+            stashed, stashed_vars = self._the_page_that_is_not_showing()
+            stashed_bottom = (
+                None if stashed is None else self._bottom_for(stashed_vars["max_y"])
+            )
+
             self.lines = lines
             self.columns = columns
 
@@ -1178,8 +1187,87 @@ class Screen:
             else:
                 self._reflow(bottom)
 
+            # And the one nobody is looking at, which used to come back
+            # at the width it was stashed at. Lillecarl/pymux#203.
+            if stashed is not None:
+                self._lay_out_the_stashed_page(stashed, stashed_vars, stashed_bottom)
+
             # A program that asked for it learns the new size in band.
             self.notify_of_resize()
+
+    def _bottom_for(self, max_y: int) -> int:
+        """
+        The last row of the screen, for a page whose content ends there.
+
+        The same arithmetic as `line_offset`, for a page whose fields
+        are not the ones on `self`.
+        """
+        return max(0, max_y - self.lines + 1) + self.lines - 1
+
+    def _the_page_that_is_not_showing(self):
+        """
+        The stashed page and the state that was stashed with it.
+
+        One of the two is always stashed once a program has taken the
+        alternate screen: the first screen while it runs, and the
+        alternate one after it stops, because "?47" and "?1047" find
+        what the last visit left. `(None, None)` before that, when the
+        alternate screen has never been used.
+        """
+        if self._original_screen is not None:
+            return self._original_screen, self._original_screen_vars
+        if self._alternate_screen is not None:
+            return self._alternate_screen, self._alternate_screen_vars
+        return None, None
+
+    def _lay_out_the_stashed_page(self, page, variables: dict, bottom: int) -> None:
+        """
+        Lay the stashed page out at the size the screen has now.
+
+        A resize laid out `self.page` alone, so the other page came
+        back at the width it was stashed at: a row of 31 cells on a
+        screen 20 columns wide, which every reader of it disagrees
+        about. It is the ordinary case and not a corner -- a person
+        resizes the window while `vim` is up, and quits it.
+        Lillecarl/pymux#203.
+
+        **The stashed page is laid out the way it would be if it were
+        showing.** The first screen reflows and the alternate one is cut
+        down, which is the same rule as in `resize` and for the same
+        reasons. Lillecarl/pymux#192.
+
+        libvterm and kitty both do this. `resize()` in libvterm's
+        `src/screen.c` calls `resize_buffer` for buffer 0 and then for
+        buffer 1 on every resize, whichever of them is active, and
+        kitty's `rewrap()` hands `main_linebuf` and `alt_linebuf` to
+        their own resizers in the same breath.
+
+        Everything a layout reads is in `swap_variables`, so standing on
+        the other page is those and `page` itself. What the layout
+        leaves is written back into the stash, because that page has to
+        come back the way this left it and not the way it arrived.
+        """
+        held_page = self.page
+        held = {name: getattr(self, name) for name in self.swap_variables}
+
+        self.page = page
+        for name, value in variables.items():
+            setattr(self, name, value)
+
+        try:
+            # The stashed page is the alternate one exactly when this
+            # screen is not on it.
+            if self.in_alternate_screen:
+                self._reflow(bottom)
+            else:
+                self._clip()
+        finally:
+            variables.update(
+                {name: getattr(self, name) for name in self.swap_variables}
+            )
+            self.page = held_page
+            for name, value in held.items():
+                setattr(self, name, value)
 
     def notify_of_resize(self) -> None:
         """
