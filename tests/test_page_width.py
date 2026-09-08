@@ -141,7 +141,10 @@ def refusing_screen(allowed):
 def test_decncsm_is_unknown_where_the_embedder_gives_no_room():
     "A mode a pane cannot have is a mode it never heard of."
     screen, stream, answers = refusing_screen(lambda: False)
-    stream.feed("\x1b[?95h\x1b[?95$p")
+    stream.feed(
+        set_mode(PrivateMode.NO_CLEAR_ON_COLUMN_CHANGE)
+        + csi(Csi.DECRQM, 95, private='?')
+    )
     assert answers == ["\x1b[?95;0$y"]
     assert not screen._keeps_the_page_through_a_width_change()
 
@@ -160,7 +163,10 @@ def test_decncsm_comes_back_when_the_embedder_changes_its_mind():
 
     allowed[0] = True
     answers.clear()
-    stream.feed("\x1b[?95h\x1b[?95$p")
+    stream.feed(
+        set_mode(PrivateMode.NO_CLEAR_ON_COLUMN_CHANGE)
+        + csi(Csi.DECRQM, 95, private='?')
+    )
     assert answers == ["\x1b[?95;1$y"]
 
 

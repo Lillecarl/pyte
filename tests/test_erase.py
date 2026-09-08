@@ -115,7 +115,12 @@ def test_erase_in_display_reaches_a_screen_that_holds_nothing():
 
 def test_erase_characters_takes_the_background_of_now():
     screen, stream = _screen()
-    stream.feed("hello\x1b[1;1H\x1b[43m\x1b[3X")
+    stream.feed(
+        "hello"
+        + csi(escape.CUP, 1, 1)
+        + csi(escape.SGR, 43)
+        + csi(escape.ECH, 3)
+    )
     row = _row(screen, 0)
     for column in range(3):
         assert row[column].char == " "

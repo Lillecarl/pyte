@@ -118,4 +118,4 @@ def test_a_custom_map_can_take_an_intermediate_sequence():
 
 
 def test_an_intermediate_byte_keeps_the_private_marker():
-    assert feed("\x1b[?3 D") == [("unscroll", (3,), {"private": True})]
+    assert feed(csi(Csi.KITTY_UNSCROLL, 3, private='?')) == [("unscroll", (3,), {"private": True})]

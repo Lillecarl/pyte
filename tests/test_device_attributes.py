@@ -44,7 +44,7 @@ def test_da_answers_the_level_and_the_extensions(pane, sequence):
     ]
 
 
-@pytest.mark.parametrize("sequence", ["\x1b[>c", "\x1b[>0c"])
+@pytest.mark.parametrize("sequence", [csi(escape.DA, private='>'), csi(escape.DA, 0, private='>')])
 def test_da2_answers_the_type_and_the_firmware(pane, sequence):
     _screen, stream, responses = pane
     stream.feed(sequence)

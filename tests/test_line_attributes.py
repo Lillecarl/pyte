@@ -16,11 +16,12 @@ import pytest
 
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte.sequences import Sharp, sharp
 
 LINES, COLUMNS = 5, 10
 
 #: The four of them, and DECALN, which this screen does act on.
-ATTRIBUTES = ["\x1b#3", "\x1b#4", "\x1b#5", "\x1b#6"]
+ATTRIBUTES = [sharp(Sharp.DECDHL_TOP), sharp(Sharp.DECDHL_BOTTOM), sharp(Sharp.DECSWL), sharp(Sharp.DECDWL)]
 
 
 def _screen(data, lines=LINES, columns=COLUMNS):

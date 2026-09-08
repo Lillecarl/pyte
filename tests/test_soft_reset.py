@@ -10,6 +10,7 @@ from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte import escape
 from pyte.sequences import Csi, csi, reset_mode, set_mode
+from pyte.sequences import esc
 
 
 def _screen(lines=5, columns=10):
@@ -39,7 +40,11 @@ def test_the_rows_of_the_region_go_back():
 
 def test_the_columns_of_the_region_go_back():
     screen, stream, _answers = _screen()
-    stream.feed("\x1b[?69h\x1b[3;7s\x1b[!p")
+    stream.feed(
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
+        + csi(Csi.DECSLRM, 3, 7)
+        + csi(Csi.DECSTR)
+    )
     assert screen.horizontal_margins is None
     assert (LEFT_RIGHT_MODE << 5) not in screen.mode
 
@@ -49,7 +54,11 @@ LEFT_RIGHT_MODE = 69
 
 def test_origin_mode_goes_off():
     screen, stream, _answers = _screen()
-    stream.feed("\x1b[2;4r\x1b[?6h\x1b[!p")
+    stream.feed(
+        csi(escape.DECSTBM, 2, 4)
+        + set_mode(PrivateMode.ORIGIN)
+        + csi(Csi.DECSTR)
+    )
     assert PrivateMode.ORIGIN.flag not in screen.mode
 
 
@@ -74,7 +83,12 @@ def test_the_cursor_stays_visible():
 
 def test_the_saved_cursor_goes_home():
     screen, stream, _answers = _screen()
-    stream.feed("\x1b[3;5H\x1b7\x1b[!p\x1b8")
+    stream.feed(
+        csi(escape.CUP, 3, 5)
+        + esc(escape.DECSC)
+        + csi(Csi.DECSTR)
+        + esc(escape.DECRC)
+    )
     assert (screen.pt_cursor_position.x, screen.pt_cursor_position.y) == (0, 0)
 
 

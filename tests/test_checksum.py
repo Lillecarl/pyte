@@ -12,6 +12,8 @@ from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte.sequences import Csi, csi
 from pyte import escape
+from pyte.modes import PrivateMode
+from pyte.sequences import set_mode
 
 
 def make_screen(lines=24, columns=80):
@@ -37,7 +39,7 @@ def checksum(stream, responses, request):
 def test_one_cell():
     screen, stream, responses = make_screen()
     stream.feed("abc")
-    assert checksum(stream, responses, "\x1b[7;0;1;1;1;1*y") == (7, ord("a"))
+    assert checksum(stream, responses, csi(Csi.DECRQCRA, 7, 0, 1, 1, 1, 1)) == (7, ord("a"))
 
 
 def test_a_rectangle_sums_its_cells():
@@ -51,7 +53,7 @@ def test_a_cell_nobody_wrote_counts_as_a_space():
     # The answer must never be "0000": a caller cannot tell that apart
     # from an answer that never came.
     screen, stream, responses = make_screen()
-    assert checksum(stream, responses, "\x1b[1;0;5;5;5;5*y") == (1, ord(" "))
+    assert checksum(stream, responses, csi(Csi.DECRQCRA, 1, 0, 5, 5, 5, 5)) == (1, ord(" "))
 
 
 def test_the_rectangle_is_clamped_to_the_screen():
@@ -59,7 +61,7 @@ def test_the_rectangle_is_clamped_to_the_screen():
     stream.feed("ab")
     # Past the last line and the last column. The whole screen holds
     # "ab" and fourteen spaces.
-    identifier, total = checksum(stream, responses, "\x1b[1;0;1;1;99;99*y")
+    identifier, total = checksum(stream, responses, csi(Csi.DECRQCRA, 1, 0, 1, 1, 99, 99))
     assert total == ord("a") + ord("b") + 14 * ord(" ")
 
 
@@ -99,23 +101,37 @@ def test_origin_mode_counts_the_rectangle_from_the_margins():
     """
     screen, stream, responses = make_screen()
     stream.feed(csi(escape.CUP, 5, 5) + "X")
-    stream.feed("\x1b[5;7r\x1b[?69h\x1b[5;7s\x1b[?6h")
-    assert checksum(stream, responses, "\x1b[7;0;1;1;1;1*y") == (7, ord("X"))
+    stream.feed(
+        csi(escape.DECSTBM, 5, 7)
+        + set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
+        + csi(Csi.DECSLRM, 5, 7)
+        + set_mode(PrivateMode.ORIGIN)
+    )
+    assert checksum(stream, responses, csi(Csi.DECRQCRA, 7, 0, 1, 1, 1, 1)) == (7, ord("X"))
 
 
 def test_the_rectangle_counts_from_the_screen_without_origin_mode():
     "With the mode off, the same margins do not move the corners."
     screen, stream, responses = make_screen()
     stream.feed(csi(escape.CUP, 5, 5) + "X")
-    stream.feed("\x1b[5;7r\x1b[?69h\x1b[5;7s")
-    assert checksum(stream, responses, "\x1b[7;0;1;1;1;1*y") == (7, ord(" "))
-    assert checksum(stream, responses, "\x1b[7;0;5;5;5;5*y") == (7, ord("X"))
+    stream.feed(
+        csi(escape.DECSTBM, 5, 7)
+        + set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
+        + csi(Csi.DECSLRM, 5, 7)
+    )
+    assert checksum(stream, responses, csi(Csi.DECRQCRA, 7, 0, 1, 1, 1, 1)) == (7, ord(" "))
+    assert checksum(stream, responses, csi(Csi.DECRQCRA, 7, 0, 5, 5, 5, 5)) == (7, ord("X"))
 
 
 def test_a_missing_corner_is_a_margin_in_origin_mode():
     "The corners that the program leaves out are the edges of the region."
     screen, stream, responses = make_screen()
-    stream.feed("\x1b[5;7r\x1b[?69h\x1b[5;7s\x1b[?6h")
+    stream.feed(
+        csi(escape.DECSTBM, 5, 7)
+        + set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
+        + csi(Csi.DECSLRM, 5, 7)
+        + set_mode(PrivateMode.ORIGIN)
+    )
     stream.feed(csi(escape.CUP, 1, 1) + "ABC" + csi(escape.CUP, 3, 1) + "DEF")
     total = sum(ord(one) for one in "ABCDEF") + ord(" ") * 3
     assert checksum(stream, responses, csi(Csi.DECRQCRA, 7)) == (7, total)

@@ -68,13 +68,25 @@ def test_a_restore_brings_the_mark_of_decsca_back(save, restore):
 def test_one_pair_saves_and_another_pair_restores():
     "A terminal holds one savepoint, not three."
     screen, stream = _screen()
-    stream.feed("\x1b[4;7H\x1b7\x1b[1;1H\x1b[u")
+    stream.feed(
+        csi(escape.CUP, 4, 7)
+        + esc(escape.DECSC)
+        + csi(escape.CUP, 1, 1)
+        + csi(Csi.KITTY_KEYBOARD)
+    )
     assert _position(screen) == (6, 3)
 
 
 def test_a_second_restore_gives_the_same_answer():
     screen, stream = _screen()
-    stream.feed("\x1b[3;5H\x1b[s\x1b[1;1H\x1b[u\x1b[1;1H\x1b[u")
+    stream.feed(
+        csi(escape.CUP, 3, 5)
+        + csi(Csi.DECSLRM)
+        + csi(escape.CUP, 1, 1)
+        + csi(Csi.KITTY_KEYBOARD)
+        + csi(escape.CUP, 1, 1)
+        + csi(Csi.KITTY_KEYBOARD)
+    )
     assert _position(screen) == (4, 2)
 
 
@@ -84,7 +96,11 @@ def test_the_columns_of_a_region_win_while_the_mode_is_set():
     it. The mode decides, and nothing else can.
     """
     screen, stream = _screen()
-    stream.feed("\x1b[3;5H\x1b[?69h\x1b[2;9s")
+    stream.feed(
+        csi(escape.CUP, 3, 5)
+        + set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
+        + csi(Csi.DECSLRM, 2, 9)
+    )
     assert screen.horizontal_margins == (1, 8)
     # DECSLRM homes the cursor, and saved nothing on the way.
     assert _position(screen) == (0, 0)
@@ -96,7 +112,12 @@ def test_a_plain_csi_u_is_not_the_keyboard_protocol():
     and "CSI ? u". A plain "CSI u" carries no marker, so it is SCORC.
     """
     screen, stream = _screen()
-    stream.feed("\x1b[2;3H\x1b[s\x1b[5;5H\x1b[u")
+    stream.feed(
+        csi(escape.CUP, 2, 3)
+        + csi(Csi.DECSLRM)
+        + csi(escape.CUP, 5, 5)
+        + csi(Csi.KITTY_KEYBOARD)
+    )
     assert _position(screen) == (2, 1)
     assert screen.kitty_keyboard_flags == 0
 
@@ -110,7 +131,10 @@ def test_a_restore_takes_origin_mode_off_again(save, restore):
     setting it back leaves a mode on that the program turned off.
     """
     screen, stream = _screen()
-    stream.feed(save + "\x1b[2;5r\x1b[?6h" + restore)
+    stream.feed(save + (
+        csi(escape.DECSTBM, 2, 5)
+        + set_mode(PrivateMode.ORIGIN)
+    ) + restore)
     stream.feed(csi(escape.CUP, 1, 1) + "X")
     assert screen.data_buffer[0][0].char == "X"
 
@@ -125,7 +149,7 @@ def test_a_restore_leaves_the_wrap_alone(save, restore):
     leaves the wrap off.
     """
     screen, stream = _screen(lines=4, columns=8)
-    stream.feed("\x1b[?7h" + save + "\x1b[?7l" + restore)
+    stream.feed(set_mode(PrivateMode.AUTOWRAP) + save + reset_mode(PrivateMode.AUTOWRAP) + restore)
     stream.feed(csi(escape.CUP, 1, 7) + "abcd")
     assert screen.pt_cursor_position.y == 0
 
@@ -161,7 +185,10 @@ def test_the_cursor_stays_on_a_second_visit(mode):
 def test_the_mode_that_saves_the_cursor_puts_it_home():
     '"?1049" saves the cursor first, so it can send it home.'
     screen, stream = _screen(lines=4, columns=8)
-    stream.feed("\x1b[2;3H\x1b[?1049h")
+    stream.feed(
+        csi(escape.CUP, 2, 3)
+        + set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR)
+    )
     assert (screen.pt_cursor_position.y, screen.pt_cursor_position.x) == (0, 0)
     stream.feed(reset_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR))
     assert (screen.pt_cursor_position.y, screen.pt_cursor_position.x) == (1, 2)
@@ -204,7 +231,14 @@ def test_the_alternate_screen_keeps_what_it_saved():
     row 3, column 5. pyte sent it home.
     """
     screen, stream = _screen(lines=6, columns=10)
-    stream.feed("\x1b[?1049h\x1b[3;5H\x1b7\x1b[?1049l\x1b[?1049h\x1b8")
+    stream.feed(
+        set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR)
+        + csi(escape.CUP, 3, 5)
+        + esc(escape.DECSC)
+        + reset_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR)
+        + set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR)
+        + esc(escape.DECRC)
+    )
     assert _position(screen) == (4, 2)
 
 
@@ -219,5 +253,13 @@ def test_the_alternate_screen_saves_its_charsets_as_well():
 def test_a_save_on_the_alternate_screen_leaves_the_first_one_alone():
     "The two screens hold two savepoints, so neither one reads the other."
     screen, stream = _screen(lines=6, columns=10)
-    stream.feed("\x1b[2;2H\x1b7\x1b[?1049h\x1b[4;7H\x1b7\x1b[?1049l\x1b8")
+    stream.feed(
+        csi(escape.CUP, 2, 2)
+        + esc(escape.DECSC)
+        + set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR)
+        + csi(escape.CUP, 4, 7)
+        + esc(escape.DECSC)
+        + reset_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR)
+        + esc(escape.DECRC)
+    )
     assert _position(screen) == (1, 1)

@@ -17,6 +17,7 @@ from pyte.streams import Stream
 from pyte import escape
 from pyte.modes import PrivateMode
 from pyte.sequences import Csi, csi, set_mode
+from pyte.sequences import reset_mode
 
 COLUMNS = 8
 
@@ -160,7 +161,10 @@ def test_a_scroll_up_ends_the_wrap_under_the_blank_row():
     row under the region is the one that continued a line the scroll
     took away.
     """
-    screen = _screen("a" * 32 + csi(escape.DECSTBM, 2, 3) + "\x1b[3;1H\x1b[S")
+    screen = _screen("a" * 32 + csi(escape.DECSTBM, 2, 3) + (
+        csi(escape.CUP, 3, 1)
+        + csi(Csi.SU)
+    ))
 
     assert _continues(screen, 1)
     assert not _continues(screen, 3)
@@ -195,7 +199,10 @@ def test_the_alternate_screen_gives_the_mark_back():
     on it, and the next resize joins two lines that nothing wrapped
     between.
     """
-    screen = _screen("a" * 12 + "\x1b[?1049h\x1b[?1049l")
+    screen = _screen("a" * 12 + (
+        set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR)
+        + reset_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR)
+    ))
     assert _continues(screen, 1)
 
 

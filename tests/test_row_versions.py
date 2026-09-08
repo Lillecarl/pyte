@@ -165,15 +165,15 @@ MOVERS = [
 
 #: The sequences that take no number at all.
 PLAIN = [
-    "\n", "\r", "\x1bD", "\x1bM", "\x1bE", "\x1b7", "\x1b8",
+    "\n", "\r", esc(escape.IND), esc(escape.RI), esc(escape.NEL), esc(escape.DECSC), esc(escape.DECRC),
     sharp(Sharp.DECALN),           # DECALN: fill the screen with E.
     esc(escape.RIS),            # RIS: a full reset.
     csi(Csi.DECSTR),          # DECSTR: a soft reset.
-    "\x1b[?1049h", "\x1b[?1049l",   # The other page, and back.
-    "\x1b[?69h", "\x1b[?69l",       # Left and right margins.
+    set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR), reset_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR),   # The other page, and back.
+    set_mode(PrivateMode.LEFT_RIGHT_MARGIN), reset_mode(PrivateMode.LEFT_RIGHT_MARGIN),       # Left and right margins.
     set_mode(PrivateMode.ORIGIN), reset_mode(PrivateMode.ORIGIN),         # Origin mode.
-    "\x1b[?7h", "\x1b[?7l",         # Autowrap.
-    "\x1b[?3h", "\x1b[?3l",         # DECCOLM: 132 columns, and back.
+    set_mode(PrivateMode.AUTOWRAP), reset_mode(PrivateMode.AUTOWRAP),         # Autowrap.
+    set_mode(PrivateMode.COLUMNS_132), reset_mode(PrivateMode.COLUMNS_132),         # DECCOLM: 132 columns, and back.
     csi(escape.SGR, 0), csi(escape.SGR, 7), csi(escape.SGR, 31, 44),
     csi(Csi.DECSCA, 1), csi(Csi.DECSCA, 0),         # DECSCA: mark what an erase leaves.
     esc(Escape.SPA), esc(Escape.EPA),               # SPA and EPA, the other mark.
@@ -294,7 +294,7 @@ def test_the_other_page_says_that_every_row_changed():
     reader = Believing(screen)
     reader.read(everything(screen, reader))
 
-    for chunk in ("\x1b[?1049h", "the other one", "\x1b[?1049l"):
+    for chunk in (set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR), "the other one", reset_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR)):
         stream.feed(chunk)
         rows = everything(screen, reader)
         believed = reader.read(rows)
