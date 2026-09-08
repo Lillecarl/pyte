@@ -3126,6 +3126,19 @@ class Screen:
             # typing never reached.
             self._forget_the_wrap_marks(interval)
 
+            # And the row under the range. The last row of the range
+            # holds nothing now, so nothing wrapped out of it, and the
+            # row below does not continue it. `ED 1` with the cursor on
+            # a continuation row is the case: the range stops above the
+            # cursor, and the erase of the cursor's own row does not
+            # reach the last column, so nothing else says it.
+            #
+            # libvterm clears the mark there, and xterm clears the flag
+            # of every row `ClearBufRows` empties, which is the same
+            # statement one row up. Lillecarl/pymux#142.
+            if interval:
+                self.set_wrapped(interval.stop, False)
+
             self.touch_rows(interval)
 
             for line in interval:

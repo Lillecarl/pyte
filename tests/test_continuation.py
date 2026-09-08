@@ -65,6 +65,48 @@ def test_an_erase_on_another_line_leaves_the_wrap():
     assert _continues(screen, 1)
 
 
+#: `"a" * 20` at eight columns fills rows 0 and 1 and puts four
+#: characters on row 2, so rows 1 and 2 both carry the mark.
+
+
+def test_erasing_the_display_to_the_end_ends_every_wrap():
+    "ED 0 from the top empties every row, so no row continues one."
+    screen = _screen("a" * 20 + "\x1b[1;1H\x1b[J")
+    assert not _any_row_is_wrapped(screen)
+
+
+def test_erasing_the_whole_display_ends_every_wrap():
+    screen = _screen("a" * 20 + "\x1b[2J")
+    assert not _any_row_is_wrapped(screen)
+
+
+def test_erasing_the_display_up_to_the_cursor_ends_the_wrap_under_it():
+    """
+    ED 1 empties the rows above the cursor, so the row the cursor
+    stands on continues nothing.
+
+    Nothing else says it. The range of whole rows stops above the
+    cursor, and the erase of the cursor's own row runs to the cursor
+    and not to the last column, which is the only thing `EL` reads.
+    libvterm answers `?lineinfo` with no mark here.
+    Lillecarl/pymux#142.
+    """
+    screen = _screen("a" * 20 + "\x1b[3;3H\x1b[1J")
+    assert not _continues(screen, 2)
+
+
+def test_erasing_the_display_up_to_a_cursor_on_the_first_row_keeps_the_wrap():
+    """
+    ED 1 with the cursor on the first row empties no whole row.
+
+    It erases the first row up to the cursor, which leaves the last
+    column of it, so text is still there to have wrapped and the row
+    below still continues it.
+    """
+    screen = _screen("a" * 20 + "\x1b[1;3H\x1b[1J")
+    assert _continues(screen, 1)
+
+
 def test_the_alternate_screen_gives_the_mark_back():
     """
     A visit to the other screen leaves the first one as it was.
