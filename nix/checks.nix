@@ -116,7 +116,14 @@ in
     setup = prepare + ''
       export PYTE_GROUP=unit
     '';
-  } "${runPytest} -m hypothesis --hypothesis-profile=roaming --hypothesis-seed=$seed";
+  } ''
+    # The seed is the whole value of a hunt that failed, and nothing
+    # else says it: it lives in the environment of the derivation, and
+    # a quiet pytest run prints no hypothesis header. So the log says
+    # it, first line, and `PYTE_HYPOTHESIS_SEED` takes it back.
+    echo "hypothesis seed $seed"
+    ${runPytest} -m hypothesis --hypothesis-profile=roaming --hypothesis-seed=$seed
+  '';
 
   # The colour specs, judged against the real Xlib. `pyte/xcms.py` is a
   # port of the colour management of Xlib, and only a comparison against
