@@ -107,6 +107,21 @@ def test_erasing_the_display_up_to_a_cursor_on_the_first_row_keeps_the_wrap():
     assert _continues(screen, 1)
 
 
+def test_a_rectangle_erase_leaves_the_marks():
+    """
+    DECERA empties the rows and leaves every mark where it was.
+
+    xterm does the same: `ScrnFillRectangle` holds no `LineClrWrapped`,
+    while `ClearRight` and `ClearBufRows` both hold one. libvterm has
+    no opinion, because it has no case for the sequence. So a rectangle
+    can leave a row that holds nothing and still says it continues the
+    row above. Lillecarl/pymux#142.
+    """
+    screen = _screen("a" * 20 + "\x1b[0;0;0;0$z")
+    assert _continues(screen, 1)
+    assert _continues(screen, 2)
+
+
 def test_the_alternate_screen_gives_the_mark_back():
     """
     A visit to the other screen leaves the first one as it was.

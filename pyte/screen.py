@@ -3312,7 +3312,20 @@ class Screen:
     def _erase_rectangle(
         self, corners: Tuple[int, int, int, int] | None, selective: bool
     ) -> None:
-        "Erase every cell of a rectangle that no mark holds back."
+        """
+        Erase every cell of a rectangle that no mark holds back.
+
+        **It leaves every continuation mark where it is**, even on a
+        row it empties to the right margin. That is a decision and not
+        a gap. xterm erases a rectangle in `ScrnFillRectangle`, which
+        holds no `LineClrWrapped`, while `ClearRight` and
+        `ClearBufRows` both hold one: the line oriented erases know
+        about lines and a rectangle does not. libvterm has no opinion,
+        because `src/state.c` has no case for the sequence.
+
+        So a rectangle can leave a row that holds nothing and still
+        says it continues the row above. Lillecarl/pymux#142.
+        """
         if corners is None:
             return
         top, left, bottom, right = corners
