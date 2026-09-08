@@ -95,13 +95,18 @@ def logical_lines(screen):
 
     lines.append(_trimmed(cells))
 
-    # The first entry is the line before the first row, which is
-    # nothing, and a line at the end that trimmed to nothing cannot be
-    # told from a row the buffer never held.
-    while lines and not lines[0]:
-        lines.pop(0)
-    while lines and not lines[-1]:
-        lines.pop()
+    # **A line that trimmed to nothing is dropped, wherever it sits.**
+    # A row of blanks and a row the buffer never held draw the same,
+    # so a content oracle has to read them the same way, which is what
+    # `_trimmed` says above. Counting an empty line in the middle and
+    # not an absent one breaks that promise, and a resize that
+    # materialises a row nobody wrote then reads as lost content.
+    #
+    # "CSI 0 T" is what found it: a scroll down puts a blank row in
+    # the region, the buffer leaves that row absent, and a reflow
+    # makes it. Lillecarl/pymux#179 holds the part this oracle cannot
+    # judge.
+    lines = [line for line in lines if line]
 
     return tuple(
         tuple((cell.char, cell.appearance) for cell in cells)
