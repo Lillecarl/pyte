@@ -87,18 +87,24 @@ KEEPS_ITS_LITERALS = frozenset(
     }
 )
 
-#: One CSI sequence, whole. The parameters, then the intermediate
-#: bytes, then the final byte: the same three parts `streams.py` reads.
+#: One CSI sequence. The parameters, then the intermediate bytes,
+#: then the final byte: the same three parts `streams.py` reads.
 #:
-#: **It ends with `\Z` and not `$`.** In Python `$` also matches
-#: before a trailing newline, so `"\x1b[4;1H\n"` read as a bare
-#: sequence and the rewrite dropped the newline. The check that every
-#: expression writes back the string it replaced is what found it.
+#: **It has no anchor at either end**, because it is matched at a
+#: position rather than against a whole string. `re.match(text, at)`
+#: anchors the front, and `match.end()` says where the sequence stops
+#: so that whatever follows becomes the next piece.
+#:
+#: It ended with `$` once, and that is worth remembering rather than
+#: repeating: in Python `$` also matches before a trailing newline, so
+#: `"\x1b[4;1H\n"` read as a bare sequence and the rewrite dropped the
+#: newline. The check that every expression writes back the string it
+#: replaced is what found it.
 A_CSI_SEQUENCE = re.compile(
-    r"\A\x1b\["
+    r"\x1b\["
     r"(?P<private>[?<>=]?)"
     r"(?P<params>[0-9;:]*)"
-    r"(?P<final>[ -/]*[@-~])\Z"
+    r"(?P<final>[ -/]*[@-~])"
 )
 
 #: The names in `escape.py` that are CSI final bytes, and only those.
@@ -175,19 +181,88 @@ class Skipped(NamedTuple):
 
 def an_expression_for(text: str) -> Rewrite | Skipped:
     """
-    The call that writes `text`, or the reason there is none.
+    The expression that writes `text`, or the reason there is none.
 
-    The rules run from the most specific to the least, so a mode is a
-    mode before it is a CSI sequence with an "h" on the end.
+    A string is a run of sequences and plain text, in any order, and
+    the answer is those pieces added together:
+
+        "\\x1b[42mhi\\x1b[K"  ->  csi(escape.SGR, 42) + "hi" + csi(escape.EL)
+
+    **Either every sequence in the string is named, or none of them
+    is.** A string this tool half understands is worse than one it
+    leaves alone: the reader cannot tell which of the pieces was
+    checked. So the first ESC that starts something no rule names
+    gives up on the whole string, and its reason is the one counted.
     """
-    if text.count("\x1b") != 1:
-        return Skipped(text, "not one sequence")
-    if not text.startswith(CSI):
-        return _an_escape_sequence(text)
+    pieces: List[str] = []
+    plain = ""
+    at = 0
 
-    match = A_CSI_SEQUENCE.match(text)
+    while at < len(text):
+        if text[at] != "\x1b":
+            plain += text[at]
+            at += 1
+            continue
+
+        found = _a_sequence_at(text, at)
+        if isinstance(found, str):
+            return Skipped(text, found)
+
+        expression, length = found
+        if plain:
+            pieces.append(_as_written(plain))
+            plain = ""
+        pieces.append(expression)
+        at += length
+
+    if plain:
+        pieces.append(_as_written(plain))
+
+    if not pieces:
+        return Skipped(text, "nothing in it")
+    return Rewrite(text, " + ".join(pieces))
+
+
+def _as_written(text: str) -> str:
+    """
+    A plain string, spelled the way this codebase spells one.
+
+    `repr` reaches for single quotes and the code here uses double,
+    so the quotes are swapped where that needs no other change. The
+    escaping is `repr`'s either way, because getting it right by hand
+    is how a rewrite writes bytes nobody meant.
+    """
+    written = repr(text)
+    if written.startswith("'") and '"' not in text and "'" not in text:
+        return '"%s"' % written[1:-1]
+    return written
+
+
+def _a_sequence_at(text: str, at: int) -> "Tuple[str, int] | str":
+    """
+    The sequence that starts at `at`: its expression and its length.
+
+    A string, rather than a pair, is the reason there is no rule for
+    what starts there.
+    """
+    if text.startswith(CSI, at):
+        return _a_csi_at(text, at)
+    return _an_escape_at(text, at)
+
+
+def _a_csi_at(text: str, at: int) -> "Tuple[str, int] | str":
+    "The CSI sequence that starts at `at`, and how long it is."
+    match = A_CSI_SEQUENCE.match(text, at)
     if match is None:
-        return Skipped(text, "no whole CSI sequence")
+        return "no whole CSI sequence"
+
+    if "%" in match.group(0):
+        # A format template, not a sequence. "\x1b[%dm" reads as a
+        # sequence whose intermediate byte is "%", and it happens that
+        # no name has a "%" in it, so nothing would be rewritten. That
+        # is luck rather than a rule, and a template rewritten as the
+        # bytes it looks like would be a silent, unreadable fault.
+        return "a format template"
 
     private = match.group("private")
     final = match.group("final")
@@ -197,42 +272,54 @@ def an_expression_for(text: str) -> Rewrite | Skipped:
         # A subparameter is a tuple, and reading one back means
         # deciding which parameter it belongs to. `csi` writes them;
         # nothing here has to guess where they go.
-        return Skipped(text, "subparameters")
+        return "subparameters"
 
     values = _values_of(params)
+    length = match.end() - at
 
     mode = _a_mode_call(final, private, values)
     if mode is not None:
-        return Rewrite(text, mode)
+        return mode, length
 
     name = _a_name_for(final)
     if name is None:
-        return Skipped(text, "no name for %r" % (final,))
+        return "no name for %r" % (final,)
 
     arguments = [name] + [_written(value) for value in values]
     if private:
         arguments.append("private=%r" % (private,))
-    return Rewrite(text, "csi(%s)" % ", ".join(arguments))
+    return "csi(%s)" % ", ".join(arguments), length
 
 
-def _an_escape_sequence(text: str) -> Rewrite | Skipped:
+def _an_escape_at(text: str, at: int) -> "Tuple[str, int] | str":
     """
-    The call for a sequence that is ESC and one or two more bytes.
+    The escape sequence that starts at `at`, and how long it is.
 
     There are three families and the intermediate byte says which:
-    nothing at all, "#", or a space. A byte that no family names is
-    left alone, which is what keeps the prefixes out: "ESC O" starts
-    an SS3 form and "ESC P" a DCS, and neither is a whole sequence.
-    """
-    for intermediate, call, names in _ESC_FAMILIES:
-        head = "\x1b" + intermediate
-        if not text.startswith(head):
-            continue
-        final = text[len(head):]
-        if final in names:
-            return Rewrite(text, "%s(%s)" % (call, names[final]))
+    nothing at all, "#", or a space. A byte that no family names ends
+    the whole string, which is what keeps the prefixes out: "ESC O"
+    starts an SS3 form and "ESC P" a DCS, and neither is a sequence a
+    builder writes.
 
-    return Skipped(text, "not CSI")
+    The families are tried longest first. Nothing turns on it today,
+    because "#" and " " are in no `ESC_NAMES`, but a rule that reads
+    "ESC #" as "ESC" and leaves a "#" behind is the kind that fails
+    quietly.
+    """
+    for intermediate, call, names in sorted(
+        _ESC_FAMILIES, key=lambda one: -len(one[0])
+    ):
+        head = "\x1b" + intermediate
+        if not text.startswith(head, at):
+            continue
+        final = text[at + len(head): at + len(head) + 1]
+        if final in names:
+            return (
+                "%s(%s)" % (call, names[final]),
+                len(head) + len(final),
+            )
+
+    return "not CSI"
 
 
 def _values_of(params: str) -> List[int | None]:
@@ -477,11 +564,13 @@ def _that_fit(
         now = was
         for change in sorted(on_this_line, key=lambda one: one.start,
                              reverse=True):
-            now = (
-                now[: change.start[1]]
-                + change.rewrite.expression
-                + now[change.end[1]:]
+            now = _spliced(
+                now,
+                change.start[1],
+                change.end[1],
+                change.rewrite.expression,
             )
+        # Counted in characters, because a line is read and not parsed.
         if len(now) <= max(ROOM_ON_A_LINE, len(was)):
             kept.extend(on_this_line)
         else:
@@ -528,14 +617,31 @@ def applied(source: str, changes: List[Change]) -> str:
             # An implicitly joined string over several lines. The
             # splice would have to decide what to do with the join.
             continue
-        line = lines[first_line - 1]
-        lines[first_line - 1] = (
-            line[:first_column]
-            + change.rewrite.expression
-            + line[last_column:]
+        lines[first_line - 1] = _spliced(
+            lines[first_line - 1],
+            first_column,
+            last_column,
+            change.rewrite.expression,
         )
 
     return "".join(lines) if lines else source
+
+
+def _spliced(line: str, start: int, end: int, expression: str) -> str:
+    """
+    One line with the columns from `start` to `end` replaced.
+
+    **The columns are counted in bytes.** `ast` reports `col_offset`
+    in UTF-8 bytes and not in characters, so a line that holds a
+    character outside ASCII before the string puts every column after
+    it too far along. Indexing the text instead ate the comma after a
+    rewrite on a line that held an "á", and left a file that does not
+    parse.
+    """
+    raw = line.encode("utf-8")
+    return (
+        raw[:start] + expression.encode("utf-8") + raw[end:]
+    ).decode("utf-8")
 
 
 def with_the_imports(source: str, changes: List[Change]) -> str:

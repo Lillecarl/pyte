@@ -11,6 +11,7 @@ The rules it must not lose are the refusals. A tool that rewrites the
 expected value of an assertion turns a test into one that passes
 whatever the code does, and nothing downstream would say so.
 """
+import ast
 import sys
 from pathlib import Path
 
@@ -128,9 +129,40 @@ def test_a_prefix_is_not_an_escape_sequence():
 # What it refuses.
 
 
-def test_a_string_with_two_sequences_is_left_alone():
-    "One call per sequence, and where a blob divides is a judgement."
-    assert reason("\x1b[2J\x1b[H") == "not one sequence"
+def test_a_string_with_two_sequences_becomes_two_calls():
+    assert rewritten("\x1b[2J\x1b[H") == "csi(escape.ED, 2) + csi(escape.CUP)"
+
+
+def test_the_text_between_two_sequences_stays_text():
+    assert rewritten("\x1b[42mhi\x1b[K") == (
+        'csi(escape.SGR, 42) + "hi" + csi(escape.EL)'
+    )
+
+
+def test_the_text_around_a_sequence_stays_text():
+    assert rewritten("a\r\nb\x1b[0S") == '"a\\r\\nb" + csi(Csi.SU, 0)'
+    assert rewritten("ab\x1b#8X") == '"ab" + sharp(Sharp.DECALN) + "X"'
+
+
+def test_a_quote_in_the_text_is_left_to_repr():
+    """
+    Double quotes are what this codebase writes, so the swap happens
+    where it needs no other change. Getting the escaping right by hand
+    is how a rewrite writes bytes nobody meant.
+    """
+    assert rewritten("a'b\x1b[2J") == '"a\'b" + csi(escape.ED, 2)'
+    assert rewritten('a"b\x1b[2J') == '\'a"b\' + csi(escape.ED, 2)'
+
+
+def test_a_string_is_named_whole_or_not_at_all():
+    """
+    A string this tool half understands is worse than one it leaves
+    alone: a reader cannot tell which of the pieces was checked. So
+    the first ESC with no rule gives up on all of it, even the parts
+    that had one.
+    """
+    assert rewritten("\x1b[2J\x1b]0;title\x07") is None
+    assert reason("\x1b[2J\x1b]0;title\x07") == "not CSI"
 
 
 def test_a_sequence_that_is_not_csi_is_left_alone():
@@ -146,19 +178,31 @@ def test_a_final_byte_with_no_name_is_counted():
     assert reason("\x1b[1*{").startswith("no name")
 
 
-def test_a_sequence_with_something_after_it_is_left_alone():
+def test_what_follows_a_sequence_survives():
     """
-    A newline after the sequence is not part of it, and the rewrite
-    would have dropped it.
+    A newline after the sequence is not part of it, and a rewrite that
+    dropped it would change what the test feeds.
 
     This is the one the tool got wrong. In Python a `$` in a pattern
     matches before a trailing newline as well as at the end, so
-    `"\\x1b[4;1H\\n"` read as a bare sequence. The check that every
-    expression writes back the string it replaced caught it, on the
-    first file outside pyte, before anything was written.
+    `"\\x1b[4;1H\\n"` read as a bare sequence and the newline went
+    away. The check that every expression writes back the string it
+    replaced caught it, on the first file outside pyte, before
+    anything was written.
     """
-    assert reason("\x1b[4;1H\n") == "no whole CSI sequence"
-    assert reason("\x1b[2Jx") == "no whole CSI sequence"
+    assert rewritten("\x1b[4;1H\n") == 'csi(escape.CUP, 4, 1) + "\\n"'
+    assert rewritten("\x1b[2Jx") == 'csi(escape.ED, 2) + "x"'
+
+
+def test_a_format_template_is_not_a_sequence():
+    """
+    `"\\x1b[%dm"` reads as a sequence whose intermediate byte is "%",
+    and no name has a "%" in it, so nothing would be rewritten
+    anyway. That is luck rather than a rule, and a template rewritten
+    as the bytes it looks like would be silent and unreadable.
+    """
+    assert reason("\x1b[%dm") == "a format template"
+    assert reason("\x1b[1;%dH") == "a format template"
 
 
 def test_what_an_assertion_expects_is_left_alone():
@@ -236,6 +280,35 @@ def test_a_line_with_no_room_is_left_alone():
 
 # ----------------------------------------------------------------------
 # What it writes into the file.
+
+
+def test_a_character_outside_ascii_does_not_move_the_splice():
+    """
+    `ast` reports a column in UTF-8 bytes and not in characters, so a
+    line that holds anything outside ASCII puts every column after it
+    too far along.
+
+    It ate the comma after the rewrite on this very line and left a
+    file that does not parse. Nothing but the parser would have said
+    so: the check that every expression writes back its own string
+    reads the string and not the line it sits on.
+    """
+    source = 'def t():\n    assert not differences("\\x1b[3Gá", lines=3)\n'
+    changes, _ = changes_in(source)
+    written = applied(source, changes)
+
+    assert 'differences(csi(escape.CHA, 3) + "á", lines=3)' in written
+    ast.parse(written)
+
+
+def test_two_rewrites_on_one_line_both_land():
+    "The splice runs backwards, so one never moves the other."
+    source = 'def t():\n    feed("\\x1b[2T", "\\x1b[3T")\n'
+    changes, _ = changes_in(source)
+    written = applied(source, changes)
+
+    assert "feed(csi(Csi.SD, 2), csi(Csi.SD, 3))" in written
+    ast.parse(written)
 
 
 def test_the_import_goes_under_the_imports_the_file_has():
