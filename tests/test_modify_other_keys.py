@@ -204,6 +204,52 @@ def test_the_kitty_flags_win():
     assert screen.encode_key("\x01") == "\x1b[97;5u"
 
 
+def test_a_pane_the_host_holds_back_stays_in_the_legacy_encoding():
+    """
+    The escape hatch, for a program that misbehaves under the extended
+    encodings. The pane hears it: it answers what it really does, and
+    not what it asked for, so a program that queries is told the
+    truth. Lillecarl/pymux#173.
+    """
+    screen, stream, replies = a_screen()
+    stream.feed("\x1b[>4;2m")
+    assert screen.encode_key("\x01") == "\x1b[27;5;97~"
+
+    screen.extended_keys_allowed = False
+
+    assert screen.modify_other_keys == ModifyOtherKeys.OFF
+    assert screen.encode_key("\x01") == "\x01"
+    replies.clear()
+    stream.feed("\x1b[?4m")
+    assert replies == ["\x1b[>4;0m"]
+
+
+def test_the_kitty_flags_go_with_it():
+    "One hatch, and both ways in are behind it."
+    screen, stream, replies = a_screen()
+    stream.feed("\x1b[>1u")
+    assert screen.encode_key("\x01") == "\x1b[97;5u"
+
+    screen.extended_keys_allowed = False
+
+    assert screen.deliverable_kitty_keyboard_flags == 0
+    assert screen.encode_key("\x01") == "\x01"
+    replies.clear()
+    stream.feed("\x1b[?u")
+    assert replies == ["\x1b[?0u"]
+
+
+def test_what_the_pane_asked_for_is_not_forgotten():
+    "The hatch closes and the pane has what it set, still."
+    screen, stream, _ = a_screen()
+    stream.feed("\x1b[>4;2m")
+
+    screen.extended_keys_allowed = False
+    screen.extended_keys_allowed = True
+
+    assert screen.modify_other_keys == ModifyOtherKeys.EVERY_MODIFIER
+
+
 def test_the_private_marker_is_not_sgr():
     """
     "CSI > Ps m" and "CSI ? Ps m" both end in the final byte of SGR.

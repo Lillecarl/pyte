@@ -264,6 +264,16 @@ class Screen:
         # have it. The host sets this one as well.
         self.synthesize_key_events: bool = True
 
+        # Whether this pane may have anything but the legacy encoding.
+        # The host sets it, and turning it off is the escape hatch for
+        # a program that misbehaves under the newer ones.
+        #
+        # A pane that is not allowed hears so: it answers "CSI ? 0 u"
+        # and "CSI > 4 ; 0 m" whatever it asked for, because a
+        # capability that is claimed and not served is worse than one
+        # that is missing. Lillecarl/pymux#173.
+        self.extended_keys_allowed: bool = True
+
         # The shapes of the pointer that "OSC 22" pushed. Each screen
         # keeps its own, the way kitty does.
         self.pointer_shapes = PointerShapes()
@@ -319,6 +329,8 @@ class Screen:
     @property
     def deliverable_kitty_keyboard_flags(self) -> int:
         "The flags that this pane really gets, of the ones it asked for."
+        if not self.extended_keys_allowed:
+            return 0
         return keys.deliverable_flags(
             self.kitty_keyboard_flags,
             self.keyboard_source_flags,
@@ -357,7 +369,15 @@ class Screen:
 
     @property
     def modify_other_keys(self) -> int:
-        "How much of the keyboard leaves the legacy encoding."
+        """
+        How much of the keyboard leaves the legacy encoding.
+
+        Nothing does, for a pane the host does not allow it. The
+        answer to XTQMODKEYS goes with it, so a program that asks is
+        told the truth rather than what it set.
+        """
+        if not self.extended_keys_allowed:
+            return keys.ModifyOtherKeys.OFF
         return self.key_modifier_options.get(
             keys.KeyModifierResource.OTHER_KEYS, keys.ModifyOtherKeys.OFF
         )
@@ -417,9 +437,13 @@ class Screen:
         resource = params[0]
         if isinstance(resource, tuple):
             resource = resource[0] if resource else 0
-        self.reply_csi(
-            ">%i;%im" % (resource, self.key_modifier_options.get(resource, 0))
-        )
+        if resource == keys.KeyModifierResource.OTHER_KEYS:
+            # The one this screen acts on, so the answer is what it
+            # really does and not what it was told.
+            value = self.modify_other_keys
+        else:
+            value = self.key_modifier_options.get(resource, 0)
+        self.reply_csi(">%i;%im" % (resource, value))
 
     def wrap_paste(self, text: str) -> str:
         """
