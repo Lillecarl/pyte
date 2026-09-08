@@ -24,6 +24,7 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Sequence,
     Set,
     Tuple,
 )
@@ -123,16 +124,36 @@ def _first_parameter(parameter: object) -> int:
     return parameter
 
 
+def _param(params: Sequence[object], index: int, default: int = 0) -> int:
+    """
+    Parameter `index`, or `default` when the program left it out.
+
+    A parameter that arrives as None was written empty, and one past
+    the end was not written at all (Lillecarl/pymux#178). A sequence
+    whose default is what it is reads the two the same way, which is
+    most of them.
+    """
+    if index >= len(params):
+        return default
+    value = params[index]
+    return default if value is None else value  # type: ignore[return-value]
+
+
 def _four(params: Tuple[int, ...], first: int) -> Tuple[int, int, int, int]:
     """
     Four parameters, counting from `first`, with zero for a missing one.
 
     A sender drops the parameters it leaves at the default, so a
-    command that names four corners can arrive with fewer. Zero is what
-    an empty parameter gives, so the two read the same way.
+    command that names four corners can arrive with fewer. An empty
+    parameter reads the same way, so a corner that is left out is zero
+    whether the program wrote a semicolon for it or stopped early.
     """
-    read = params[first : first + 4]
-    return tuple(read) + (0,) * (4 - len(read))  # type: ignore[return-value]
+    return (
+        _param(params, first),
+        _param(params, first + 1),
+        _param(params, first + 2),
+        _param(params, first + 3),
+    )
 
 
 # Custom Savepoint that also stores the rendition.
@@ -483,13 +504,10 @@ class Screen:
         What XTMODKEYS and XTFMTKEYS both do with what they carry.
 
         With no parameter at all every resource goes back to where it
-        started, and with the resource alone that one does.
-
-        **The first of those two is unreachable here.** The CSI parser
-        turns an empty parameter into a zero, so "CSI > f" arrives as
-        the number zero and cannot be told from "CSI > 0 f". The
-        narrower reading wins, and the branch stays for the day the
-        parser can say the difference. Lillecarl/pymux#178.
+        started, and with the resource alone that one does. xterm says
+        both, and the two are told apart because a sequence that writes
+        no parameter carries none, while "CSI > 0 f" carries a zero.
+        Lillecarl/pymux#178.
         """
         if not params:
             options.clear()
@@ -861,7 +879,7 @@ class Screen:
         DECSEL leave a marked cell alone, and ED, EL and ECH do not:
         that is the whole difference between the two pairs.
         """
-        if (params[0] if params else 0) == 1:
+        if (_param(params, 0)) == 1:
             self.protection |= Protection.DEC
         else:
             self.protection &= ~Protection.DEC
@@ -1289,8 +1307,8 @@ class Screen:
         # mean the default, which is the first row and the last. So
         # "CSI r" names the whole screen, and that is how a program
         # gives the screen back after it has used a region.
-        first = params[0] if len(params) > 0 else 0
-        last = params[1] if len(params) > 1 else 0
+        first = _param(params, 0)
+        last = _param(params, 1)
 
         # The parameters count from one and the margins count from
         # zero, and both stay on the screen.
@@ -1412,8 +1430,8 @@ class Screen:
             self.save_cursor()
             return
 
-        left = (params[0] if len(params) > 0 else 0) or 1
-        right = (params[1] if len(params) > 1 else 0) or self.columns
+        left = (_param(params, 0)) or 1
+        right = (_param(params, 1)) or self.columns
 
         left = max(1, min(left, self.columns))
         right = max(1, min(right, self.columns))
@@ -3473,7 +3491,7 @@ class Screen:
 
         The cursor does not move.
         """
-        code = params[0] if params else 0
+        code = _param(params, 0)
         if not any(low <= code <= high for low, high in self.FILL_RANGES):
             return
 
@@ -3590,8 +3608,8 @@ class Screen:
         top, left, bottom, right = corners
 
         target_top, target_left = self._corner(
-            params[5] if len(params) > 5 else 0,
-            params[6] if len(params) > 6 else 0,
+            _param(params, 5),
+            _param(params, 6),
         )
         if target_top >= self.lines or target_left >= self.columns:
             return
@@ -3636,7 +3654,7 @@ class Screen:
         nothing acts on it. A program writes it and reads it back with
         DECRQSS, and an answer that says nothing sends it to a guess.
         """
-        value = params[0] if params else 0
+        value = _param(params, 0)
         if value in tuple(AttributeExtent):
             self.attribute_extent = AttributeExtent(value)
 
@@ -3648,7 +3666,7 @@ class Screen:
         for the whole window. So the setting is kept and the output
         stays on the screen.
         """
-        value = params[0] if params else 0
+        value = _param(params, 0)
         if value in tuple(StatusDisplay):
             self.active_display = StatusDisplay(value)
 
@@ -3658,7 +3676,7 @@ class Screen:
 
         Kept, for the same reason as DECSASD.
         """
-        value = params[0] if params else 0
+        value = _param(params, 0)
         if value in tuple(StatusLineType):
             self.status_line = StatusLineType(value)
 
@@ -3677,7 +3695,7 @@ class Screen:
         are both eight bit. It is optional, and level 1 ignores it.
         S7C1T and S8C1T set the same thing.
         """
-        level = params[0] if params else 0
+        level = _param(params, 0)
         if level in tuple(ConformanceLevel):
             self.conformance_level = ConformanceLevel(level)
         if len(params) > 1 and self.conformance_level != ConformanceLevel.VT100:
@@ -3692,7 +3710,7 @@ class Screen:
         pymux owns how big it is, so ptterm keeps the number and does
         not resize anything.
         """
-        self.lines_per_screen = (params[0] if params else 0) or self.lines
+        self.lines_per_screen = (_param(params, 0)) or self.lines
 
     def set_tab_stop(self) -> None:
         "Set a horizontal tab stop at cursor position."
@@ -4274,7 +4292,7 @@ class Screen:
         if self.conformance_level < ConformanceLevel.VT300:
             return
 
-        number = params[0] if params else 0
+        number = _param(params, 0)
         is_private = private is True
 
         if is_private:
@@ -4317,7 +4335,7 @@ class Screen:
         so a pane that asks for a bar gets one. A program that sets a
         shape also asks for it back, and it reads what it wrote.
         """
-        style = params[0] if params else 0
+        style = _param(params, 0)
         if style == 0:
             self.cursor_style = DEFAULT_CURSOR_STYLE
         elif style in iter(CursorShape):
@@ -4527,8 +4545,8 @@ class Screen:
             self.titles.change_modes(params, True)
             return
 
-        what = params[0] if params else 0
-        which = params[1] if len(params) > 1 else 0
+        what = _param(params, 0)
+        which = _param(params, 1)
 
         if what >= FIRST_PAGE_LENGTH:
             # DECSLPP: a page of `what` lines, and the columns stay.
@@ -4655,7 +4673,7 @@ class Screen:
         cell is never zero, and the answer is never "0000", which a
         caller cannot tell apart from an answer that never came.
         """
-        pid = params[0] if params else 0
+        pid = _param(params, 0)
 
         # Origin mode counts the corners from the margins, the same way
         # every other rectangle command counts them. A corner that is
@@ -4668,11 +4686,11 @@ class Screen:
             if self.horizontal_margins is not None:
                 first_column, last_column = self.horizontal_margins
 
-        named_bottom = params[4] if len(params) > 4 else 0
-        named_right = params[5] if len(params) > 5 else 0
+        named_bottom = _param(params, 4)
+        named_right = _param(params, 5)
         top, left = self._corner(
-            params[2] if len(params) > 2 else 0,
-            params[3] if len(params) > 3 else 0,
+            _param(params, 2),
+            _param(params, 3),
         )
         bottom = first_row + named_bottom - 1 if named_bottom else last_row
         right = first_column + named_right - 1 if named_right else last_column
@@ -4773,21 +4791,21 @@ class Screen:
         elif private == ">":
             # Push. The flags default to none.
             self.kitty_flags_stack = keys.pushed(
-                self.kitty_flags_stack, params[0] if params else 0
+                self.kitty_flags_stack, _param(params, 0)
             )
 
         elif private == "<":
             # Pop. The count defaults to one.
             self.kitty_flags_stack = keys.popped(
-                self.kitty_flags_stack, params[0] if params else 1
+                self.kitty_flags_stack, _param(params, 0, 1)
             )
 
         elif private == "=":
             # Set. The mode defaults to setting the flags exactly.
             stack = keys.with_flags_set(
                 self.kitty_flags_stack,
-                params[0] if params else 0,
-                params[1] if len(params) > 1 else keys.FlagsMode.SET_EXACTLY,
+                _param(params, 0),
+                _param(params, 1, keys.FlagsMode.SET_EXACTLY),
             )
             if stack is not None:
                 self.kitty_flags_stack = stack

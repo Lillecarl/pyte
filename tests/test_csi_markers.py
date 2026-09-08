@@ -41,14 +41,15 @@ def test_kitty_push():
 
 
 def test_kitty_push_without_flags():
+    "A sequence with no parameter carries none. Lillecarl/pymux#178."
     assert feed(csi(Csi.KITTY_KEYBOARD, private=">")) == [
-        ("report_kitty_keyboard", (0,), {"private": ">"})
+        ("report_kitty_keyboard", (), {"private": ">"})
     ]
 
 
 def test_kitty_pop():
     assert feed(csi(Csi.KITTY_KEYBOARD, private="<")) == [
-        ("report_kitty_keyboard", (0,), {"private": "<"})
+        ("report_kitty_keyboard", (), {"private": "<"})
     ]
     assert feed(csi(Csi.KITTY_KEYBOARD, 2, private="<")) == [
         ("report_kitty_keyboard", (2,), {"private": "<"})
@@ -66,7 +67,7 @@ def test_kitty_set_flags():
 
 def test_kitty_query():
     assert feed(csi(Csi.KITTY_KEYBOARD, private="?")) == [
-        ("report_kitty_keyboard", (0,), {"private": True})
+        ("report_kitty_keyboard", (), {"private": True})
     ]
 
 
@@ -95,7 +96,7 @@ def test_secondary_da_marker_is_dispatched():
     # "CSI > c" (Secondary DA) dispatches like "CSI c", with the marker
     # passed through as ``private``.
     assert feed(csi(escape.DA, private=">")) == [
-        ("report_device_attributes", (0,), {"private": ">"})
+        ("report_device_attributes", (), {"private": ">"})
     ]
 
 

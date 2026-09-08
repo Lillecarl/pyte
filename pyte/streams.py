@@ -41,21 +41,37 @@ if TYPE_CHECKING:
     ParserGenerator = Generator[bool | None, str, None]
 
 
-def limit_parameters(handler: "Callable[..., None]") -> "Callable[..., None]":
+def fit_parameters(handler: "Callable[..., None]") -> "Callable[..., None]":
     """
-    A handler that quietly drops the parameters it has no room for.
+    A handler that gets the parameters it can take, with its defaults.
 
-    A terminal reads the parameters that a sequence needs and ignores
-    the rest. Without this, a sequence such as "CSI 1;1 G", which
-    carries one parameter too many, raises a TypeError and stops the
-    stream. One stray sequence may not stop a whole terminal.
+    Two things, and both read the handler's own signature.
+
+    **It drops the parameters the handler has no room for.** A terminal
+    reads the parameters a sequence needs and ignores the rest. Without
+    this, a sequence such as "CSI 1;1 G", which carries one parameter
+    too many, raises a TypeError and stops the stream. One stray
+    sequence may not stop a whole terminal.
+
+    **It fills in the default of a parameter the program left out.** An
+    omitted parameter arrives as None (Lillecarl/pymux#178), and the
+    signature is the default table of the sequence: `erase_in_line`
+    declares `type_of: int = 0`, so "CSI K" reads as "CSI 0 K" without
+    the handler doing anything.
+
+    So a handler that must tell zero from omitted declares its default
+    as None and reads it. Most do that already, because `count or 1`
+    answers both for a sequence whose zero means one.
+
+    A handler that takes `*params` is handed what arrived, None and
+    all. It names no defaults, so there are none to fill.
     """
     try:
         signature = inspect.signature(handler)
     except (TypeError, ValueError):
         return handler
 
-    count = 0
+    defaults: "list[Any]" = []
     for parameter in signature.parameters.values():
         if parameter.kind is parameter.VAR_POSITIONAL:
             return handler  # It takes as many as arrive.
@@ -63,7 +79,11 @@ def limit_parameters(handler: "Callable[..., None]") -> "Callable[..., None]":
             parameter.POSITIONAL_ONLY,
             parameter.POSITIONAL_OR_KEYWORD,
         ):
-            count += 1
+            defaults.append(
+                None if parameter.default is parameter.empty else parameter.default
+            )
+
+    count = len(defaults)
 
     takes_private = "private" in signature.parameters or any(
         parameter.kind is parameter.VAR_KEYWORD
@@ -73,7 +93,13 @@ def limit_parameters(handler: "Callable[..., None]") -> "Callable[..., None]":
     def call(*params: "Any", **kwargs: "Any") -> None:
         if not takes_private:
             kwargs.pop("private", None)
-        handler(*params[:count], **kwargs)
+        handler(
+            *(
+                defaults[index] if value is None else value
+                for index, value in enumerate(params[:count])
+            ),
+            **kwargs,
+        )
 
     return call
 
@@ -391,11 +417,11 @@ class Stream:
         escape_mapping = self.escape
         escape_dispatch = create_dispatcher(self.escape)
         # Only a CSI sequence carries parameters, so only its handlers
-        # need the guard against a sequence that carries too many.
+        # need the count trimmed and the defaults filled in.
         csi_dispatch = defaultdict(
             lambda: debug,
             {
-                event: limit_parameters(handler)
+                event: fit_parameters(handler)
                 for event, handler in create_dispatcher(self.csi).items()
             },
         )
@@ -550,7 +576,12 @@ class Stream:
                         current = ""
                     elif char == ";":
                         if subparams is None:
-                            params.append(int(current or 0))
+                            # An empty parameter is None and not zero, so
+                            # that a handler can tell "the program said
+                            # nothing here" from "the program said zero".
+                            # Some sequences read the two differently.
+                            # Lillecarl/pymux#178.
+                            params.append(None if current == "" else int(current))
                         else:
                             params.append(tuple(subparams + [int(current or 0)]))
                             subparams = None
@@ -561,10 +592,15 @@ class Stream:
                         # NOTE: Parameters are not capped, because the kitty
                         # keyboard protocol uses functional key codes above
                         # 9999.
-                        if subparams is None:
-                            params.append(int(current or 0))
-                        else:
+                        if subparams is not None:
                             params.append(tuple(subparams + [int(current or 0)]))
+                        elif current != "" or params:
+                            # An empty parameter *string* is not one empty
+                            # parameter. ECMA-48 reads "CSI m" as "the
+                            # defaults apply throughout", so it carries no
+                            # parameter at all, while "CSI ; m" carries two
+                            # that were left out.
+                            params.append(None if current == "" else int(current))
 
                         # An intermediate byte makes another sequence:
                         # it is part of the key that names the handler.

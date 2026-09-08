@@ -73,7 +73,8 @@ def test_unknown_sequences():
     # "Y" names no sequence. "Z" did until the parser learned CBT.
     stream.feed(ctrl.CSI + "6;Y")
     assert handler.count == 1
-    assert handler.args == (6, 0)
+    # The second parameter is empty, so it is None and not zero.
+    assert handler.args == (6, None)
     assert handler.kwargs == {}
 
 
@@ -130,6 +131,11 @@ def test_reset_mode():
 
 
 def test_missing_params():
+    """
+    A parameter the program left empty arrives as None, and not as the
+    number zero, so that a handler can tell the two apart.
+    Lillecarl/pymux#178.
+    """
     handler = argcheck()
     screen = a_screen(80, 24)
     screen.cursor_position = handler
@@ -137,7 +143,59 @@ def test_missing_params():
     stream = pyte.Stream(screen)
     stream.feed(ctrl.CSI + ";" + esc.HVP)
     assert handler.count == 1
-    assert handler.args == (0, 0)
+    assert handler.args == (None, None)
+
+
+def test_no_params_at_all_is_no_parameter():
+    """
+    An empty parameter *string* is not one empty parameter. ECMA-48
+    reads "CSI H" as "the defaults apply throughout", so it carries
+    nothing, while "CSI ; H" carries two that were left out.
+    """
+    handler = argcheck()
+    screen = a_screen(80, 24)
+    screen.cursor_position = handler
+
+    stream = pyte.Stream(screen)
+    stream.feed(ctrl.CSI + esc.HVP)
+    assert handler.args == ()
+
+
+def test_a_handler_gets_the_default_it_declares():
+    """
+    The signature is the default table of the sequence.
+
+    An empty parameter reaches the dispatch as None, and a handler that
+    names a default for that position gets the default instead. So
+    "CSI ; K" reads as "CSI 0 K" with nothing in the handler to say so.
+
+    A handler that names None as its default gets None, which is how it
+    tells "the program said nothing" from "the program said zero".
+    """
+
+    def named_default(type_of: int = 3, private: bool = False):
+        seen.append(type_of)
+
+    def named_none(count: int | None = None):
+        seen.append(count)
+
+    seen = []
+    screen = a_screen(80, 24)
+    screen.erase_in_line = named_default
+    screen.cursor_up = named_none
+
+    stream = pyte.Stream(screen)
+    stream.feed(ctrl.CSI + ";" + esc.EL)
+    stream.feed(ctrl.CSI + ";" + esc.CUU)
+
+    assert seen == [3, None]
+
+    # And a parameter the program did write wins over the default.
+    seen.clear()
+    stream.feed(ctrl.CSI + "2" + esc.EL)
+    stream.feed(ctrl.CSI + "0" + esc.CUU)
+
+    assert seen == [2, 0]
 
 
 def test_overflow():

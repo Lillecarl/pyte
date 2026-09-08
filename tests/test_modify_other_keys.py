@@ -112,15 +112,13 @@ def test_a_resource_alone_puts_that_one_back():
     assert screen.encode_key("\x01") == "\x01"
 
 
-def test_a_parameter_that_is_left_out_reads_as_zero():
+def test_no_parameter_at_all_puts_every_resource_back():
     """
-    xterm puts every resource back when XTMODKEYS carries no
-    parameter at all, and `CSI > 0 m` puts back modifyKeyboard alone.
+    xterm: "If no parameters are given, all resources are reset to
+    their initial values."
 
-    **This screen cannot tell the two apart.** The CSI parser turns an
-    empty parameter into a zero, so both arrive as the number zero and
-    the narrower reading wins. Nothing sends `CSI > m`, and a program
-    that did would find modifyKeyboard reset and nothing else.
+    This is the sequence that could not be told from `CSI > 0 m` while
+    the parser turned an empty parameter into a zero.
     Lillecarl/pymux#178.
     """
     screen, stream, _ = a_screen()
@@ -128,6 +126,18 @@ def test_a_parameter_that_is_left_out_reads_as_zero():
     stream.feed("\x1b[>4;2m")
 
     stream.feed("\x1b[>m")
+
+    assert screen.key_modifier_options == {}
+    assert screen.modify_other_keys == ModifyOtherKeys.OFF
+
+
+def test_a_resource_of_zero_puts_back_that_one_alone():
+    "`CSI > 0 m` names modifyKeyboard, and leaves the rest as they are."
+    screen, stream, _ = a_screen()
+    stream.feed("\x1b[>0;2m")
+    stream.feed("\x1b[>4;2m")
+
+    stream.feed("\x1b[>0m")
 
     assert KeyModifierResource.KEYBOARD not in screen.key_modifier_options
     assert screen.modify_other_keys == ModifyOtherKeys.EVERY_MODIFIER

@@ -84,13 +84,16 @@ class Titles:
 
         Each parameter names one mode, so one sequence can change
         several. A sequence that carries no parameter names mode zero,
-        the way a missing number is a zero everywhere else.
+        and so does one that carries an empty parameter: an empty
+        parameter asks for the default of that position, which here is
+        zero. Lillecarl/pymux#178.
 
         A number that no mode has is ignored. xterm does the same, and
         a program that asks for a mode nobody carries should not lose
         the modes it asked for in the same sequence.
         """
-        for number in params or (0,):
+        for given in params or (None,):
+            number = 0 if given is None else given
             if number not in tuple(TitleMode):
                 continue
             if on:
