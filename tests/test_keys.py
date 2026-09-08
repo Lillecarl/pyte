@@ -1,11 +1,11 @@
 """
-Tests for the key data translation in pyte.kitty_keys.
+Tests for the key data translation in pyte.keys.
 
 `translate_key_data` converts raw key data (as produced by the terminal
 feeding the pane) into the encoding that the pane expects, given its
 kitty keyboard protocol flags.
 """
-from pyte.kitty_keys import translate_key_data
+from pyte.keys import translate_key_data
 
 DISAMBIGUATE = 0b1
 EVENT_TYPES = 0b10

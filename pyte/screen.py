@@ -33,7 +33,7 @@ from .images import (
     ASSUMED_CELL_WIDTH,
     GraphicsState,
 )
-from . import kitty_keys
+from . import keys
 from .cells import (
     BASELINE_PARAMETERS,
     UNDERLINE_PARAMETERS,
@@ -304,12 +304,12 @@ class Screen:
         The currently effective kitty keyboard protocol flags. (The top of
         the flag stack, or zero when the stack is empty.)
         """
-        return kitty_keys.current_flags(self.kitty_flags_stack)
+        return keys.current_flags(self.kitty_flags_stack)
 
     @property
     def deliverable_kitty_keyboard_flags(self) -> int:
         "The flags that this pane really gets, of the ones it asked for."
-        return kitty_keys.deliverable_flags(
+        return keys.deliverable_flags(
             self.kitty_keyboard_flags,
             self.keyboard_source_flags,
             self.synthesize_key_events,
@@ -335,7 +335,7 @@ class Screen:
         ones it asked for. One value answers the query of the pane and
         drives the encoding, so the answer holds.
         """
-        return kitty_keys.translate_key_data(
+        return keys.translate_key_data(
             data,
             flags=self.deliverable_kitty_keyboard_flags,
             application_mode=self.in_application_mode,
@@ -4536,24 +4536,24 @@ class Screen:
 
         elif private == ">":
             # Push. The flags default to none.
-            self.kitty_flags_stack = kitty_keys.pushed(
+            self.kitty_flags_stack = keys.pushed(
                 self.kitty_flags_stack, params[0] if params else 0
             )
 
         elif private == "<":
             # Pop. The count defaults to one.
-            self.kitty_flags_stack = kitty_keys.popped(
+            self.kitty_flags_stack = keys.popped(
                 self.kitty_flags_stack, params[0] if params else 1
             )
 
         elif private == "=":
             # Set. The mode defaults to setting the flags exactly.
-            stack = kitty_keys.with_flags_set(
+            stack = keys.with_flags_set(
                 self.kitty_flags_stack,
                 params[0] if params else 0,
                 params[1]
                 if len(params) > 1
-                else kitty_keys.FlagsMode.SET_EXACTLY,
+                else keys.FlagsMode.SET_EXACTLY,
             )
             if stack is not None:
                 self.kitty_flags_stack = stack

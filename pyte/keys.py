@@ -1,12 +1,29 @@
 """
-Key data translation for the kitty keyboard protocol.
+What a key is, in every mode a keyboard can be in.
 
-The process running inside a pane can request the kitty keyboard
-protocol (pushing flags with "CSI > flags u", tracked by Screen).
-The terminal that feeds us key data (the multiplexer client of pymux,
-or any other prompt_toolkit application) can send keys in the legacy
-encoding, in the kitty CSI u encoding, or a mix of both. This module
-translates raw key data into the encoding that the pane expects:
+A keyboard has three modes, and this module stands between two of
+them at once: the mode the terminal of the person is in, and the mode
+the program in the pane asked for.
+
+| mode | shape | who asks for it |
+| --- | --- | --- |
+| legacy | control codes, `ESC` for alt, "CSI 1 ; mods X", SS3 | everybody |
+| extended | "CSI 27 ; mods ; code ~", or "CSI code ; mods u" | xterm, vim |
+| kitty | "CSI code:alt ; mods:event ; text u", and a flag stack | kitty, foot |
+
+**Three readers and three writers, and never a table between them.**
+`parse_key_data` reads bytes into `KeyEvent`s and `translate_key_data`
+writes them out again in the form the pane holds. Nothing here turns
+one mode into another directly: six arrows would become twelve the day
+a fourth mode arrives, and the `KeyEvent` in the middle is what keeps
+it at six functions.
+
+Each mode is the legacy encoding plus a rule about which keys leave
+it, and no byte sequence means two things, which is what makes one
+event in the middle work. Lillecarl/pymux#172.
+
+The process in a pane asks with "CSI > flags u", and `Screen` holds
+the stack. What it gets:
 
 - No flag at all: the legacy encoding. A CSI u sequence becomes its
   legacy equivalent, and everything else passes through verbatim.

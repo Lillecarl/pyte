@@ -38,7 +38,7 @@ PURE = {
     "control",
     "escape",
     "images",
-    "kitty_keys",
+    "keys",
     "modes",
     "osc",
     "page",
@@ -146,7 +146,7 @@ def _imports(path: Path):
                 # "from .colors import SgrColor".
                 inside.add(node.module)
             else:
-                # "from . import kitty_keys" names one module per alias.
+                # "from . import keys" names one module per alias.
                 for alias in node.names:
                     inside.add(alias.name)
     return outside, inside
@@ -221,7 +221,7 @@ def test_the_reading_sees_an_import_where_there_is_one():
     found no import anywhere would pass every module.
     """
     outside, inside = _imports(MODULES["screen"])
-    assert {"cells", "colors", "images", "kitty_keys", "page"} <= inside
+    assert {"cells", "colors", "images", "keys", "page"} <= inside
 
     # `cells` is where the one outside import of the pure layer is:
     # `wcwidth` measures a character, and nothing else here reaches
