@@ -86,15 +86,26 @@ class Modifier(IntFlag):
     The value in a CSI u sequence is one plus the sum of these bits, so
     a sequence with no modifier carries a one and not a zero.
 
-    The protocol counts five more: super, hyper, meta, caps lock and
-    num lock. Only these three change what a key writes, so only these
-    three are named. A sequence that carries one of the others keeps
-    it, because the whole number is passed on.
+    The first three are the ones the legacy encoding can write. The
+    rest it cannot, which is why a key that carries one of them has to
+    leave that encoding: kitty's rule is that "all key events that do
+    not generate text" go out as an escape code
+    (`docs/keyboard-protocol.rst`, under the disambiguate flag).
+
+    **The two locks are not in that group.** kitty says so in the same
+    place: "the Lock modifiers are not reported for text producing
+    keys, to keep them usable in legacy programs". Caps lock on a
+    letter gives the capital, and that is text.
     """
 
     SHIFT = 1
     ALT = 2
     CTRL = 4
+    SUPER = 8
+    HYPER = 16
+    META = 32
+    CAPS_LOCK = 64
+    NUM_LOCK = 128
 
 
 class KeyboardFlag(IntFlag):
@@ -200,6 +211,26 @@ _CTRL_TAKES_OFF_A_SYMBOL = ord("\\") - 28
 #: What shift and Tab send in the legacy encoding, after the escape.
 #: CBT by its other name.
 BACK_TAB = "[Z"
+
+#: The modifiers a key cannot carry in the legacy encoding, so that a
+#: key which has one has to leave it.
+#:
+#: kitty names the combinations that go out as escape codes when a pane
+#: asks to disambiguate: "the Esc, alt+key, ctrl+key, ctrl+alt+key,
+#: shift+alt+key keys". Its rule under that is the general one, and it
+#: is the one to read: "all key events that do not generate text".
+#:
+#: Shift is not here, because shift on a letter is the capital and
+#: that is text. Nor are the two locks, for the same reason, which
+#: kitty says in the same place: "the Lock modifiers are not reported
+#: for text producing keys, to keep them usable in legacy programs".
+_MODIFIERS_WITH_NO_LEGACY_FORM = (
+    Modifier.CTRL
+    | Modifier.ALT
+    | Modifier.SUPER
+    | Modifier.HYPER
+    | Modifier.META
+)
 
 
 def _has_a_shifted_character(code: int, text: str) -> bool:
@@ -838,7 +869,7 @@ def _encode_event(
 
     if final == "u":
         ambiguous = (
-            bool(mods & (Modifier.CTRL | Modifier.ALT))
+            bool(mods & _MODIFIERS_WITH_NO_LEGACY_FORM)
             or code == KeyCode.ESCAPE
         )
         # A functional key still here belongs to a pane that reads the
