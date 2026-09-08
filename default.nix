@@ -77,9 +77,17 @@ let
   #
   # It is built here and not in `nix/checks.nix`, because `./.` there is the
   # `nix` directory and this needs the root of the repository.
+  # `tools` is here because a test judges one of them.
+  # `tools/name_the_sequences.py` rewrites hand-typed escape sequences
+  # into the builders of `pyte.sequences`, and it has changed a few
+  # hundred lines across three repositories, so what it refuses to
+  # touch is worth a test. Lillecarl/pymux#165.
   testSources = lib.fileset.toSource {
     root = ./.;
-    fileset = ./tests;
+    fileset = lib.fileset.unions [
+      ./tests
+      ./tools
+    ];
   };
 
   checks = callPackage ./nix/checks.nix { inherit package testSources; };

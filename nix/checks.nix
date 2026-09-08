@@ -57,6 +57,9 @@ let
 
   prepare = ''
     cp -r ${testSources}/tests .
+    # `tests/test_naming_the_sequences.py` imports the rewriting tool,
+    # and finds it beside the tests the way the checkout has it.
+    cp -r ${testSources}/tools .
     chmod -R +w .
     export HOME="$TMPDIR"
     export LANG=C.UTF-8
