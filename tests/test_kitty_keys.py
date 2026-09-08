@@ -434,6 +434,56 @@ def test_a_pane_that_asked_reads_the_number_of_the_key():
     )
 
 
+#: A key in xterm's modifyOtherKeys form, and the bytes a pane that
+#: asked for nothing has to read for it.
+#:
+#: The third parameter is the value of the key without its modifiers.
+#: xterm gives two examples: alt+Tab is "CSI 27 ; 3 ; 9 ~" and
+#: shift+Tab is "CSI 27 ; 2 ; 9 ~" (`ctlseqs.ms`, under "Alt and Meta
+#: Keys"). Level 3 sends an unmodified key as well.
+MODIFY_OTHER_KEYS = [
+    ("ctrl+a", "\x1b[27;5;97~", "\x01"),
+    ("alt+a", "\x1b[27;3;97~", "\x1ba"),
+    ("ctrl+shift+a", "\x1b[27;6;97~", "\x01"),
+    ("ctrl+enter", "\x1b[27;5;13~", "\n"),
+    ("shift+enter", "\x1b[27;2;13~", "\r"),
+    ("alt+tab", "\x1b[27;3;9~", "\x1b\t"),
+    ("space, at level 3", "\x1b[27;1;32~", " "),
+]
+
+
+def test_a_key_in_the_modify_other_keys_form_is_the_key_it_names():
+    """
+    The key is in the third parameter and the first one names the
+    form. Reading the first as the key gave the wrong one: ctrl+a,
+    alt+a and ctrl+enter all came out as "CSI 27 ; mods ~", which
+    names none of them and no other key either. Lillecarl/pymux#171.
+    """
+    for name, sequence, legacy in MODIFY_OTHER_KEYS:
+        assert translate_key_data(sequence, flags=0) == legacy, name
+
+
+def test_a_pane_that_asked_reads_the_same_key_in_its_own_form():
+    "One key event in the middle, and each end writes its own form."
+    assert translate_key_data("\x1b[27;5;97~", flags=DISAMBIGUATE) == (
+        "\x1b[97;5u"
+    )
+    assert translate_key_data("\x1b[27;3;9~", flags=REPORT_ALL) == "\x1b[9;3u"
+
+
+def test_a_real_tilde_key_is_not_a_modify_other_keys_key():
+    """
+    The "~" form numbers a key from the table of the VT220, which
+    stops well short of 27, so nothing else has this shape. These are
+    the keys that would be lost if it did.
+    """
+    assert translate_key_data("\x1b[3~", flags=0) == "\x1b[3~"
+    assert translate_key_data("\x1b[15;5~", flags=0) == "\x1b[15;5~"
+    assert translate_key_data("\x1b[2;3~", flags=0) == "\x1b[2;3~"
+    # Three parameters, and the first is not 27.
+    assert translate_key_data("\x1b[15;5;97~", flags=0) == "\x1b[15;5~"
+
+
 def test_a_folded_keypad_key_follows_the_cursor_key_mode():
     "The fold gives a normal key, and a normal arrow reads DECCKM."
     assert translate_key_data(

@@ -346,6 +346,37 @@ def _control_or_text_event(char: str) -> KeyEvent:
     return KeyEvent(code, 0, "u")
 
 
+#: The number in the first parameter of a key in the modifyOtherKeys
+#: form. It names the form and not a key: the key is in the third
+#: parameter. xterm chose the code of the Escape key for it.
+MODIFY_OTHER_KEYS = 27
+
+
+def _is_modify_other_keys(
+    final: str, keys: Sequence[int | None], rows: Sequence[Sequence[int | None]]
+) -> bool:
+    """
+    Whether this is a key in xterm's modifyOtherKeys form.
+
+    The form is "CSI 27 ; mods ; code ~", and the third parameter is
+    the value of the key without its modifiers: alt+Tab is
+    "CSI 27 ; 3 ; 9 ~", and shift+Tab is "CSI 27 ; 2 ; 9 ~"
+    (`xterm-snapshots/ctlseqs.ms`, under "Alt and Meta Keys").
+
+    Three things have to hold at once, and nothing else has that
+    shape. A key of the "~" form is numbered by the table of the
+    VT220, which stops well short of 27. The kitty protocol numbers a
+    key by its code point in the "u" form and never in the "~" one.
+    """
+    return (
+        final == "~"
+        and len(rows) == 3
+        and _first(keys, 0) == MODIFY_OTHER_KEYS
+        and bool(rows[2])
+        and rows[2][0] is not None
+    )
+
+
 def _parse_csi(data: str, start: int) -> Tuple[_Item, int]:
     "Parse a CSI sequence at data[start] ('ESC [')."
     i = start + 2
@@ -376,6 +407,17 @@ def _parse_csi(data: str, start: int) -> Tuple[_Item, int]:
     mods = max(0, _first(modifiers, 1) - 1)
     event = modifiers[1] if len(modifiers) > 1 and modifiers[1] else EventType.PRESS
     alternates = _trimmed(keys[1:])
+
+    if _is_modify_other_keys(final, keys, rows):
+        # xterm's modifyOtherKeys. The key is in the third parameter
+        # and the first one names the form, so reading this as a key of
+        # the "~" form gives the wrong key: ctrl+a, alt+a and
+        # ctrl+enter all became "CSI 27 ; mods ~", which is none of
+        # them. Lillecarl/pymux#171.
+        return (
+            KeyEvent(_first(rows[2], 0), mods, "u", "", (), event),
+            i + 1 - start,
+        )
 
     if final in ("u", "~") or final in _LETTER_FINALS:
         # A key of the letter form carries no code of its own: the
