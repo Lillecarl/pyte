@@ -4551,7 +4551,9 @@ class Screen:
             stack = kitty_keys.with_flags_set(
                 self.kitty_flags_stack,
                 params[0] if params else 0,
-                params[1] if len(params) > 1 else kitty_keys.SET_EXACTLY,
+                params[1]
+                if len(params) > 1
+                else kitty_keys.FlagsMode.SET_EXACTLY,
             )
             if stack is not None:
                 self.kitty_flags_stack = stack

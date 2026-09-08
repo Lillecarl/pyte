@@ -8,13 +8,12 @@ or any other prompt_toolkit application) can send keys in the legacy
 encoding, in the kitty CSI u encoding, or a mix of both. This module
 translates raw key data into the encoding that the pane expects:
 
-- flags == 0: legacy encoding. Kitty CSI u sequences are translated to
-  their legacy equivalents; everything else passes through verbatim.
-- flags & 0b1 (disambiguate): escape and ctrl/alt combinations are
-  encoded as CSI u. Text keys and plain Enter/Tab/Backspace stay
-  legacy, as the spec requires.
-- flags & 0b1000 (report all keys as escape codes): everything is
-  encoded as CSI u.
+- No flag at all: the legacy encoding. A CSI u sequence becomes its
+  legacy equivalent, and everything else passes through verbatim.
+- `KeyboardFlag.DISAMBIGUATE`: escape and the ctrl and alt
+  combinations are written as CSI u. Text keys and a plain Enter, Tab
+  or Backspace stay legacy, as the specification asks.
+- `KeyboardFlag.REPORT_ALL_KEYS`: every key is written as CSI u.
 
 Three parts of a key event need a terminal that speaks the protocol:
 the event type (press, repeat or release), the other codes of the key
@@ -39,6 +38,7 @@ All three are served for a legacy terminal as well, as far as it can:
 The forms follow the encoder of kitty (`kitty/key_encoding.c`), so a
 pane sees what a real kitty gives it.
 """
+from enum import IntEnum, IntFlag
 from typing import List, NamedTuple, Sequence, Tuple
 
 __all__ = [
@@ -48,28 +48,63 @@ __all__ = [
     "pushed",
     "popped",
     "with_flags_set",
+    "EventType",
+    "FlagsMode",
+    "KeyboardFlag",
+    "Modifier",
     "MAX_FLAGS_STACK",
     "FLAGS_THAT_NEED_A_SOURCE",
 ]
 
 
-# Modifier bits. (The encoded value in a CSI u sequence is one plus the
-# sum of the set bits.)
-_SHIFT = 1
-_ALT = 2
-_CTRL = 4
+class Modifier(IntFlag):
+    """
+    The modifier keys held down with a key.
 
-# Keyboard protocol flags. (Screen.kitty_keyboard_flags.)
-_DISAMBIGUATE = 0b1
-_REPORT_EVENT_TYPES = 0b10
-_REPORT_ALTERNATE_KEYS = 0b100
-_REPORT_ALL_KEYS = 0b1000
-_REPORT_ASSOCIATED_TEXT = 0b10000
+    The value in a CSI u sequence is one plus the sum of these bits, so
+    a sequence with no modifier carries a one and not a zero.
 
-# Event types. (The encoded value is the one below.)
-_PRESS = 1
-_REPEAT = 2
-_RELEASE = 3
+    The protocol counts five more: super, hyper, meta, caps lock and
+    num lock. Only these three change what a key writes, so only these
+    three are named. A sequence that carries one of the others keeps
+    it, because the whole number is passed on.
+    """
+
+    SHIFT = 1
+    ALT = 2
+    CTRL = 4
+
+
+class KeyboardFlag(IntFlag):
+    """
+    What a program asks the keyboard protocol for.
+
+    A program pushes a set of these with "CSI > flags u", and
+    `Screen.kitty_keyboard_flags` holds the set in force.
+    """
+
+    DISAMBIGUATE = 0b1
+    REPORT_EVENT_TYPES = 0b10
+    REPORT_ALTERNATE_KEYS = 0b100
+    REPORT_ALL_KEYS = 0b1000
+    REPORT_ASSOCIATED_TEXT = 0b10000
+
+
+class EventType(IntEnum):
+    "What a key did. The value is the one the protocol writes."
+
+    PRESS = 1
+    REPEAT = 2
+    RELEASE = 3
+
+
+class FlagsMode(IntEnum):
+    'What "CSI = flags ; mode u" does with the flags it carries.'
+
+    SET_EXACTLY = 1
+    SET_THE_BITS = 2
+    CLEAR_THE_BITS = 3
+
 
 # Final bytes of the "CSI 1 ; modifier <letter>" functional key form.
 _LETTER_FINALS = "ABCDEFHPQS"
@@ -84,12 +119,9 @@ MAX_FLAGS_STACK = 64
 #: the layout of the user; the legacy encoding carries neither by
 #: itself. The other three flags are a form to write a key in, so any
 #: terminal serves them.
-FLAGS_THAT_NEED_A_SOURCE = _REPORT_EVENT_TYPES | _REPORT_ALTERNATE_KEYS
-
-#: What "CSI = flags ; mode u" does with the flags it carries.
-SET_EXACTLY = 1
-SET_THE_BITS = 2
-CLEAR_THE_BITS = 3
+FLAGS_THAT_NEED_A_SOURCE = (
+    KeyboardFlag.REPORT_EVENT_TYPES | KeyboardFlag.REPORT_ALTERNATE_KEYS
+)
 
 
 def current_flags(stack: Tuple[int, ...]) -> int:
@@ -140,11 +172,11 @@ def with_flags_set(
     stack a set acts like a push, the way kitty does it.
     """
     current = current_flags(stack)
-    if mode == SET_EXACTLY:
+    if mode == FlagsMode.SET_EXACTLY:
         new = flags
-    elif mode == SET_THE_BITS:
+    elif mode == FlagsMode.SET_THE_BITS:
         new = current | flags
-    elif mode == CLEAR_THE_BITS:
+    elif mode == FlagsMode.CLEAR_THE_BITS:
         new = current & ~flags
     else:
         return None
@@ -164,7 +196,7 @@ class KeyEvent(NamedTuple):
     #: which key gives a character depends on the layout of the user.
     alternates: Tuple[int | None, ...] = ()
     #: Press, repeat or release. Legacy data holds presses only.
-    event: int = _PRESS
+    event: int = EventType.PRESS
 
 
 # Parse result items: KeyEvent, or a str to pass through verbatim
@@ -220,11 +252,11 @@ def _control_or_text_event(char: str) -> KeyEvent:
     if char == "\x7f":
         return KeyEvent(127, 0, "u")
     if 1 <= code <= 26:  # ctrl+a .. ctrl+z (and \n = ctrl+j)
-        return KeyEvent(code + 96, _CTRL, "u")
+        return KeyEvent(code + 96, Modifier.CTRL, "u")
     if code == 0:  # ctrl+@
-        return KeyEvent(64, _CTRL, "u")
+        return KeyEvent(64, Modifier.CTRL, "u")
     if 28 <= code <= 31:  # ctrl+\ ^ _
-        return KeyEvent(code + 64, _CTRL, "u")
+        return KeyEvent(code + 64, Modifier.CTRL, "u")
     # A printable character is the text of its own key event. A pane
     # that asks for the text of a key gets it that way, also from a
     # terminal that speaks the legacy encoding only.
@@ -234,7 +266,7 @@ def _control_or_text_event(char: str) -> KeyEvent:
         # asks for the other codes of a key gets that one. The key of
         # the base layout stays empty: kitty leaves it out for a
         # layout where it is the key itself, which is every Latin one.
-        return KeyEvent(ord(lower), _SHIFT, "u", char, (code,))
+        return KeyEvent(ord(lower), Modifier.SHIFT, "u", char, (code,))
     if char.isprintable():
         return KeyEvent(code, 0, "u", char)
     return KeyEvent(code, 0, "u")
@@ -268,7 +300,7 @@ def _parse_csi(data: str, start: int) -> Tuple[_Item, int]:
     keys = rows[0] if rows else []
     modifiers = rows[1] if len(rows) > 1 else []
     mods = max(0, _first(modifiers, 1) - 1)
-    event = modifiers[1] if len(modifiers) > 1 and modifiers[1] else _PRESS
+    event = modifiers[1] if len(modifiers) > 1 and modifiers[1] else EventType.PRESS
     alternates = _trimmed(keys[1:])
 
     if final in ("u", "~") or final in _LETTER_FINALS:
@@ -320,7 +352,9 @@ def _parse_key_data(data: str) -> List[_Item]:
             else:
                 # alt+char in the legacy encoding.
                 inner = _control_or_text_event(nxt)
-                items.append(KeyEvent(inner.code, inner.mods | _ALT, "u"))
+                items.append(
+                    KeyEvent(inner.code, inner.mods | Modifier.ALT, "u")
+                )
                 i += 2
                 continue
             items.append(item)
@@ -333,7 +367,7 @@ def _serialize(
     mods_value: int,
     final: str,
     alternates: Tuple[int | None, ...] = (),
-    event: int = _PRESS,
+    event: int = EventType.PRESS,
     text: str = "",
 ) -> str:
     """
@@ -354,7 +388,7 @@ def _serialize(
     person sends, and xterm sends "CSI 1 ~" for Home.
     Lillecarl/pymux#152.
     """
-    second = mods_value != 1 or event != _PRESS
+    second = mods_value != 1 or event != EventType.PRESS
     third = bool(text)
 
     out = "\x1b["
@@ -368,7 +402,7 @@ def _serialize(
         out += ";"
         if mods_value != 1:
             out += str(mods_value)
-        if event != _PRESS:
+        if event != EventType.PRESS:
             out += ":%d" % event
     if third:
         out += ";" + ":".join(str(ord(char)) for char in text)
@@ -388,24 +422,24 @@ def _encode_event(event: KeyEvent, flags: int, application_mode: bool) -> str:
 
     # Only a pane that asked for the event types can read a release. A
     # repeat without that flag is a press: that is what the key did.
-    if kind == _RELEASE and not flags & _REPORT_EVENT_TYPES:
+    if kind == EventType.RELEASE and not flags & KeyboardFlag.REPORT_EVENT_TYPES:
         return ""
-    if not flags & _REPORT_EVENT_TYPES:
-        kind = _PRESS
-    if kind == _RELEASE and mods == 0 and code in _CONTROL_CODES:
-        if not flags & _REPORT_ALL_KEYS:
+    if not flags & KeyboardFlag.REPORT_EVENT_TYPES:
+        kind = EventType.PRESS
+    if kind == EventType.RELEASE and mods == 0 and code in _CONTROL_CODES:
+        if not flags & KeyboardFlag.REPORT_ALL_KEYS:
             return ""
-    if not flags & _REPORT_ALTERNATE_KEYS or final != "u":
+    if not flags & KeyboardFlag.REPORT_ALTERNATE_KEYS or final != "u":
         # kitty sends the other codes of a key for the "u" form only.
         alternates = ()
-    embedded = text if flags & _REPORT_ASSOCIATED_TEXT else ""
+    embedded = text if flags & KeyboardFlag.REPORT_ASSOCIATED_TEXT else ""
 
     if final == "u":
-        ambiguous = bool(mods & (_CTRL | _ALT)) or code == 27
+        ambiguous = bool(mods & (Modifier.CTRL | Modifier.ALT)) or code == 27
         if (
-            flags & _REPORT_ALL_KEYS
-            or (flags & _DISAMBIGUATE and ambiguous)
-            or kind != _PRESS
+            flags & KeyboardFlag.REPORT_ALL_KEYS
+            or (flags & KeyboardFlag.DISAMBIGUATE and ambiguous)
+            or kind != EventType.PRESS
             or alternates
             or embedded
         ):
@@ -414,12 +448,12 @@ def _encode_event(event: KeyEvent, flags: int, application_mode: bool) -> str:
             )
 
         # Legacy form.
-        if text and not mods & (_CTRL | _ALT):
+        if text and not mods & (Modifier.CTRL | Modifier.ALT):
             # The reported text accounts for shift and the layout.
             return text
-        if mods & (_CTRL | _ALT):
-            result = "\x1b" if mods & _ALT else ""
-            if mods & _CTRL:
+        if mods & (Modifier.CTRL | Modifier.ALT):
+            result = "\x1b" if mods & Modifier.ALT else ""
+            if mods & Modifier.CTRL:
                 if code == 13:
                     result += "\n"
                 elif code == 9:
@@ -438,12 +472,12 @@ def _encode_event(event: KeyEvent, flags: int, application_mode: bool) -> str:
                     result += chr(code)
             else:
                 char = chr(code)
-                if mods & _SHIFT and char.isalpha():
+                if mods & Modifier.SHIFT and char.isalpha():
                     char = char.upper()
                 result += char
             return result
         char = chr(code)
-        if mods & _SHIFT and char.isalpha():
+        if mods & Modifier.SHIFT and char.isalpha():
             char = char.upper()
         return char
 
@@ -451,12 +485,12 @@ def _encode_event(event: KeyEvent, flags: int, application_mode: bool) -> str:
         return _serialize(code, mods_value, "~", (), kind, embedded)
 
     # Functional keys with a letter final byte.
-    if mods == 0 and kind == _PRESS and not embedded:
+    if mods == 0 and kind == EventType.PRESS and not embedded:
         # The SS3 form belongs to a pane that pushed no flag at all.
         # kitty calls that the legacy mode, and reads it off the same
         # three flags.
         legacy = not flags & (
-            _DISAMBIGUATE | _REPORT_EVENT_TYPES | _REPORT_ALL_KEYS
+            KeyboardFlag.DISAMBIGUATE | KeyboardFlag.REPORT_EVENT_TYPES | KeyboardFlag.REPORT_ALL_KEYS
         )
         if legacy:
             if application_mode and final in "ABCD":
@@ -494,8 +528,8 @@ def translate_key_data(
     # The release of a key that the terminal never reports coming up.
     double = bool(
         synthesize
-        and flags & _REPORT_EVENT_TYPES
-        and not source_flags & _REPORT_EVENT_TYPES
+        and flags & KeyboardFlag.REPORT_EVENT_TYPES
+        and not source_flags & KeyboardFlag.REPORT_EVENT_TYPES
     )
 
     parts = []
@@ -504,10 +538,10 @@ def translate_key_data(
             parts.append(item)
             continue
         parts.append(_encode_event(item, flags, application_mode))
-        if double and item.event == _PRESS:
+        if double and item.event == EventType.PRESS:
             parts.append(
                 _encode_event(
-                    item._replace(event=_RELEASE), flags, application_mode
+                    item._replace(event=EventType.RELEASE), flags, application_mode
                 )
             )
     return "".join(parts)
