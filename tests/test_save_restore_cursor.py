@@ -61,7 +61,7 @@ def test_a_restore_brings_the_rendition_back(save, restore):
 def test_a_restore_brings_the_mark_of_decsca_back(save, restore):
     screen, stream = _screen()
     stream.feed(csi(Csi.DECSCA, 1) + save + csi(Csi.DECSCA, 0) + restore)
-    stream.feed("a\x1b[1;1;1;1${")
+    stream.feed("a" + csi(Csi.DECSERA, 1, 1, 1, 1))
     assert screen.page.data_buffer[0][0].char == "a"
 
 
@@ -111,7 +111,7 @@ def test_a_restore_takes_origin_mode_off_again(save, restore):
     """
     screen, stream = _screen()
     stream.feed(save + "\x1b[2;5r\x1b[?6h" + restore)
-    stream.feed("\x1b[1;1HX")
+    stream.feed(csi(escape.CUP, 1, 1) + "X")
     assert screen.data_buffer[0][0].char == "X"
 
 
@@ -126,7 +126,7 @@ def test_a_restore_leaves_the_wrap_alone(save, restore):
     """
     screen, stream = _screen(lines=4, columns=8)
     stream.feed("\x1b[?7h" + save + "\x1b[?7l" + restore)
-    stream.feed("\x1b[1;7Habcd")
+    stream.feed(csi(escape.CUP, 1, 7) + "abcd")
     assert screen.pt_cursor_position.y == 0
 
 

@@ -9,6 +9,7 @@ from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte import escape
 from pyte.sequences import csi
+from pyte.sequences import Csi, esc
 
 
 def _screen(lines=5, columns=8):
@@ -24,37 +25,37 @@ def _row(screen):
 def test_a_move_up_above_the_region_reaches_the_top():
     screen, stream = _screen()
     # "CSI r" homes the cursor, which is above a top margin of two.
-    stream.feed("\x1b[2;3r\x1b[A")
+    stream.feed(csi(escape.DECSTBM, 2, 3) + csi(escape.CUU))
     assert _row(screen) == 0
 
 
 def test_a_reverse_index_above_the_region_stays():
     screen, stream = _screen()
-    stream.feed("\x1b[2;3r\x1bM")
+    stream.feed(csi(escape.DECSTBM, 2, 3) + esc(escape.RI))
     assert _row(screen) == 0
 
 
 def test_a_move_down_below_the_region_reaches_the_bottom():
     screen, stream = _screen()
-    stream.feed("\x1b[2;3r\x1b[5;1H\x1b[B")
+    stream.feed(csi(escape.DECSTBM, 2, 3) + csi(escape.CUP, 5, 1) + csi(escape.CUD))
     assert _row(screen) == 4
 
 
 def test_an_index_below_the_region_stays():
     screen, stream = _screen()
-    stream.feed("\x1b[2;3r\x1b[5;1H\x1bD")
+    stream.feed(csi(escape.DECSTBM, 2, 3) + csi(escape.CUP, 5, 1) + esc(escape.IND))
     assert _row(screen) == 4
 
 
 def test_a_move_up_inside_the_region_stops_at_the_top_margin():
     screen, stream = _screen()
-    stream.feed("\x1b[2;3r\x1b[3;1H\x1b[9A")
+    stream.feed(csi(escape.DECSTBM, 2, 3) + csi(escape.CUP, 3, 1) + csi(escape.CUU, 9))
     assert _row(screen) == 1
 
 
 def test_a_move_down_inside_the_region_stops_at_the_bottom_margin():
     screen, stream = _screen()
-    stream.feed("\x1b[2;3r\x1b[3;1H\x1b[9B")
+    stream.feed(csi(escape.DECSTBM, 2, 3) + csi(escape.CUP, 3, 1) + csi(escape.CUD, 9))
     assert _row(screen) == 2
 
 
@@ -69,19 +70,19 @@ def test_a_move_down_above_the_region_reaches_the_bottom():
     # two. The bottom margin belongs to the region, not to a cursor
     # that sits outside it, so the screen stops the move.
     screen, stream = _screen()
-    stream.feed("\x1b[2;3r\x1b[9B")
+    stream.feed(csi(escape.DECSTBM, 2, 3) + csi(escape.CUD, 9))
     assert _row(screen) == 4
 
 
 def test_a_move_up_below_the_region_reaches_the_top():
     screen, stream = _screen()
-    stream.feed("\x1b[2;3r\x1b[5;1H\x1b[9A")
+    stream.feed(csi(escape.DECSTBM, 2, 3) + csi(escape.CUP, 5, 1) + csi(escape.CUU, 9))
     assert _row(screen) == 0
 
 
 def test_a_move_down_above_the_region_counts_the_lines():
     screen, stream = _screen()
-    stream.feed("\x1b[2;3r\x1b[3B")
+    stream.feed(csi(escape.DECSTBM, 2, 3) + csi(escape.CUD, 3))
     assert _row(screen) == 3
 
 
@@ -123,7 +124,7 @@ def test_a_row_inside_the_region_lands_where_it_was_asked():
 
 def test_the_region_does_not_hold_the_row_without_origin_mode():
     screen, stream = _screen()
-    stream.feed("\x1b[1;2r\x1b[3;1H")
+    stream.feed(csi(escape.DECSTBM, 1, 2) + csi(escape.CUP, 3, 1))
     assert _row(screen) == 2
 
 
@@ -135,19 +136,19 @@ def test_the_region_does_not_hold_the_row_without_origin_mode():
 
 def test_hpb_moves_the_cursor_to_the_left():
     screen, stream = _screen()
-    stream.feed("\x1b[1;7H\x1b[3j")
+    stream.feed(csi(escape.CUP, 1, 7) + csi(Csi.HPB, 3))
     assert screen.pt_cursor_position.x == 3
 
 
 def test_hpb_with_no_parameter_moves_one_column():
     screen, stream = _screen()
-    stream.feed("\x1b[1;7H\x1b[j")
+    stream.feed(csi(escape.CUP, 1, 7) + csi(Csi.HPB))
     assert screen.pt_cursor_position.x == 5
 
 
 def test_hpb_stops_at_the_first_column():
     screen, stream = _screen()
-    stream.feed("\x1b[1;3H\x1b[9j")
+    stream.feed(csi(escape.CUP, 1, 3) + csi(Csi.HPB, 9))
     assert screen.pt_cursor_position.x == 0
 
 
@@ -159,25 +160,25 @@ def test_hpb_stops_at_the_left_margin():
 
 def test_vpb_moves_the_cursor_up():
     screen, stream = _screen()
-    stream.feed("\x1b[4;1H\x1b[2k")
+    stream.feed(csi(escape.CUP, 4, 1) + csi(Csi.VPB, 2))
     assert _row(screen) == 1
 
 
 def test_vpb_with_no_parameter_moves_one_row():
     screen, stream = _screen()
-    stream.feed("\x1b[4;1H\x1b[k")
+    stream.feed(csi(escape.CUP, 4, 1) + csi(Csi.VPB))
     assert _row(screen) == 2
 
 
 def test_vpb_stops_at_the_first_row():
     screen, stream = _screen()
-    stream.feed("\x1b[3;1H\x1b[9k")
+    stream.feed(csi(escape.CUP, 3, 1) + csi(Csi.VPB, 9))
     assert _row(screen) == 0
 
 
 def test_vpb_stops_at_the_top_margin():
     screen, stream = _screen()
-    stream.feed("\x1b[2;4r\x1b[4;1H\x1b[9k")
+    stream.feed(csi(escape.DECSTBM, 2, 4) + csi(escape.CUP, 4, 1) + csi(Csi.VPB, 9))
     assert _row(screen) == 1
 
 
@@ -188,5 +189,5 @@ def test_hpb_ends_the_wait_to_wrap():
     `at_phantom` on HPB for the same reason.
     """
     screen, stream = _screen()
-    stream.feed("abcdefgh\x1b[0jX")
+    stream.feed("abcdefgh" + csi(Csi.HPB, 0) + "X")
     assert screen.pt_cursor_position.y - screen.line_offset == 0

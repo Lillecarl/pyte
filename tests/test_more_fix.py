@@ -13,6 +13,8 @@ from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte.modes import PrivateMode
 from pyte.sequences import reset_mode, set_mode
+from pyte import escape
+from pyte.sequences import csi
 
 MORE_FIX = set_mode(PrivateMode.MORE_FIX)
 
@@ -69,6 +71,6 @@ def test_the_row_the_tab_left_counts_as_wrapped():
     screen, stream = make_screen()
     stream.feed(MORE_FIX + set_mode(PrivateMode.REVERSE_WRAP))
     fill_the_row_and_tab(stream)
-    stream.feed("\x1b[1G\x08")
+    stream.feed(csi(escape.CHA, 1) + "\x08")
     assert screen.pt_cursor_position.y == 0
     assert screen.pt_cursor_position.x == 15

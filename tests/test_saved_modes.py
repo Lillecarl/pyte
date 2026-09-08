@@ -49,9 +49,9 @@ def test_a_mode_saved_while_off_comes_back_off(pane):
 
 def test_one_sequence_saves_several_modes(pane):
     screen, stream, _responses = pane
-    stream.feed("\x1b[?7h\x1b[?25l")
+    stream.feed(set_mode(PrivateMode.AUTOWRAP) + reset_mode(PrivateMode.SHOW_CURSOR))
     stream.feed(csi(Csi.DECSLRM, 7, 25, private='?'))
-    stream.feed("\x1b[?7l\x1b[?25h")
+    stream.feed(reset_mode(PrivateMode.AUTOWRAP) + set_mode(PrivateMode.SHOW_CURSOR))
     stream.feed(csi(escape.DECSTBM, 7, 25, private='?'))
     assert is_set(screen, 7)
     assert not is_set(screen, 25)
@@ -76,7 +76,7 @@ def test_the_private_marker_tells_a_save_from_a_region(pane):
     # "CSI Pl ; Pr s" names a region and "CSI ? Pm s" puts modes away.
     # One final byte, two commands.
     screen, stream, _responses = pane
-    stream.feed("\x1b[?69h\x1b[3;20s")
+    stream.feed(set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 3, 20))
     assert screen.horizontal_margins == (2, 19)
     stream.feed(csi(Csi.DECSLRM, 7, private='?'))
     assert screen.horizontal_margins == (2, 19)

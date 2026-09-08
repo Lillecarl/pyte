@@ -41,7 +41,7 @@ def test_an_erased_cell_and_a_written_blank_look_the_same():
     row. Lillecarl/pymux#56.
     """
     screen, stream = _screen()
-    stream.feed("\x1b[42m \x1b[1;2H\x1b[K")
+    stream.feed(csi(escape.SGR, 42) + " " + csi(escape.CUP, 1, 2) + csi(escape.EL))
     row = _row(screen, 0)
     written, erased = row[0], row[1]
     assert written == erased
@@ -51,7 +51,7 @@ def test_an_erased_cell_and_a_written_blank_look_the_same():
 
 def test_erase_in_line_keeps_a_background():
     screen, stream = _screen()
-    stream.feed("\x1b[42mhi\x1b[K")
+    stream.feed(csi(escape.SGR, 42) + "hi" + csi(escape.EL))
     row = _row(screen, 0)
     assert row[0].char == "h"
     for column in range(2, 20):
@@ -61,7 +61,7 @@ def test_erase_in_line_keeps_a_background():
 
 def test_erase_in_line_stays_sparse_without_a_background():
     screen, stream = _screen()
-    stream.feed("hi\x1b[K")
+    stream.feed("hi" + csi(escape.EL))
     # "CSI K" erases from the cursor, so "hi" stays and nothing after
     # it takes a cell.
     assert set(_row(screen, 0)) == {0, 1}
@@ -69,7 +69,7 @@ def test_erase_in_line_stays_sparse_without_a_background():
 
 def test_erase_in_line_to_the_left_keeps_a_background():
     screen, stream = _screen()
-    stream.feed("\x1b[44mhello\x1b[1K")
+    stream.feed(csi(escape.SGR, 44) + "hello" + csi(escape.EL, 1))
     row = _row(screen, 0)
     for column in range(0, 6):
         assert row[column].char == " "
@@ -78,7 +78,7 @@ def test_erase_in_line_to_the_left_keeps_a_background():
 
 def test_erase_the_whole_line_keeps_a_background():
     screen, stream = _screen()
-    stream.feed("\x1b[41mhello\x1b[2K")
+    stream.feed(csi(escape.SGR, 41) + "hello" + csi(escape.EL, 2))
     row = _row(screen, 0)
     for column in range(0, 20):
         assert row[column].char == " "
@@ -87,7 +87,7 @@ def test_erase_the_whole_line_keeps_a_background():
 
 def test_reverse_video_paints_with_the_foreground():
     screen, stream = _screen()
-    stream.feed("\x1b[31m\x1b[7mhi\x1b[K")
+    stream.feed(csi(escape.SGR, 31) + csi(escape.SGR, 7) + "hi" + csi(escape.EL))
     row = _row(screen, 0)
     assert _rendition(row, 5).reverse
     assert _rendition(row, 5).color == SgrColor(index=1)
@@ -95,7 +95,7 @@ def test_reverse_video_paints_with_the_foreground():
 
 def test_erase_in_display_keeps_a_background():
     screen, stream = _screen()
-    stream.feed("hello\x1b[42m\x1b[2J")
+    stream.feed("hello" + csi(escape.SGR, 42) + csi(escape.ED, 2))
     for y in range(5):
         row = _row(screen, y)
         for column in range(20):
@@ -106,7 +106,7 @@ def test_erase_in_display_reaches_a_screen_that_holds_nothing():
     screen, stream = _screen()
     # No cell has been written yet, so there is nothing to take away.
     # The background still has to cover the screen.
-    stream.feed("\x1b[42m\x1b[J")
+    stream.feed(csi(escape.SGR, 42) + csi(escape.ED))
     for y in range(5):
         row = _row(screen, y)
         for column in range(20):
@@ -134,7 +134,7 @@ def test_an_underline_reaches_no_erased_cell():
     of it. Lillecarl/pymux#67.
     """
     screen, stream = _screen()
-    stream.feed("\x1b[4mhi\x1b[K")
+    stream.feed(csi(escape.SGR, 4) + "hi" + csi(escape.EL))
     row = _row(screen, 0)
     for column in range(2, 20):
         assert not _rendition(row, column).underline
@@ -143,7 +143,7 @@ def test_an_underline_reaches_no_erased_cell():
 def test_a_background_still_reaches_the_erased_cells():
     "The other half of the same question, and the panel is five to one."
     screen, stream = _screen()
-    stream.feed("\x1b[41mhi\x1b[K")
+    stream.feed(csi(escape.SGR, 41) + "hi" + csi(escape.EL))
     row = _row(screen, 0)
     for column in range(2, 20):
         assert row[column].char == " "

@@ -82,7 +82,7 @@ def test_a_resize_in_pixels_keeps_at_least_one_cell():
 def test_a_pane_with_no_embedder_changes_nothing():
     screen = Screen(24, 80, write_process_input=lambda data: None)
     stream = Stream(screen)
-    stream.feed("\x1b[27t\x1b[8;30;100t")
+    stream.feed(csi(Csi.XTWINOPS, 27) + csi(Csi.XTWINOPS, 8, 30, 100))
     assert (screen.lines, screen.columns) == (24, 80)
 
 
@@ -129,5 +129,5 @@ def test_the_room_and_the_text_area_agree():
 
 def test_asking_how_much_room_there_is_resizes_nothing():
     _screen_, stream, asks = _screen()
-    stream.feed("\x1b[19t\x1b[15t")
+    stream.feed(csi(Csi.XTWINOPS, 19) + csi(Csi.XTWINOPS, 15))
     assert asks == []

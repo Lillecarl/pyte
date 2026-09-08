@@ -6,6 +6,8 @@ linefeed saw nothing happen before.
 """
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte import escape
+from pyte.sequences import Csi, csi
 
 
 def _screen(lines=4, columns=8):
@@ -25,35 +27,35 @@ def _rows(screen):
 
 def test_scroll_up_moves_the_lines_up():
     screen, stream = _screen()
-    stream.feed("a\r\nb\r\nc\x1b[1S")
+    stream.feed("a\r\nb\r\nc" + csi(Csi.SU, 1))
     assert _rows(screen) == ["b", "c", "", ""]
 
 
 def test_scroll_up_takes_a_count():
     screen, stream = _screen()
-    stream.feed("a\r\nb\r\nc\x1b[2S")
+    stream.feed("a\r\nb\r\nc" + csi(Csi.SU, 2))
     assert _rows(screen) == ["c", "", "", ""]
 
 
 def test_scroll_down_moves_the_lines_down():
     screen, stream = _screen()
-    stream.feed("a\r\nb\r\nc\x1b[2T")
+    stream.feed("a\r\nb\r\nc" + csi(Csi.SD, 2))
     assert _rows(screen) == ["", "", "a", "b"]
 
 
 def test_a_count_past_the_screen_clears_it():
     screen, stream = _screen()
-    stream.feed("a\r\nb\r\nc\x1b[9S")
+    stream.feed("a\r\nb\r\nc" + csi(Csi.SU, 9))
     assert _rows(screen) == ["", "", "", ""]
 
 
 def test_scrolling_stays_inside_the_margins():
     screen, stream = _screen()
-    stream.feed("a\r\nb\r\nc\r\nd\x1b[2;3r\x1b[1S")
+    stream.feed("a\r\nb\r\nc\r\nd" + csi(escape.DECSTBM, 2, 3) + csi(Csi.SU, 1))
     assert _rows(screen) == ["a", "c", "", "d"]
 
 
 def test_the_cursor_does_not_move():
     screen, stream = _screen()
-    stream.feed("a\r\nb\x1b[1;3H\x1b[1S")
+    stream.feed("a\r\nb" + csi(escape.CUP, 1, 3) + csi(Csi.SU, 1))
     assert (screen.pt_cursor_position.x, screen.pt_cursor_position.y) == (2, 0)

@@ -43,7 +43,7 @@ def test_the_icon_label_is_reported():
 
 def test_a_title_that_was_never_set_is_reported_empty():
     _screen_, stream, answers = _screen()
-    stream.feed("\x1b[20t\x1b[21t")
+    stream.feed(csi(Csi.XTWINOPS, 20) + csi(Csi.XTWINOPS, 21))
     assert answers == ["\x1b]L\x1b\\", "\x1b]l\x1b\\"]
 
 
@@ -51,7 +51,7 @@ def test_one_sequence_sets_both():
     "OSC 0 names the window title and the icon label together."
     _screen_, stream, answers = _screen()
     stream.feed("\x1b]0;both\x1b\\")
-    stream.feed("\x1b[20t\x1b[21t")
+    stream.feed(csi(Csi.XTWINOPS, 20) + csi(Csi.XTWINOPS, 21))
     assert answers == ["\x1b]Lboth\x1b\\", "\x1b]lboth\x1b\\"]
 
 
@@ -97,7 +97,7 @@ def test_a_pop_takes_one_entry_off_whichever_title_it_names():
     _titles(stream, "window", "icon")
     stream.feed(csi(Csi.XTWINOPS, 22, 0))
     _titles(stream, "x", "x")
-    stream.feed("\x1b[23;1t\x1b[23;2t")
+    stream.feed(csi(Csi.XTWINOPS, 23, 1) + csi(Csi.XTWINOPS, 23, 2))
     assert (screen.titles.window, screen.titles.icon) == ("x", "icon")
 
 

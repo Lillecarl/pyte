@@ -160,7 +160,7 @@ def test_the_answer_of_a_table_carries_one_byte():
 
 
 def test_the_position_report_carries_one_byte():
-    assert answered(S8C1T + "\x1b[3;4H\x1b[6n") == b"\x9b3;4R"
+    assert answered(S8C1T + csi(escape.CUP, 3, 4) + csi(escape.DSR, 6)) == b"\x9b3;4R"
 
 
 def test_the_device_attributes_carry_one_byte():

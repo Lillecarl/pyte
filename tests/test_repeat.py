@@ -29,13 +29,13 @@ def row(screen, index):
 
 def test_a_repeat_with_no_count_draws_one_more(pane):
     screen, stream = pane
-    stream.feed("a\x1b[b")
+    stream.feed("a" + csi(Csi.REP))
     assert row(screen, 0) == "aa" + " " * (COLUMNS - 2)
 
 
 def test_a_repeat_draws_the_count_it_is_given(pane):
     screen, stream = pane
-    stream.feed("a\x1b[2b")
+    stream.feed("a" + csi(Csi.REP, 2))
     assert row(screen, 0) == "aaa" + " " * (COLUMNS - 3)
 
 
@@ -43,7 +43,7 @@ def test_a_repeat_of_zero_draws_one(pane):
     # Zero is what an empty parameter gives, and an empty parameter
     # means the default.
     screen, stream = pane
-    stream.feed("a\x1b[0b")
+    stream.feed("a" + csi(Csi.REP, 0))
     assert row(screen, 0) == "aa" + " " * (COLUMNS - 2)
 
 
@@ -57,14 +57,14 @@ def test_a_repeat_before_anything_is_drawn_draws_nothing(pane):
 
 def test_a_repeat_takes_the_last_character_of_a_run(pane):
     screen, stream = pane
-    stream.feed("abc\x1b[2b")
+    stream.feed("abc" + csi(Csi.REP, 2))
     assert row(screen, 0) == "abccc" + " " * (COLUMNS - 5)
 
 
 def test_a_repeat_wraps_at_the_right_margin(pane):
     screen, stream = pane
     stream.feed("\x1b[?69h\x1b[2;4s")  # A region from column 2 to 4.
-    stream.feed("\x1b[1;2Ha\x1b[3b")
+    stream.feed(csi(escape.CUP, 1, 2) + "a" + csi(Csi.REP, 3))
     assert row(screen, 0) == " aaa" + " " * (COLUMNS - 4)
     assert row(screen, 1) == " a" + " " * (COLUMNS - 2)
 
@@ -82,7 +82,7 @@ def test_a_repeat_scrolls_at_the_bottom_margin(pane):
 
 def test_a_repeat_carries_the_rendition_that_is_set(pane):
     screen, stream = pane
-    stream.feed("\x1b[31ma\x1b[2b")
+    stream.feed(csi(escape.SGR, 31) + "a" + csi(Csi.REP, 2))
     line = screen.data_buffer[0]
     assert row(screen, 0) == "aaa" + " " * (COLUMNS - 3)
     assert line[0].appearance == line[2].appearance

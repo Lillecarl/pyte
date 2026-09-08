@@ -8,6 +8,8 @@ the cells outside the margins stay where they are.
 """
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte import escape
+from pyte.sequences import Csi, Escape, csi, esc
 
 
 def _screen(lines=5, columns=10):
@@ -44,14 +46,14 @@ def _grid(stream, rows=GRID):
 def test_an_insert_of_columns_moves_every_row():
     screen, stream = _screen()
     _grid(stream)
-    stream.feed("\x1b[1;2H\x1b['}")
+    stream.feed(csi(escape.CUP, 1, 2) + csi(Csi.DECIC))
     assert _lines(screen) == ["a bcde", "f ghij", "k lmno", "p qrst", "u vwxy"]
 
 
 def test_an_insert_of_columns_takes_a_count():
     screen, stream = _screen()
     _grid(stream)
-    stream.feed("\x1b[1;2H\x1b[2'}")
+    stream.feed(csi(escape.CUP, 1, 2) + csi(Csi.DECIC, 2))
     assert _lines(screen) == ["a  bcde", "f  ghij", "k  lmno", "p  qrst",
                               "u  vwxy"]
 
@@ -59,7 +61,7 @@ def test_an_insert_of_columns_takes_a_count():
 def test_an_insert_of_columns_holds_to_the_rows_of_the_region():
     screen, stream = _screen()
     _grid(stream)
-    stream.feed("\x1b[2;4r\x1b[2;2H\x1b['}")
+    stream.feed(csi(escape.DECSTBM, 2, 4) + csi(escape.CUP, 2, 2) + csi(Csi.DECIC))
     assert _lines(screen) == ["abcde", "f ghij", "k lmno", "p qrst", "uvwxy"]
 
 
@@ -80,14 +82,14 @@ def test_an_insert_of_columns_outside_the_margins_does_nothing():
 def test_a_delete_of_columns_moves_every_row():
     screen, stream = _screen()
     _grid(stream)
-    stream.feed("\x1b[1;2H\x1b['~")
+    stream.feed(csi(escape.CUP, 1, 2) + csi(Csi.DECDC))
     assert _lines(screen) == ["acde", "fhij", "kmno", "prst", "uwxy"]
 
 
 def test_a_delete_of_columns_takes_a_count():
     screen, stream = _screen()
     _grid(stream)
-    stream.feed("\x1b[1;2H\x1b[2'~")
+    stream.feed(csi(escape.CUP, 1, 2) + csi(Csi.DECDC, 2))
     assert _lines(screen) == ["ade", "fij", "kno", "pst", "uxy"]
 
 
@@ -111,13 +113,13 @@ def test_a_delete_of_columns_outside_the_margins_does_nothing():
 
 def test_a_forward_index_moves_the_cursor_right():
     screen, stream = _screen()
-    stream.feed("\x1b[2;5H\x1b9")
+    stream.feed(csi(escape.CUP, 2, 5) + esc(Escape.DECFI))
     assert screen.pt_cursor_position.x == 5
 
 
 def test_a_back_index_moves_the_cursor_left():
     screen, stream = _screen()
-    stream.feed("\x1b[2;5H\x1b6")
+    stream.feed(csi(escape.CUP, 2, 5) + esc(Escape.DECBI))
     assert screen.pt_cursor_position.x == 3
 
 
@@ -146,7 +148,7 @@ def test_a_forward_index_at_the_last_column_moves_the_screen():
 
 def test_a_back_index_at_the_first_column_moves_the_screen():
     screen, stream = _screen()
-    stream.feed("\x1b[1;1Hx\x1b[1;1H\x1b6")
+    stream.feed(csi(escape.CUP, 1, 1) + "x" + csi(escape.CUP, 1, 1) + esc(Escape.DECBI))
     assert _line(screen, 0) == " x"
 
 

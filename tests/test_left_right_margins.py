@@ -9,6 +9,7 @@ from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte.modes import PrivateMode
 from pyte.sequences import Csi, csi, set_mode
+from pyte import escape
 
 
 def _screen(lines=5, columns=10):
@@ -37,7 +38,7 @@ def _column(screen):
 
 def test_the_mode_holds_the_margins():
     screen, stream, _answers = _screen()
-    stream.feed("\x1b[?69h\x1b[3;7s")
+    stream.feed(set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 3, 7))
     assert screen.horizontal_margins == (2, 6)
 
 
@@ -56,13 +57,13 @@ def test_resetting_the_mode_takes_the_margins_away():
 
 def test_the_whole_width_is_no_region():
     screen, stream, _answers = _screen()
-    stream.feed("\x1b[?69h\x1b[1;10s")
+    stream.feed(set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 1, 10))
     assert screen.horizontal_margins is None
 
 
 def test_a_region_of_one_column_is_refused():
     screen, stream, _answers = _screen()
-    stream.feed("\x1b[?69h\x1b[3;3s")
+    stream.feed(set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 3, 3))
     assert screen.horizontal_margins is None
 
 
@@ -74,7 +75,7 @@ def test_the_margins_home_the_cursor():
 
 def test_a_resize_takes_the_margins_away():
     screen, stream, _answers = _screen()
-    stream.feed("\x1b[?69h\x1b[3;7s")
+    stream.feed(set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 3, 7))
     screen.resize(lines=6, columns=12)
     assert screen.horizontal_margins is None
 
@@ -86,7 +87,7 @@ def test_a_resize_takes_the_margins_away():
 def test_the_margins_are_reported():
     _screen_, stream, answers = _screen()
     stream.feed("\x1bP$qs\x1b\\")
-    stream.feed("\x1b[?69h\x1b[3;7s")
+    stream.feed(set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 3, 7))
     stream.feed("\x1bP$qs\x1b\\")
     assert answers == ["\x1bP1$r1;10s\x1b\\", "\x1bP1$r3;7s\x1b\\"]
 
@@ -105,7 +106,7 @@ def test_the_mode_is_answered_by_a_mode_query():
 
 def test_a_line_wraps_at_the_right_margin():
     screen, stream, _answers = _screen()
-    stream.feed("\x1b[?69h\x1b[2;4s")
+    stream.feed(set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 2, 4))
     stream.feed("abcdefgh")
     assert _line(screen, 0) == "abcd      "
     assert _line(screen, 1) == " efg      "
@@ -115,7 +116,7 @@ def test_a_line_wraps_at_the_right_margin():
 def test_a_line_without_wrap_stops_at_the_right_margin():
     screen, stream, _answers = _screen()
     stream.feed("\x1b[?69h\x1b[2;4s\x1b[?7l")
-    stream.feed("\x1b[1;2Habcdef")
+    stream.feed(csi(escape.CUP, 1, 2) + "abcdef")
     assert _line(screen, 0) == " abf      "
     assert _column(screen) == 3
 
@@ -123,8 +124,8 @@ def test_a_line_without_wrap_stops_at_the_right_margin():
 def test_a_line_right_of_the_margin_runs_to_the_edge():
     "A program that draws outside the region keeps the whole line."
     screen, stream, _answers = _screen()
-    stream.feed("\x1b[?69h\x1b[2;4s")
-    stream.feed("\x1b[1;9Hxyz")
+    stream.feed(set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 2, 4))
+    stream.feed(csi(escape.CUP, 1, 9) + "xyz")
     assert _line(screen, 0) == "        xy"
     assert _line(screen, 1) == " z        "
 
@@ -381,14 +382,14 @@ def test_a_cursor_right_of_the_margin_reports_where_it_stands():
     read back the margin instead.
     """
     screen, stream, answers = _screen(lines=8, columns=10)
-    stream.feed("\x1b[?69h\x1b[2;5s")
-    stream.feed("\x1b[5;6H\x1b[6n")
+    stream.feed(set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 2, 5))
+    stream.feed(csi(escape.CUP, 5, 6) + csi(escape.DSR, 6))
     assert answers == ["\x1b[5;6R"]
 
 
 def test_a_cursor_waiting_to_wrap_reports_the_margin():
     "A character in the last column of the region leaves the wait."
     screen, stream, answers = _screen(lines=8, columns=10)
-    stream.feed("\x1b[?69h\x1b[2;5s")
-    stream.feed("\x1b[5;5Hx\x1b[6n")
+    stream.feed(set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 2, 5))
+    stream.feed(csi(escape.CUP, 5, 5) + "x" + csi(escape.DSR, 6))
     assert answers == ["\x1b[5;5R"]

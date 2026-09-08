@@ -56,7 +56,7 @@ def test_the_two_answers_carry_different_prefixes(pane):
     # DA that answers in the DA2 shape is read as a DA2 reply, and
     # every answer after it lands one place out of step.
     _screen, stream, responses = pane
-    stream.feed("\x1b[c\x1b[>c")
+    stream.feed(csi(escape.DA) + csi(escape.DA, private='>'))
     assert responses[0].startswith("\x1b[?")
     assert responses[1].startswith("\x1b[>")
 

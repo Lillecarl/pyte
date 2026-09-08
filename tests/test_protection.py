@@ -12,6 +12,8 @@ programs that came before DECSCA.
 from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte.sequences import Csi, csi
+from pyte import escape
+from pyte.sequences import esc
 
 
 def _screen(lines=4, columns=10):
@@ -130,24 +132,24 @@ def test_a_selective_erase_to_the_left_leaves_a_marked_cell():
 
 def test_the_mark_travels_with_a_scroll():
     screen, stream, _answers = _screen()
-    stream.feed('\x1b[1"qkeep\x1b[0"q')
-    stream.feed("\x1b[2;1H\x1b[S")  # Scroll up by one.
-    stream.feed("\x1b[1;1H\x1b[?2K")
+    stream.feed(csi(Csi.DECSCA, 1) + "keep" + csi(Csi.DECSCA, 0))
+    stream.feed(csi(escape.CUP, 2, 1) + csi(Csi.SU))  # Scroll up by one.
+    stream.feed(csi(escape.CUP, 1, 1) + csi(escape.EL, 2, private='?'))
     assert _line(screen) == ""
-    stream.feed("\x1b[2;1H\x1b[?2K")
+    stream.feed(csi(escape.CUP, 2, 1) + csi(escape.EL, 2, private='?'))
     assert _line(screen) == ""
 
 
 def test_the_mark_stays_on_a_reset():
     "RIS clears the screen, so nothing carries a mark afterwards."
     screen, stream, _answers = _screen()
-    stream.feed('\x1b[1"qabc\x1bc')
+    stream.feed(csi(Csi.DECSCA, 1) + "abc" + esc(escape.RIS))
     assert screen.protection == 0
 
 
 def test_a_soft_reset_takes_the_mark_off_what_comes_next():
     screen, stream, _answers = _screen()
-    stream.feed('\x1b[1"q\x1b[!p')
+    stream.feed(csi(Csi.DECSCA, 1) + csi(Csi.DECSTR))
     assert screen.protection == 0
 
 
@@ -172,5 +174,5 @@ def test_a_save_and_a_restore_carry_the_mark():
     screen, stream, _answers = _screen()
     stream.feed('\x1b[1"q\x1b7\x1b[0"q\x1b8')
     assert screen.protection == 2
-    stream.feed("a\x1b[1;1;1;1${")
+    stream.feed("a" + csi(Csi.DECSERA, 1, 1, 1, 1))
     assert _line(screen) == "a"

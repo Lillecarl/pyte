@@ -69,14 +69,14 @@ def test_the_terminal_says_it_is_well():
 
 def test_the_cursor_position_comes_back():
     _screen_, stream, answers = _screen()
-    stream.feed("\x1b[6;5H\x1b[6n")
+    stream.feed(csi(escape.CUP, 6, 5) + csi(escape.DSR, 6))
     assert answers == ["\x1b[6;5R"]
 
 
 def test_the_page_number_follows_the_position():
     "DECXCPR ('CSI ? 6 n') adds the page, and a pane holds one page."
     _screen_, stream, answers = _screen()
-    stream.feed("\x1b[6;5H\x1b[?6n")
+    stream.feed(csi(escape.CUP, 6, 5) + csi(escape.DSR, 6, private='?'))
     assert answers == ["\x1b[?6;5;1R"]
 
 

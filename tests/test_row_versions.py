@@ -242,7 +242,7 @@ def test_a_row_that_nothing_wrote_keeps_its_count():
     stream.feed("first\r\nsecond")
     before = dict(screen.written_at)
 
-    stream.feed("\x1b[1;1Hagain")
+    stream.feed(csi(escape.CUP, 1, 1) + "again")
     # Row 1 was not touched, so a reader leaves it alone.
     assert screen.written_at.get(1) == before.get(1)
     # Row 0 was, so a reader draws it again.
@@ -257,7 +257,7 @@ def test_the_count_only_goes_up():
 
     seen = []
     for _ in range(5):
-        stream.feed("\x1b[1;1Hx")
+        stream.feed(csi(escape.CUP, 1, 1) + "x")
         seen.append(screen.written_at[0])
     assert seen == sorted(set(seen))
 

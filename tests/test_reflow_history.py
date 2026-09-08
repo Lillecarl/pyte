@@ -20,6 +20,7 @@ assert. Lillecarl/pymux#57.
 from pyte.cells import WrittenCell
 from pyte.screen import Screen
 from pyte.streams import Stream
+from pyte.sequences import Csi, csi
 
 # The prompt of libvterm's "Shell wrapped prompt behaviour" case. On ten
 # columns it takes seven rows, so two of them scroll off a five row
@@ -120,7 +121,7 @@ def test_the_cursor_lands_once():
     a row low, on the "t" of "text". Lillecarl/pymux#110.
     """
     screen = Screen(6, 10, write_process_input=lambda answer: None)
-    Stream(screen).feed("text\x1b[0T")
+    Stream(screen).feed("text" + csi(Csi.SD, 0))
     screen.resize(6, 4)
 
     row, column = screen.pt_cursor_position.y, screen.pt_cursor_position.x

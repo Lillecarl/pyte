@@ -14,6 +14,7 @@ import pytest
 from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte.sequences import Csi, csi
+from pyte import escape
 
 #: DECSCL for each terminal, with seven bit controls.
 VT200 = csi(Csi.DECSCL, 62, 1)
@@ -73,5 +74,5 @@ def test_the_same_byte_saves_the_cursor_on_an_earlier_terminal():
     "Without the mode, 'CSI s' is SCOSC, so it saves and does not name a region."
     screen, stream, answers = make_screen()
     stream.feed(VT300 + "\x1b[2;4H\x1b[?69h\x1b[3;6s")
-    stream.feed("\x1b[1;1H\x1b[u")
+    stream.feed(csi(escape.CUP, 1, 1) + csi(Csi.KITTY_KEYBOARD))
     assert (screen.pt_cursor_position.y, screen.pt_cursor_position.x) == (1, 3)

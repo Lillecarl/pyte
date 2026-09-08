@@ -48,23 +48,23 @@ def test_a_line_feed_marks_nothing():
 
 def test_erasing_to_the_end_of_the_line_ends_the_wrap():
     "The text that wrapped away is gone, so nothing wrapped."
-    screen = _screen("a" * 12 + "\x1b[1;5H\x1b[K")
+    screen = _screen("a" * 12 + csi(escape.CUP, 1, 5) + csi(escape.EL))
     assert not _continues(screen, 1)
 
 
 def test_erasing_the_whole_line_ends_the_wrap():
-    screen = _screen("a" * 12 + "\x1b[1;5H\x1b[2K")
+    screen = _screen("a" * 12 + csi(escape.CUP, 1, 5) + csi(escape.EL, 2))
     assert not _continues(screen, 1)
 
 
 def test_erasing_up_to_the_cursor_leaves_the_wrap():
     "Text is still there to have wrapped, so the mark stands."
-    screen = _screen("a" * 12 + "\x1b[1;5H\x1b[1K")
+    screen = _screen("a" * 12 + csi(escape.CUP, 1, 5) + csi(escape.EL, 1))
     assert _continues(screen, 1)
 
 
 def test_an_erase_on_another_line_leaves_the_wrap():
-    screen = _screen("a" * 12 + "\x1b[2;3H\x1b[K")
+    screen = _screen("a" * 12 + csi(escape.CUP, 2, 3) + csi(escape.EL))
     assert _continues(screen, 1)
 
 
@@ -74,7 +74,7 @@ def test_an_erase_on_another_line_leaves_the_wrap():
 
 def test_erasing_the_display_to_the_end_ends_every_wrap():
     "ED 0 from the top empties every row, so no row continues one."
-    screen = _screen("a" * 20 + "\x1b[1;1H\x1b[J")
+    screen = _screen("a" * 20 + csi(escape.CUP, 1, 1) + csi(escape.ED))
     assert not _any_row_is_wrapped(screen)
 
 
@@ -94,7 +94,7 @@ def test_erasing_the_display_up_to_the_cursor_ends_the_wrap_under_it():
     libvterm answers `?lineinfo` with no mark here.
     Lillecarl/pymux#142.
     """
-    screen = _screen("a" * 20 + "\x1b[3;3H\x1b[1J")
+    screen = _screen("a" * 20 + csi(escape.CUP, 3, 3) + csi(escape.ED, 1))
     assert not _continues(screen, 2)
 
 
@@ -106,7 +106,7 @@ def test_erasing_the_display_up_to_a_cursor_on_the_first_row_keeps_the_wrap():
     column of it, so text is still there to have wrapped and the row
     below still continues it.
     """
-    screen = _screen("a" * 20 + "\x1b[1;3H\x1b[1J")
+    screen = _screen("a" * 20 + csi(escape.CUP, 1, 3) + csi(escape.ED, 1))
     assert _continues(screen, 1)
 
 
@@ -168,7 +168,7 @@ def test_a_scroll_up_ends_the_wrap_under_the_blank_row():
 
 def test_inserting_a_line_ends_the_wrap_under_it():
     "IL brings a blank row in the same way, at the cursor."
-    screen = _screen("a" * 20 + "\x1b[2;1H\x1b[L")
+    screen = _screen("a" * 20 + csi(escape.CUP, 2, 1) + csi(escape.IL))
 
     assert not _continues(screen, 2)
     assert _continues(screen, 3)

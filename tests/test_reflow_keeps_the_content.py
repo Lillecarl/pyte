@@ -36,6 +36,7 @@ from pyte.streams import Stream
 from test_row_versions import a_chunk
 from pyte import escape
 from pyte.sequences import esc
+from pyte.sequences import Csi, csi
 
 
 def _trimmed(cells):
@@ -196,7 +197,7 @@ SIZES = st.lists(
 # open: the oracle stopped counting a blank line, and the two ends
 # still do not agree about whether the row is real.
 @example(
-    chunks=["wider text that wraps around the end of a short row\n\x1b[0T"],
+    chunks=["wider text that wraps around the end of a short row\n" + csi(Csi.SD, 0)],
     sizes=[(1, 4)],
 )
 def test_a_size_change_keeps_every_line(chunks, sizes):
