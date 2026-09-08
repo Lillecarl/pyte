@@ -242,6 +242,16 @@ class Screen:
         # "CSI < number u" pops. See `report_kitty_keyboard`.)
         self.kitty_flags_stack: Tuple[int, ...] = ()
 
+        # What XTMODKEYS was told, per resource. Only resource 4,
+        # modifyOtherKeys, changes what a key sends; the rest are kept
+        # so that XTQMODKEYS answers what it was told.
+        #
+        # It belongs beside the flag stack and not with it. A program
+        # asks for one or the other, and a terminal that had both would
+        # have to say which wins; the flag stack does, because every
+        # branch of the encoder answers before the extended one.
+        self.key_modifier_options: Dict[int, int] = {}
+
         # What the terminal that feeds this pane its keys can report,
         # in the same flags. The host sets it; zero means a terminal
         # that speaks the legacy encoding only. It belongs to the host
@@ -325,11 +335,12 @@ class Screen:
         The bytes that one key press sends to the program on this
         screen.
 
-        Two modes decide it, and the screen holds both: the kitty
-        keyboard protocol that the program turned on, and the
-        application cursor keys of DECCKM. Neither belongs to whoever
-        drew the keyboard, so a Textual widget and a prompt_toolkit
-        widget send the same bytes for the same key.
+        Three modes decide it, and the screen holds all three: the
+        kitty keyboard protocol that the program turned on, xterm's
+        modifyOtherKeys, and the application cursor keys of DECCKM.
+        None of them belongs to whoever drew the keyboard, so a
+        Textual widget and a prompt_toolkit widget send the same bytes
+        for the same key.
 
         The kitty flags are the ones this pane really gets, and not the
         ones it asked for. One value answers the query of the pane and
@@ -341,6 +352,73 @@ class Screen:
             application_mode=self.in_application_mode,
             source_flags=self.keyboard_source_flags,
             synthesize=self.synthesize_key_events,
+            modify_other_keys=self.modify_other_keys,
+        )
+
+    @property
+    def modify_other_keys(self) -> int:
+        "How much of the keyboard leaves the legacy encoding."
+        return self.key_modifier_options.get(
+            keys.KeyModifierResource.OTHER_KEYS, keys.ModifyOtherKeys.OFF
+        )
+
+    def set_key_modifier_options(self, *params: int) -> None:
+        """
+        XTMODKEYS ("CSI > Pp ; Pv m"): how much modifier information a
+        group of keys carries.
+
+        With no parameter at all every resource goes back to where it
+        started, and with the resource alone that one does. xterm says
+        both, and a program that is finishing sends "CSI > 4 m" to put
+        modifyOtherKeys back.
+
+        **The first of those two is unreachable here.** The CSI parser
+        turns an empty parameter into a zero, so "CSI > m" arrives as
+        the number zero and cannot be told from "CSI > 0 m". The
+        narrower reading wins, and the branch below stays for the day
+        the parser can say the difference. Lillecarl/pymux#178.
+
+        A value this screen does not act on is still kept, so that
+        XTQMODKEYS answers what it was told. A resource that is
+        remembered and not acted on is honest; one that is forgotten
+        makes a program believe it failed to set it.
+        """
+        if not params:
+            self.key_modifier_options = {}
+            return
+        resource = params[0]
+        if isinstance(resource, tuple):
+            resource = resource[0] if resource else 0
+        if len(params) < 2:
+            self.key_modifier_options.pop(resource, None)
+            return
+        value = params[1]
+        if isinstance(value, tuple):
+            value = value[0] if value else 0
+        self.key_modifier_options[resource] = value
+
+    def report_key_modifier_options(self, *params: int) -> None:
+        """
+        XTQMODKEYS ("CSI ? Pp m"): what is one of them set to?
+
+        The answer is an XTMODKEYS control, so a program can send it
+        back to restore the state. That is xterm's reason for the
+        shape, and it is why the answer names the resource as well as
+        the value.
+
+        A resource nobody has set answers zero. xterm starts some of
+        them at other numbers, because it really does encode a cursor
+        key or a function key that way. This screen does not, so zero
+        is what it does, and a capability that is claimed and not
+        served is worse than one that is missing.
+        """
+        if not params:
+            return
+        resource = params[0]
+        if isinstance(resource, tuple):
+            resource = resource[0] if resource else 0
+        self.reply_csi(
+            ">%i;%im" % (resource, self.key_modifier_options.get(resource, 0))
         )
 
     def wrap_paste(self, text: str) -> str:
@@ -473,6 +551,12 @@ class Screen:
         # full terminal reset. It also clears all graphics.)
         self.kitty_flags_stack = ()
         self.graphics.clear()
+
+        # XTMODKEYS goes back to where it started too. It does not swap
+        # with the alternate screen, the way the flag stack does: xterm
+        # holds it as a resource of the terminal and not as state of a
+        # screen, so a program that switches screens keeps what it set.
+        self.key_modifier_options = {}
 
         # The shape of the cursor, as DECSCUSR names it. A reset puts
         # it back to the shape that the terminal starts with.
@@ -3574,12 +3658,18 @@ class Screen:
         SGR ("CSI Ps m"): the style of the cells that come next.
 
         A private marker makes another sequence, and none of them is
-        SGR. "CSI > Ps m" is XTMODKEYS, which says how xterm encodes a
-        key with a modifier; a program sends "CSI > 4 m" to put
-        modifyOtherKeys back to where it started. Reading that as SGR
-        turns the underline on, and everything the program draws after
-        it carries a line it never asked for.
+        SGR. "CSI > Ps m" is XTMODKEYS, which says how much modifier
+        information a group of keys carries, and "CSI ? Ps m" asks
+        what it is set to. Reading either as SGR turns the underline
+        on, and everything the program draws after it carries a line
+        it never asked for.
         """
+        if private == ">":
+            self.set_key_modifier_options(*attrs_tuple)
+            return
+        if private is True:
+            self.report_key_modifier_options(*attrs_tuple)
+            return
         if private:
             return
 

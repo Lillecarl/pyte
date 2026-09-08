@@ -128,6 +128,52 @@ class FlagsMode(IntEnum):
     CLEAR_THE_BITS = 3
 
 
+class KeyModifierResource(IntEnum):
+    """
+    The resources XTMODKEYS sets, as "CSI > Pp ; Pv m" numbers them.
+
+    Each says how much modifier information a group of keys carries.
+    Only `OTHER_KEYS` is acted on here; the rest are named so that a
+    reader of a sequence knows what it asked for, and so that
+    XTQMODKEYS can answer about a resource nobody has set.
+
+    Five is missing on purpose. xterm keeps it for input through the
+    `string` action. (`xterm-snapshots/ctlseqs.ms`, XTMODKEYS.)
+    """
+
+    KEYBOARD = 0
+    CURSOR_KEYS = 1
+    FUNCTION_KEYS = 2
+    KEYPAD_KEYS = 3
+    OTHER_KEYS = 4
+    MODIFIER_KEYS = 6
+    SPECIAL_KEYS = 7
+
+
+class ModifyOtherKeys(IntEnum):
+    """
+    How much of the keyboard leaves the legacy encoding.
+
+    This is XTMODKEYS resource 4, and the form a key leaves in is
+    "CSI 27 ; mods ; code ~". xterm names the levels
+    (`ctlseqs.ms`, under "Alt and Meta Keys"):
+
+    - `OFF`: nothing leaves.
+    - `ALT_AND_META`: shift and ctrl work as usual, and alt or meta
+      make an ordinary key go out as if it were a function key.
+      "alt-Tab sends CSI 27 ; 3 ; 9 ~".
+    - `EVERY_MODIFIER`: all of the modifiers apply. "shift-Tab sends
+      CSI 27 ; 2 ; 9 ~ rather than CSI Z".
+    - `EVERY_KEY`: a key with no modifier at all goes out as well.
+      "space sends CSI 27 ; 1 ; 32 ~".
+    """
+
+    OFF = 0
+    ALT_AND_META = 1
+    EVERY_MODIFIER = 2
+    EVERY_KEY = 3
+
+
 class KeyCode(IntEnum):
     """
     The code of a key that writes one control character.
@@ -154,6 +200,49 @@ _CTRL_TAKES_OFF_A_SYMBOL = ord("\\") - 28
 #: What shift and Tab send in the legacy encoding, after the escape.
 #: CBT by its other name.
 BACK_TAB = "[Z"
+
+
+def _has_a_shifted_character(code: int, text: str) -> bool:
+    """
+    Whether shift on this key gives a character of its own.
+
+    Shift on a letter gives the capital, and a terminal sends that
+    character rather than saying "shift and a letter". Shift on Tab
+    gives nothing, which is why shift+Tab is the example xterm uses
+    for the level where all the modifiers apply.
+    """
+    if text:
+        return True
+    character = chr(code)
+    return character.isprintable() and character.upper() != character
+
+
+def _wants_the_escape_form(level: int, code: int, mods: int, text: str) -> bool:
+    """
+    Whether this key goes out as "CSI 27 ; mods ; code ~".
+
+    The rule per level is xterm's, in its own words. At
+    `ALT_AND_META`, "the usual shift- and control-modifiers work as
+    expected, but other modifiers cause ordinary keys to be encoded as
+    if they were function-keys".
+
+    At `EVERY_MODIFIER` all of them apply, and shift is the one that
+    needs care: a capital letter is a character and goes out as one,
+    or a person typing into vim would get escape sequences instead of
+    text. Shift counts on a key that has no shifted character, which
+    is the shift+Tab that xterm gives as its example.
+    """
+    if level >= ModifyOtherKeys.EVERY_KEY:
+        return True
+    if level == ModifyOtherKeys.EVERY_MODIFIER:
+        if mods & (Modifier.CTRL | Modifier.ALT):
+            return True
+        return bool(mods & Modifier.SHIFT) and not _has_a_shifted_character(
+            code, text
+        )
+    if level == ModifyOtherKeys.ALT_AND_META:
+        return bool(mods & Modifier.ALT)
+    return False
 
 
 def _legacy_mode(flags: int) -> bool:
@@ -226,6 +315,9 @@ class TildeKey(IntEnum):
 #: The first code point of the Private Use Area. A key numbered from
 #: here up writes no character of its own.
 FIRST_FUNCTIONAL_KEY = 0xE000
+
+#: The bytes that introduce a control sequence.
+CSI = "\x1b["
 
 # Final bytes of the "CSI 1 ; modifier <letter>" functional key form.
 _LETTER_FINALS = "ABCDEFHPQS"
@@ -660,7 +752,12 @@ def _folded(event: KeyEvent, flags: int) -> KeyEvent | None:
     return event._replace(code=code, final=final)
 
 
-def _encode_event(event: KeyEvent, flags: int, application_mode: bool) -> str:
+def _encode_event(
+    event: KeyEvent,
+    flags: int,
+    application_mode: bool,
+    modify_other_keys: int = ModifyOtherKeys.OFF,
+) -> str:
     "Encode a key event for a pane with the given protocol flags."
     plain = _folded(event, flags)
     if plain is None:
@@ -708,6 +805,14 @@ def _encode_event(event: KeyEvent, flags: int, application_mode: bool) -> str:
         ):
             return _serialize(
                 code, mods_value, "u", alternates, kind, embedded
+            )
+
+        # The extended mode, which a pane asks for with XTMODKEYS and
+        # not with the flag stack. A pane in one of the kitty modes
+        # never gets here, because every branch above answers first.
+        # Lillecarl/pymux#169.
+        if _wants_the_escape_form(modify_other_keys, code, mods, text):
+            return "%s27;%d;%d~" % (CSI, mods_value, code
             )
 
         # Legacy form.
@@ -774,10 +879,16 @@ def translate_key_data(
     application_mode: bool = False,
     source_flags: int = 0,
     synthesize: bool = True,
+    modify_other_keys: int = ModifyOtherKeys.OFF,
 ) -> str:
     """
     Translate raw key data into the encoding for a pane with the given
     keyboard protocol flags.
+
+    `modify_other_keys` is the other way a pane asks for more than the
+    legacy encoding: XTMODKEYS resource 4, which xterm has and the
+    flag stack does not replace. A pane that pushed any kitty flag
+    never reaches it, because those answer first.
 
     `source_flags` says what the terminal that sends the keys reports,
     in the same flags. A terminal that reports the event types sends a
@@ -804,7 +915,9 @@ def translate_key_data(
         if not isinstance(item, KeyEvent):
             parts.append(item)
             continue
-        parts.append(_encode_event(item, flags, application_mode))
+        parts.append(
+            _encode_event(item, flags, application_mode, modify_other_keys)
+        )
         if double and item.event == EventType.PRESS:
             parts.append(
                 _encode_event(
