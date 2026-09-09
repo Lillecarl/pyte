@@ -161,13 +161,74 @@ def test_a_scroll_up_ends_the_wrap_under_the_blank_row():
     SU brings its blank rows in at the bottom of the region, so the
     row under the region is the one that continued a line the scroll
     took away.
+
+    The row at the top of the region loses its mark as well, and for
+    the other reason: the row it continued is one the scroll dropped.
+    Lillecarl/pymux#188 below says why that is not the same question.
     """
     screen = _screen(
         "a" * 32 + csi(escape.DECSTBM, 2, 3) + (csi(escape.CUP, 3, 1) + csi(Csi.SU))
     )
 
-    assert _continues(screen, 1)
     assert not _continues(screen, 3)
+
+
+# ----------------------------------------------------------------------
+# A move that drops the row a line continued. Lillecarl/pymux#188.
+
+
+def test_a_scroll_up_ends_the_wrap_on_the_row_it_brings_to_the_top():
+    """
+    SU drops the rows that leave the region, so the row that lands at
+    the top continues a row that is gone.
+
+    Four rows of "a" over eight columns, and the whole screen scrolled
+    up by one. Row zero holds what row one held, and the row it
+    continued went with the scroll. Nothing is above it now.
+
+    **xterm keeps the mark here and that is right for xterm**, which
+    never lays a screen out again: `ScrnDeleteLine` moves the
+    `LineData` pointers and clears nothing. `Page.unwrap` does read the
+    mark, so keeping it joins two lines a program wrote apart. kitty,
+    WezTerm and Alacritty keep them apart, and the vote is recorded in
+    `ptterm/tests/test_a_scroll_and_the_wrap_mark.py`, which is where a
+    resize can see the mark at all.
+    """
+    screen = _screen("a" * 32 + csi(Csi.SU))
+
+    assert not _continues(screen, 0)
+    assert _continues(screen, 1)
+    assert _continues(screen, 2)
+
+
+def test_deleting_lines_ends_the_wrap_on_the_row_that_moves_up():
+    """
+    DL moves the rows under the cursor up and drops the ones it
+    deletes, so the row that lands on the cursor's own row continues
+    a row that has gone.
+    """
+    screen = _screen("a" * 32 + csi(escape.CUP, 2, 1) + csi(escape.DL))
+
+    assert not _continues(screen, 1)
+    assert _continues(screen, 2)
+
+
+def test_the_rows_under_it_keep_their_marks():
+    """
+    Only the row at the top loses one.
+
+    The rows under it continue rows that are still there, so a line
+    that survives a scroll whole is still one line. Without this the
+    fix above would take a wrapped line apart every time it moved.
+    """
+    screen = _screen("a" * 32 + csi(Csi.SU))
+
+    assert [_continues(screen, row) for row in range(4)] == [
+        False,
+        True,
+        True,
+        False,
+    ]
 
 
 def test_inserting_a_line_ends_the_wrap_under_it():

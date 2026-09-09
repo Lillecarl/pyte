@@ -2273,13 +2273,31 @@ class Screen:
             # under the range it erases, and cites libvterm and xterm
             # for it. Lillecarl/pymux#142.
             #
-            # It says nothing about the row the move brings to the top
-            # of the region, whose own predecessor the move discarded.
-            # That is a different question and xterm answers it the
-            # other way: it moves the rows and their marks and clears
-            # neither. Lillecarl/pymux#188.
             under_the_blanks = top + steps if amount < 0 else bottom + 1
             self._forget_the_wrap_marks([under_the_blanks + line_offset])
+
+            # And the row the move brings to the top of the region,
+            # whose own predecessor the move discarded.
+            #
+            # A scroll up drops the rows that leave, so the row that
+            # lands at the top continues a row that is gone. What is
+            # above it is either a line the program wrote separately,
+            # outside the region, or the history, and the mark says
+            # this row carries on from it.
+            #
+            # **xterm keeps the mark, and that costs xterm nothing.**
+            # `ScrnDeleteLine` moves the `LineData` pointers and clears
+            # nothing, and xterm never lays a screen out again. We do,
+            # and `Page.unwrap` reads the mark, so keeping it joins two
+            # lines a program wrote apart.
+            #
+            # kitty, WezTerm and Alacritty keep them apart; libvterm
+            # and xterm.js join them. The vote is in
+            # `ptterm/tests/test_a_scroll_and_the_wrap_mark.py`, which
+            # is where a resize can see the mark at all.
+            # Lillecarl/pymux#188.
+            if amount > 0:
+                self._forget_the_wrap_marks([top + line_offset])
 
             # Graphics placements scroll with the text. An image sits on
             # whole lines, so it moves only when whole lines move.
