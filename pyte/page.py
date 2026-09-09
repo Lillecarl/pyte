@@ -13,9 +13,9 @@ Lillecarl/pymux#129.
 """
 
 from collections import defaultdict, namedtuple
-from typing import DefaultDict, List, NamedTuple, Tuple
+from typing import DefaultDict, Dict, List, NamedTuple, Tuple
 
-from .cells import Cell
+from .cells import UNWRITTEN, Cell
 
 __all__ = (
     "CursorPosition",
@@ -58,7 +58,7 @@ class CursorPosition:
         return f"pymux.CursorPosition(x={self.x!r}, y={self.y!r})"
 
 
-class Row(DefaultDict[int, Cell]):
+class Row(Dict[int, Cell]):
     """
     One row of the buffer: its cells, and what is true of the row
     itself rather than of any cell in it.
@@ -77,18 +77,30 @@ class Row(DefaultDict[int, Cell]):
     WezTerm and Ghostty on the row.
 
     A cell that nobody wrote is absent, so an untouched row costs one
-    dictionary and the default answers for every column.
+    dictionary and `UNWRITTEN` answers for every column.
+
+    **A read never writes.** `__missing__` answers a column nobody
+    wrote and does not keep the answer, which is the one thing a
+    `defaultdict` does differently. This was a `defaultdict`, and it
+    cost twice over. Asking about a cell made one, so a cursor parked
+    past the end of a line gave that line a run of blanks nobody wrote
+    (Lillecarl/pymux#143) and a frame filled in every gap of every row
+    it drew, for ever. And the factory was a closure over the blank,
+    so every row carried a function of its own: 10.7 MB of the 38.3 MB
+    a fifty thousand row history took. Lillecarl/pymux#227.
     """
 
     __slots__ = ("wrapped",)
 
-    def __init__(self, default_char: Cell) -> None:
-        super().__init__(lambda: default_char)
-
+    def __init__(self) -> None:
         #: Did a wrap bring this row into being? Then it holds the rest
         #: of the row above and is not a line of its own, and a reflow
         #: joins the two back together before it lays them out again.
         self.wrapped: bool = False
+
+    def __missing__(self, column: int) -> Cell:
+        "What a column nobody wrote reads as. It stays absent."
+        return UNWRITTEN
 
 
 class LogicalLine:
@@ -151,11 +163,16 @@ class Page:
 
     __slots__ = ("data_buffer", "show_cursor")
 
-    def __init__(self, default_char: Cell) -> None:
+    def __init__(self) -> None:
         #: The cells, by row and then by column. A row that nobody
         #: wrote to is absent, and so is a column, so the cost of an
         #: empty screen is one dictionary.
-        self.data_buffer: DefaultDict[int, Row] = defaultdict(lambda: Row(default_char))
+        #:
+        #: **Asking for a row does make one**, unlike asking for a
+        #: cell. A reflow lays every line out by writing to the row it
+        #: lands on, so the rows have to arrive; `wrapped` and the
+        #: readers that must not write use `.get`.
+        self.data_buffer: DefaultDict[int, Row] = defaultdict(Row)
 
         #: Does the cursor show? DECTCEM ("?25") sets it, and it belongs
         #: to the screen in front, so the alternate screen has its own.

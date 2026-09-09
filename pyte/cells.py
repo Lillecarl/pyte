@@ -34,6 +34,7 @@ __all__ = (
     "Protection",
     "ProtectedCell",
     "Rendition",
+    "UNWRITTEN",
     "WrittenCell",
     "appearance_of",
     "character_width",
@@ -335,3 +336,18 @@ appearance_of: FastDictCache[Tuple[Rendition, str, str], Appearance] = FastDictC
 #: How a screen draws before any program has asked for anything, and
 #: what an untouched cell carries.
 PLAIN_APPEARANCE = appearance_of[PLAIN, "", ""]
+
+#: What a column that nobody wrote reads back as.
+#:
+#: A row holds only the cells a program put there, so every other
+#: column answers with this one object. It is a plain `Cell` and not a
+#: `WrittenCell`: nobody wrote it, so a renderer that keeps the blanks
+#: a program wrote drops this one, and a reflow trims it off the end
+#: of a line. It is not an `ErasedCell` either -- an erase is
+#: something a program did, and it writes its cells.
+#:
+#: One object for the whole package, because it carries nothing that
+#: could differ. A row that held its own cost a closure per row: 10.7
+#: MB of the 38.3 MB a fifty thousand row history took.
+#: Lillecarl/pymux#227.
+UNWRITTEN = Cell(" ", PLAIN_APPEARANCE)

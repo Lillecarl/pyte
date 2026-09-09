@@ -638,9 +638,9 @@ class Screen:
 
         * Scroll margins are reset to screen boundaries.
         * Cursor is moved to home location -- ``(0, 0)`` and its
-          attributes are set to defaults (see :attr:`default_char`).
-        * Screen is cleared -- each character is reset to
-          :attr:`default_char`.
+          attributes are set to defaults.
+        * Screen is cleared -- every cell goes, so every column reads
+          back as `pyte.cells.UNWRITTEN`.
         * Tabstops are reset to "every eight columns".
 
         .. note::
@@ -990,7 +990,7 @@ class Screen:
         # count then.
         if hasattr(self, "page"):
             self.touch_everything()
-        self.page = Page(default_char=Cell(" ", PLAIN_APPEARANCE))
+        self.page = Page()
 
         self.data_buffer = self.page.data_buffer
         self.pt_cursor_position = CursorPosition(0, 0)
@@ -2693,7 +2693,7 @@ class Screen:
 
         # A fresh row, so the continuation mark of whatever stood here
         # goes with the cells.
-        line = Row(Cell(" ", PLAIN_APPEARANCE))
+        line = Row()
         erased = ErasedCell(" ", appearance)
         for column in range(self.columns):
             line[column] = erased
@@ -3480,7 +3480,7 @@ class Screen:
                     self._erase_row_in_place(data_buffer[line], erased, private is True)
                     continue
 
-                data_buffer[line] = Row(Cell(" ", PLAIN_APPEARANCE))
+                data_buffer[line] = Row()
                 if erased is not None:
                     # A background is set, so the erased cells take it.
                     row = data_buffer[line]
@@ -5316,10 +5316,11 @@ class Screen:
 
         # The character the cursor stands on, for the check at the end.
         #
-        # **The read goes through `.get`**: the buffer and the rows in
-        # it are defaultdicts, so asking makes a cell, and asking about
-        # a cursor parked past the end of a line gave that line a run
-        # of blanks nobody wrote. Lillecarl/pymux#143.
+        # **The read goes through `.get`**: the buffer makes a row for
+        # a number nobody wrote, and a row made here is a row the
+        # reflow then lays out. A row no longer makes a cell, which is
+        # what gave a line a run of blanks nobody wrote before
+        # Lillecarl/pymux#227. Lillecarl/pymux#143.
         #
         # **Only a character a program wrote counts.** The trim below
         # takes the blanks an erase left off the end of a line, so a

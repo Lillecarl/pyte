@@ -23,7 +23,7 @@ def _a_page(*rows):
     wrap brought it into being. An empty string is a row the buffer
     holds and nothing was written on.
     """
-    page = Page(default_char=WrittenCell(" ", PLAIN_APPEARANCE))
+    page = Page()
     for number, text in enumerate(rows):
         wrapped = text.startswith("|")
         row = page.data_buffer[number]
