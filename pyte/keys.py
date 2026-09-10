@@ -375,6 +375,11 @@ class TildeKey(IntEnum):
     DELETE = 3
     PAGE_UP = 5
     PAGE_DOWN = 6
+    #: F3 alone of the function row, because "CSI R" is the cursor
+    #: position report. kitty gives F3 this form and leaves F1, F2 and
+    #: F4 their letters (`csi_number_for_name` and `tilde_trailers` in
+    #: `kitty/key_encoding.py`). Lillecarl/pymux#242.
+    F3 = 13
 
 
 #: The first code point of the Private Use Area. A key numbered from
@@ -387,8 +392,10 @@ CSI = "\x1b["
 # Final bytes of the "CSI 1 ; modifier <letter>" functional key form.
 #
 # "R" is not one of them: "CSI R" is the cursor position report, and a
-# pane reading its own input cannot tell the two apart. F3 therefore
-# has no CSI form and only an SS3 one.
+# pane reading its own input cannot tell the two apart. So F3 takes
+# `TildeKey.F3` for a pane that speaks the protocol, and a legacy pane
+# reads the SS3 form or the report-shaped "CSI 1;5R" that every
+# terminal but kitty sends.
 _LETTER_FINALS = "ABCDEFHPQS"
 
 #: Final bytes of the "SS3 <letter>" form, which F3 does have. The
@@ -651,6 +658,12 @@ def _parse_csi(data: str, start: int) -> Tuple[_Item, int]:
         # A key of the letter form carries no code of its own: the
         # first parameter is the one of the sequence, and it is one.
         code = _first(keys, 1 if final in _LETTER_FINALS else 0)
+        if final == "~" and code == TildeKey.F3:
+            # F3, in the form kitty and rxvt send it. One key has one
+            # event, so it takes the spelling of the rest of the
+            # function row. "CSI 13 u" is Enter and stays Enter: the
+            # number is shared and the final byte is not.
+            code, final = _LETTER_FORM_CODE, "R"
         text = "".join(chr(n) for n in rows[2] if n) if len(rows) > 2 else ""
         return (
             KeyEvent(code, mods, final, text, alternates, event),
@@ -995,6 +1008,13 @@ def _encode_event(
         if mods & Modifier.SHIFT and char.isalpha():
             char = char.upper()
         return char
+
+    if final == "R" and not _legacy_mode(flags):
+        # A pane that speaks the protocol reads F3 as a number, because
+        # kitty's own decoder refuses the letter: "CSI R" and "CSI 1;5R"
+        # both raise there, and "CSI 13~" and "CSI 13;5~" come back as
+        # F3. Lillecarl/pymux#242.
+        code, final = TildeKey.F3, "~"
 
     if final == "~":
         return _serialize(code, mods_value, "~", (), kind, embedded)

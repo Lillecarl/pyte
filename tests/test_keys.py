@@ -508,6 +508,57 @@ def test_a_back_tab_from_a_legacy_keyboard_reaches_the_pane_in_its_form():
         assert translate_key_data("\x1b[Z", flags=flags) == "\x1b[9;2u"
 
 
+def test_f3_takes_the_tilde_form_for_a_pane_that_speaks_the_protocol():
+    """
+    F3 is the one key of the function row that kitty numbers instead of
+    naming with a letter, because "CSI R" is the cursor position report.
+
+    Its own encoder says so: `encode_key_event` writes "CSI 13~" for F3
+    and keeps "CSI P", "CSI Q" and "CSI S" for F1, F2 and F4. Its
+    decoder says the same in the other direction, and raises
+    `KeyError: 'R'` on what pyte used to write here.
+    Lillecarl/pymux#242.
+    """
+    assert translate_key_data("\x1bOR", flags=DISAMBIGUATE) == "\x1b[13~"
+    assert translate_key_data("\x1b[13;5~", flags=DISAMBIGUATE) == "\x1b[13;5~"
+    assert translate_key_data("\x1bOP", flags=DISAMBIGUATE) == "\x1b[P"
+
+
+def test_f3_keeps_its_letter_for_a_legacy_pane():
+    """
+    Ten terminfo entries against one. xterm, foot, WezTerm, Ghostty,
+    Alacritty, VTE, tmux and screen all give `kf3=\\EOR` and
+    `kf27=\\E[1;5R`; kitty alone gives `kf27=\\E[13;5~`. pyte's own
+    entry names `xterm-256color` as its parent, so it publishes the
+    first pair, and the bytes have to be the ones the entry promises.
+    """
+    assert translate_key_data("\x1b[13~", flags=0) == "\x1bOR"
+    assert translate_key_data("\x1b[13;5~", flags=0) == "\x1b[1;5R"
+
+
+def test_ctrl_and_f3_reaches_a_legacy_pane_as_a_cursor_report():
+    """
+    The one key pyte writes and cannot read back.
+
+    "CSI 1;5R" is ctrl+F3 to every terminal but kitty, and a report of
+    row 1, column 5 to every program that just asked where the cursor
+    is. Nothing tells them apart, so the parser keeps the report: a
+    reply a program waits for costs more than a key it rarely presses.
+    """
+    written = translate_key_event(KeyEvent(1, Modifier.CTRL, "R"), flags=0)
+
+    assert written == "\x1b[1;5R"
+    assert parse_key_data(written) == [written]
+
+
+def test_f3_is_one_event_in_both_of_its_forms():
+    "Enter shares the number and not the final byte, and stays Enter."
+    assert parse_key_data("\x1b[13~") == [KeyEvent(1, 0, "R")]
+    assert parse_key_data("\x1bOR") == [KeyEvent(1, 0, "R")]
+    assert parse_key_data("\x1b[13;5~") == [KeyEvent(1, Modifier.CTRL, "R")]
+    assert parse_key_data("\x1b[13u") == [KeyEvent(KeyCode.ENTER, 0, "u")]
+
+
 def _every_key_worth_writing():
     "One event of every shape the encoder can write."
     for code in (ord("a"), ord("1"), KeyCode.ENTER, KeyCode.TAB, KeyCode.ESCAPE):
@@ -516,13 +567,9 @@ def _every_key_worth_writing():
     for code in (2, 3, 5, 6, 15, 17, 24):
         for mods in (0, Modifier.CTRL, Modifier.CTRL | Modifier.SHIFT):
             yield KeyEvent(code, mods, "~")
-    for final in "ABCDEFHPQS":
+    for final in "ABCDEFHPQRS":
         for mods in (0, Modifier.CTRL, Modifier.SHIFT):
             yield KeyEvent(1, mods, final)
-    # **F3 is left out, and it is the one key that is.** Its CSI form
-    # is "CSI 1;5R", which is the cursor position report byte for byte,
-    # so pyte refuses to read it and this walk cannot ask it to.
-    # Lillecarl/pymux#242.
     yield KeyEvent(KeyCode.TAB, Modifier.SHIFT, "u")
 
 
@@ -540,6 +587,14 @@ def test_the_parser_reads_back_what_the_encoder_writes(event, flags):
     so, because F3 was read through prompt_toolkit's table on the way
     in and never through this one.
     """
+    if event.final == "R" and event.mods and not flags:
+        # ctrl+F3 to a legacy pane is "CSI 1;5R", the cursor position
+        # report byte for byte, and the parser keeps the report. It is
+        # the one hole left in this walk, and
+        # `test_ctrl_and_f3_reaches_a_legacy_pane_as_a_cursor_report`
+        # is where it is written down. Lillecarl/pymux#242.
+        return
+
     encoded = translate_key_event(event, flags=flags)
     if not encoded:
         return
