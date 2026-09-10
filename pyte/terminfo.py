@@ -174,15 +174,22 @@ class DeviceExtension(IntEnum):
 
 
 #: What DA answers after the conformance level: the extensions that a
-#: pane really has. The four that xterm names and this leaves out are
-#: PRINTER, LOCATOR_PORT, USER_WINDOWS and ANSI_TEXT_LOCATOR, and a
-#: pane has none of them. `DEVIATIONS.md` says what that costs.
+#: pane really has. The six that xterm names and this leaves out are
+#: PRINTER, NATIONAL_CHARSETS, TECHNICAL_CHARACTERS, LOCATOR_PORT,
+#: USER_WINDOWS and ANSI_TEXT_LOCATOR, and a pane has none of them.
+#: `DEVIATIONS.md` says what that costs.
+#:
+#: **The two character set numbers were here and were not true.**
+#: `charsets.MAPS` holds `B`, `0`, `U` and `V`, so `ESC ( A` and
+#: `ESC ( >` reach `define_charset`, match nothing, and are dropped
+#: without a word. A program that read 9 and then selected a national
+#: set got ASCII and drew the wrong glyph, with nothing to say it had.
+#: vttest found it. Lillecarl/pymux#112, and Lillecarl/pymux#111 is
+#: the code that would let them come back.
 DEVICE_EXTENSIONS = (
     DeviceExtension.COLUMNS_132,
     DeviceExtension.SIXEL,
     DeviceExtension.SELECTIVE_ERASE,
-    DeviceExtension.NATIONAL_CHARSETS,
-    DeviceExtension.TECHNICAL_CHARACTERS,
     DeviceExtension.TERMINAL_STATE_REPORTS,
     DeviceExtension.HORIZONTAL_SCROLLING,
     DeviceExtension.COLOR,

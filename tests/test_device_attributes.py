@@ -70,11 +70,52 @@ def test_da_names_nothing_that_a_pane_cannot_do(pane):
     # pane cannot draw.
     for absent in (
         DeviceExtension.PRINTER,
+        DeviceExtension.NATIONAL_CHARSETS,
+        DeviceExtension.TECHNICAL_CHARACTERS,
         DeviceExtension.LOCATOR_PORT,
         DeviceExtension.USER_WINDOWS,
         DeviceExtension.ANSI_TEXT_LOCATOR,
     ):
         assert absent not in DEVICE_EXTENSIONS
+
+
+def test_the_charset_claims_follow_the_charsets_that_exist():
+    """
+    The rule above, tied to the code rather than to a list.
+
+    A pane may name 9 and 15 exactly when `define_charset` does
+    something for a national set and for the technical one. It does
+    not: `MAPS` holds `B`, `0`, `U` and `V`, and every other code is
+    dropped without a word. vttest read the answer back and found the
+    claim. Lillecarl/pymux#112.
+
+    Implementing the sets is Lillecarl/pymux#111. This test is what
+    puts the numbers back with the code, and what fails if either
+    moves without the other.
+    """
+    from pyte import charsets
+
+    #: What `ESC ( A` and `ESC ( >` select, which are the national and
+    #: the technical sets. xterm has more national codes than this;
+    #: one is enough to say whether any of them work.
+    A_NATIONAL_SET = "A"
+    THE_TECHNICAL_SET = ">"
+
+    has_national = A_NATIONAL_SET in charsets.MAPS
+    has_technical = THE_TECHNICAL_SET in charsets.MAPS
+
+    assert has_national == (DeviceExtension.NATIONAL_CHARSETS in DEVICE_EXTENSIONS)
+    assert has_technical == (DeviceExtension.TECHNICAL_CHARACTERS in DEVICE_EXTENSIONS)
+
+
+def test_selecting_a_set_that_is_not_named_changes_nothing(pane):
+    "The other side of it: what a program gets if it tries anyway."
+    screen, stream, _responses = pane
+
+    was = screen.g0_charset
+    stream.feed("\x1b(A")
+
+    assert screen.g0_charset is was
 
 
 def test_a_da_with_a_parameter_that_is_not_zero_is_ignored(pane):
