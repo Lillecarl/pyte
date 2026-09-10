@@ -2,8 +2,9 @@
 Tests for the OSC sequences that a pane hands to its embedder.
 
 A pane cannot serve the clipboard, a desktop notification or the shape
-of the pointer. Only the terminal of the user can. Those sequences
-therefore leave the pane through `osc_func`.
+of the pointer. Only the terminal of the user can. The subcommands of
+OSC 1337 name services of the embedder too. Those sequences therefore
+leave the pane through `osc_func`, and the embedder reads them.
 """
 
 import pytest
@@ -44,6 +45,8 @@ def feed(stream, code, param):
         ("52", "p;"),  # Clear the primary selection.
         ("99", "i=1:d=0:p=title;Build ready"),  # A notification.
         ("22", "pointer"),  # The shape of the pointer.
+        ("1337", "OpenURL=:aHR0cHM6Ly9leGFtcGxlLmNvbQ=="),  # Open a browser.
+        ("1337", "File=name=t.png;inline=1:AAAA"),  # An image of iTerm2's kind.
     ],
 )
 def test_a_sequence_for_the_user_leaves_the_pane(code, param):
@@ -53,8 +56,9 @@ def test_a_sequence_for_the_user_leaves_the_pane(code, param):
     assert answers == []  # The pane itself answers nothing.
 
 
-def test_the_forwarded_codes_are_the_three_of_the_user():
-    assert FORWARDED_OSC == {"22", "52", "99"}
+def test_the_forwarded_codes_are_the_ones_of_the_user():
+    "The palette and the title belong to the pane; the rest goes out."
+    assert FORWARDED_OSC == {"22", "52", "99", "1337"}
 
 
 def test_a_clipboard_query_stays_inside_the_pane():

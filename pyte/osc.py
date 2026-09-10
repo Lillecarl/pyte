@@ -77,17 +77,23 @@ class Osc(StrEnum):
     RESET_PALETTE_COLOR = "104"
     #: "OSC 105": put special colours back to their defaults.
     RESET_SPECIAL_COLOR = "105"
+    #: "OSC 1337": iTerm2's namespace of terminal extensions. A pane
+    #: hands the whole namespace over; the embedder reads the
+    #: subcommands it knows and drops the rest.
+    TERMINAL_EXTENSION = "1337"
 
 
 #: The OSC sequences that a pane cannot answer by itself. They ask the
 #: terminal of the user for the shape of the pointer (22), the
-#: clipboard (52) or a desktop notification (99). `Screen.osc_func`
-#: receives them, and a pane without such a function consumes them.
+#: clipboard (52) or a desktop notification (99), or they name a
+#: service of the embedder (1337). `Screen.osc_func` receives them,
+#: and a pane without such a function consumes them.
 FORWARDED_OSC = frozenset(
     [
         Osc.POINTER_SHAPE,
         Osc.CLIPBOARD,
         Osc.NOTIFICATION,
+        Osc.TERMINAL_EXTENSION,
     ]
 )
 
