@@ -61,7 +61,10 @@ from typing import List, NamedTuple, Sequence, Tuple
 
 __all__ = [
     "translate_key_data",
+    "translate_key_event",
     "parse_key_data",
+    "Unhearable",
+    "the_modifiers_a_pane_cannot_read",
     "KeyEvent",
     "KeyCode",
     "FunctionalKey",
@@ -249,9 +252,21 @@ BACK_TAB = "[Z"
 #: that is text. Nor are the two locks, for the same reason, which
 #: kitty says in the same place: "the Lock modifiers are not reported
 #: for text producing keys, to keep them usable in legacy programs".
-_MODIFIERS_WITH_NO_LEGACY_FORM = (
+#: **Ambiguous is not the same as absent**, which the old name of this
+#: said and cost a wrong rule. ctrl is a control code and alt is an
+#: escape in front of the key, so the legacy encoding writes both. What
+#: it cannot do is tell them apart from something else: ctrl+a is
+#: ctrl+shift+a, and alt+a is an escape and an a.
+_MODIFIERS_THAT_MAKE_A_KEY_AMBIGUOUS = (
     Modifier.CTRL | Modifier.ALT | Modifier.SUPER | Modifier.HYPER | Modifier.META
 )
+
+#: The modifiers the legacy encoding has no way to write at all.
+#:
+#: These three reach a pane only in a form that carries the number of a
+#: key. Anywhere else they are dropped and the key arrives without
+#: them, which is what a keyboard does as well.
+_MODIFIERS_THE_LEGACY_ENCODING_DROPS = Modifier.SUPER | Modifier.HYPER | Modifier.META
 
 
 def _has_a_shifted_character(code: int, text: str) -> bool:
@@ -900,7 +915,7 @@ def _encode_event(
 
     if final == "u":
         ambiguous = (
-            bool(mods & _MODIFIERS_WITH_NO_LEGACY_FORM) or code == KeyCode.ESCAPE
+            bool(mods & _MODIFIERS_THAT_MAKE_A_KEY_AMBIGUOUS) or code == KeyCode.ESCAPE
         )
         # A functional key still here belongs to a pane that reads the
         # number of a key: `_folded` took it away from every other one.
@@ -1047,20 +1062,133 @@ def translate_key_data(
             parts.append(item)
             continue
         parts.append(
-            _encode_event(
+            translate_key_event(
                 item,
                 flags,
                 application_mode,
+                double,
                 modify_other_keys,
                 application_keypad,
                 format_other_keys,
                 backarrow_sends_backspace,
             )
         )
-        if double and item.event == EventType.PRESS:
-            parts.append(
-                _encode_event(
-                    item._replace(event=EventType.RELEASE), flags, application_mode
-                )
-            )
     return "".join(parts)
+
+
+def translate_key_event(
+    event: KeyEvent,
+    flags: int,
+    application_mode: bool = False,
+    double: bool = False,
+    modify_other_keys: int = ModifyOtherKeys.OFF,
+    application_keypad: bool = False,
+    format_other_keys: int = FormatOtherKeys.TILDE,
+    backarrow_sends_backspace: bool = False,
+    exactly: bool = False,
+) -> str:
+    """
+    The bytes one key event sends to a pane with these protocol flags.
+
+    `translate_key_data` for a caller holding the event and no bytes.
+    Going through the legacy form so that it can be parsed back loses
+    whatever that form cannot carry.
+
+    `double` belongs here and not to the caller, or a key sent by name
+    would stop sending the release a pane asked for.
+
+    **What this cannot write, it writes without**: super+a reaches a
+    legacy pane as "a", which is what a keyboard delivers there. A
+    caller that may not lose any of it asks with `exactly`.
+    """
+    if exactly:
+        lost = the_modifiers_a_pane_cannot_read(event, flags)
+        encoded = translate_key_event(
+            event,
+            flags,
+            application_mode,
+            double,
+            modify_other_keys,
+            application_keypad,
+            format_other_keys,
+            backarrow_sends_backspace,
+        )
+        if lost or not encoded:
+            raise Unhearable(event, lost, encoded)
+        return encoded
+
+    encoded = _encode_event(
+        event,
+        flags,
+        application_mode,
+        modify_other_keys,
+        application_keypad,
+        format_other_keys,
+        backarrow_sends_backspace,
+    )
+    if double and event.event == EventType.PRESS:
+        encoded += _encode_event(
+            event._replace(event=EventType.RELEASE), flags, application_mode
+        )
+    return encoded
+
+
+class Unhearable(ValueError):
+    "A key that a pane in this mode has no way to read."
+
+    def __init__(self, event: KeyEvent, lost: int, encoded: str) -> None:
+        self.event = event
+        self.lost = lost
+        #: What the pane reads instead. Empty for a key with no form.
+        self.encoded = encoded
+        super().__init__(
+            "This pane cannot read the key %r." % (event,)
+            if not encoded
+            else "This pane reads %r instead of the key %r." % (encoded, event)
+        )
+
+
+def _carries_the_number(flags: int) -> bool:
+    "Every modifier fits when it does: the form has a field for them."
+    return bool(
+        flags
+        & (
+            KeyboardFlag.DISAMBIGUATE
+            | KeyboardFlag.REPORT_ALL_KEYS
+            | KeyboardFlag.REPORT_ASSOCIATED_TEXT
+        )
+    )
+
+
+def the_modifiers_a_pane_cannot_read(event: KeyEvent, flags: int) -> int:
+    """
+    The bits of `event.mods` this pane has no form for, and zero when
+    the key fits whole.
+
+    **The encoder's own accounting, not a second opinion**: each branch
+    below is a branch of `_encode_event`, and drift between the two is
+    a key sent wrong in silence. A key with no form at all is not here,
+    because `translate_key_event` answers with nothing for one.
+    """
+    if _carries_the_number(flags):
+        return 0
+
+    lost = event.mods & _MODIFIERS_THE_LEGACY_ENCODING_DROPS
+    if event.final != "u":
+        # The CSI forms write the modifiers in, which is why a legacy
+        # pane reads ctrl+shift+Insert whole.
+        return lost
+
+    if event.code == KeyCode.TAB and event.mods & Modifier.SHIFT:
+        # Back tab is "CSI Z" and carries no ctrl, as in kitty.
+        # Lillecarl/pymux#174.
+        return lost | (event.mods & Modifier.CTRL)
+    if event.mods & Modifier.CTRL:
+        # ctrl+a and ctrl+shift+a are one control code.
+        # Lillecarl/pymux#168.
+        return lost | (event.mods & Modifier.SHIFT)
+    if event.mods & Modifier.SHIFT and not chr(event.code).isalpha():
+        # Shift is carried by the capital, and "1" has none. A keyboard
+        # answers with the text it reports; a name has no text.
+        return lost | Modifier.SHIFT
+    return lost

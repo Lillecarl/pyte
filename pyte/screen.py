@@ -412,6 +412,44 @@ class Screen:
             backarrow_sends_backspace=self.backarrow_sends_backspace,
         )
 
+    def encode_key_event(self, event: keys.KeyEvent, exactly: bool = False) -> str:
+        """
+        The bytes one key event sends to the program on this screen.
+
+        `encode_key` for a caller holding the key and not the bytes.
+
+        **What this program cannot read, it is sent without**, which is
+        what a keyboard delivers and is right for a key really pressed.
+        `exactly` raises `keys.Unhearable` instead: nobody typing
+        `send-keys super+a` means "type an a".
+        """
+        return keys.translate_key_event(
+            event,
+            flags=self.deliverable_kitty_keyboard_flags,
+            application_mode=self.in_application_mode,
+            double=self.sends_a_release_of_its_own,
+            modify_other_keys=self.modify_other_keys,
+            application_keypad=self.in_application_keypad,
+            format_other_keys=self.format_other_keys,
+            backarrow_sends_backspace=self.backarrow_sends_backspace,
+            exactly=exactly,
+        )
+
+    @property
+    def sends_a_release_of_its_own(self) -> bool:
+        """
+        Whether a press to this pane carries its release behind it.
+
+        `translate_key_data` works this out from `source_flags`. A key
+        sent by name has no source, so it is named here for both.
+        """
+        return bool(
+            self.synthesize_key_events
+            and self.deliverable_kitty_keyboard_flags
+            & keys.KeyboardFlag.REPORT_EVENT_TYPES
+            and not self.keyboard_source_flags & keys.KeyboardFlag.REPORT_EVENT_TYPES
+        )
+
     @property
     def backarrow_sends_backspace(self) -> bool:
         """
