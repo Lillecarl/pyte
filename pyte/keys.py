@@ -1021,10 +1021,17 @@ def translate_key_data(
     application_keypad: bool = False,
     format_other_keys: int = FormatOtherKeys.TILDE,
     backarrow_sends_backspace: bool = False,
+    report=None,
 ) -> str:
     """
     Translate raw key data into the encoding for a pane with the given
     keyboard protocol flags.
+
+    `report` is called as `report(event, lost, encoded)` for each key
+    this pane reads as something else or not at all, and never for one
+    that arrives whole. **A key really pressed still degrades**, which
+    is what a keyboard does; this is the only way anything finds out.
+    Nothing is worked out when nobody is asking.
 
     `application_keypad` is DECKPAM, the other half of what terminfo's
     `smkx` turns on. With it a keypad key sends an SS3 form instead of
@@ -1061,18 +1068,24 @@ def translate_key_data(
         if not isinstance(item, KeyEvent):
             parts.append(item)
             continue
-        parts.append(
-            translate_key_event(
-                item,
-                flags,
-                application_mode,
-                double,
-                modify_other_keys,
-                application_keypad,
-                format_other_keys,
-                backarrow_sends_backspace,
-            )
+        encoded = translate_key_event(
+            item,
+            flags,
+            application_mode,
+            double,
+            modify_other_keys,
+            application_keypad,
+            format_other_keys,
+            backarrow_sends_backspace,
         )
+        if report is not None and item.event == EventType.PRESS:
+            # Not a release. A pane that did not ask for the event types
+            # is meant not to read one, and every press sends one, so
+            # reporting those would be a line per keystroke.
+            lost = the_modifiers_a_pane_cannot_read(item, flags)
+            if lost or not encoded:
+                report(item, lost, encoded)
+        parts.append(encoded)
     return "".join(parts)
 
 

@@ -384,7 +384,7 @@ class Screen:
         "The whole screen is set to reverse video."
         return PrivateMode.REVERSE_VIDEO.flag in self.mode
 
-    def encode_key(self, data: str) -> str:
+    def encode_key(self, data: str, report=None) -> str:
         """
         The bytes that one key press sends to the program on this
         screen.
@@ -410,6 +410,7 @@ class Screen:
             application_keypad=self.in_application_keypad,
             format_other_keys=self.format_other_keys,
             backarrow_sends_backspace=self.backarrow_sends_backspace,
+            report=report,
         )
 
     def encode_key_event(self, event: keys.KeyEvent, exactly: bool = False) -> str:
