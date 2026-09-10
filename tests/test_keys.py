@@ -526,11 +526,15 @@ def test_f3_takes_the_tilde_form_for_a_pane_that_speaks_the_protocol():
 
 def test_f3_keeps_its_letter_for_a_legacy_pane():
     """
-    Ten terminfo entries against one. xterm, foot, WezTerm, Ghostty,
-    Alacritty, VTE, tmux and screen all give `kf3=\\EOR` and
-    `kf27=\\E[1;5R`; kitty alone gives `kf27=\\E[13;5~`. pyte's own
-    entry names `xterm-256color` as its parent, so it publishes the
-    first pair, and the bytes have to be the ones the entry promises.
+    Eight terminfo entries against one. xterm, xterm-256color, foot,
+    wezterm, ghostty, alacritty, vte-256color and tmux-256color all
+    give `kf3=\\EOR` and `kf27=\\E[1;5R`; kitty alone gives
+    `kf27=\\E[13;5~`. screen names no modified F3 at all, and the Linux
+    console is its own scheme (`kf3=\\E[[C`, `kf15=\\E[28~`).
+
+    pyte's own entry names `xterm-256color` as its parent, so it
+    publishes the first pair, and the bytes have to be the ones the
+    entry promises.
     """
     assert translate_key_data("\x1b[13~", flags=0) == "\x1bOR"
     assert translate_key_data("\x1b[13;5~", flags=0) == "\x1b[1;5R"
@@ -540,10 +544,11 @@ def test_ctrl_and_f3_reaches_a_legacy_pane_as_a_cursor_report():
     """
     The one key pyte writes and cannot read back.
 
-    "CSI 1;5R" is ctrl+F3 to every terminal but kitty, and a report of
-    row 1, column 5 to every program that just asked where the cursor
-    is. Nothing tells them apart, so the parser keeps the report: a
-    reply a program waits for costs more than a key it rarely presses.
+    "CSI 1;5R" is ctrl+F3 to every entry that names one but kitty's,
+    and a report of row 1, column 5 to every program that just asked
+    where the cursor is. The bytes alone do not tell them apart, so the
+    parser keeps the report: a reply a program waits for costs more
+    than a key it rarely presses.
     """
     written = translate_key_event(KeyEvent(1, Modifier.CTRL, "R"), flags=0)
 

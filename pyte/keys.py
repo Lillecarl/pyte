@@ -395,7 +395,7 @@ CSI = "\x1b["
 # pane reading its own input cannot tell the two apart. So F3 takes
 # `TildeKey.F3` for a pane that speaks the protocol, and a legacy pane
 # reads the SS3 form or the report-shaped "CSI 1;5R" that every
-# terminal but kitty sends.
+# terminfo entry naming a modified F3 gives, except kitty's.
 _LETTER_FINALS = "ABCDEFHPQS"
 
 #: Final bytes of the "SS3 <letter>" form, which F3 does have. The
@@ -485,7 +485,7 @@ class KeyEvent(NamedTuple):
 
     code: int  # unicode key code, or the number of the CSI form
     mods: int  # shift/alt/ctrl bitmask (without the +1 offset)
-    final: str  # "u", "~" or one of _LETTER_FINALS
+    final: str  # "u", "~" or one of _SS3_FINALS
     text: str = ""  # reported text, if the terminal sent it
     #: The other codes of the key: the shifted key, then the key of the
     #: base layout. Only a terminal that speaks the protocol sends
