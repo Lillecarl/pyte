@@ -6,7 +6,16 @@ feeding the pane) into the encoding that the pane expects, given its
 kitty keyboard protocol flags.
 """
 
-from pyte.keys import translate_key_data
+import pytest
+
+from pyte.keys import (
+    KeyCode,
+    KeyEvent,
+    Modifier,
+    parse_key_data,
+    translate_key_data,
+    translate_key_event,
+)
 
 DISAMBIGUATE = 0b1
 EVENT_TYPES = 0b10
@@ -484,10 +493,59 @@ def test_the_back_tab_belongs_to_the_legacy_mode_alone():
     )
 
 
-def test_a_back_tab_from_a_legacy_keyboard_passes_through():
-    "Nothing reads `CSI Z` as a key, so nothing can spoil it."
-    for flags in (0, DISAMBIGUATE, REPORT_ALL):
-        assert translate_key_data("\x1b[Z", flags=flags) == "\x1b[Z"
+def test_a_back_tab_from_a_legacy_keyboard_reaches_the_pane_in_its_form():
+    """
+    `CSI Z` is shift and tab, and a pane that asked for the protocol
+    reads it as one.
+
+    It used to pass through to every pane, because the parser could not
+    read the form the encoder writes. The encoder has always meant
+    otherwise: its back tab branch sends `CSI 9;2u` to a pane that is
+    not in the legacy mode. Lillecarl/pymux#174, Lillecarl/pymux#237.
+    """
+    assert translate_key_data("\x1b[Z", flags=0) == "\x1b[Z"
+    for flags in (DISAMBIGUATE, REPORT_ALL):
+        assert translate_key_data("\x1b[Z", flags=flags) == "\x1b[9;2u"
+
+
+def _every_key_worth_writing():
+    "One event of every shape the encoder can write."
+    for code in (ord("a"), ord("1"), KeyCode.ENTER, KeyCode.TAB, KeyCode.ESCAPE):
+        for mods in (0, Modifier.CTRL, Modifier.SHIFT, Modifier.ALT):
+            yield KeyEvent(code, mods, "u")
+    for code in (2, 3, 5, 6, 15, 17, 24):
+        for mods in (0, Modifier.CTRL, Modifier.CTRL | Modifier.SHIFT):
+            yield KeyEvent(code, mods, "~")
+    for final in "ABCDEFHPQS":
+        for mods in (0, Modifier.CTRL, Modifier.SHIFT):
+            yield KeyEvent(1, mods, final)
+    # **F3 is left out, and it is the one key that is.** Its CSI form
+    # is "CSI 1;5R", which is the cursor position report byte for byte,
+    # so pyte refuses to read it and this walk cannot ask it to.
+    # Lillecarl/pymux#242.
+    yield KeyEvent(KeyCode.TAB, Modifier.SHIFT, "u")
+
+
+@pytest.mark.parametrize("event", list(_every_key_worth_writing()))
+@pytest.mark.parametrize("flags", [0, DISAMBIGUATE])
+def test_the_parser_reads_back_what_the_encoder_writes(event, flags):
+    """
+    **pyte has to be able to read its own output.**
+
+    It could not, twice. The encoder writes back tab as "CSI Z" and F3
+    as "ESC O R", and the parser read neither: "Z" is not a final byte
+    of the letter form, and "R" is left out of it because "CSI R" is
+    the cursor position report. So a back tab reaching a pane that
+    speaks the protocol became three bytes of nothing, and nothing said
+    so, because F3 was read through prompt_toolkit's table on the way
+    in and never through this one.
+    """
+    encoded = translate_key_event(event, flags=flags)
+    if not encoded:
+        return
+
+    read_back = [item for item in parse_key_data(encoded) if isinstance(item, KeyEvent)]
+    assert read_back, "nothing read %r back" % (encoded,)
 
 
 def test_a_plain_tab_is_not_a_back_tab():

@@ -370,7 +370,15 @@ FIRST_FUNCTIONAL_KEY = 0xE000
 CSI = "\x1b["
 
 # Final bytes of the "CSI 1 ; modifier <letter>" functional key form.
+#
+# "R" is not one of them: "CSI R" is the cursor position report, and a
+# pane reading its own input cannot tell the two apart. F3 therefore
+# has no CSI form and only an SS3 one.
 _LETTER_FINALS = "ABCDEFHPQS"
+
+#: Final bytes of the "SS3 <letter>" form, which F3 does have. The
+#: cursor report is a CSI sequence, so "ESC O R" is unambiguous.
+_SS3_FINALS = _LETTER_FINALS + "R"
 
 #: The number a key of the letter form carries. It is always one: the
 #: letter names the key, so the number has nothing to say.
@@ -613,6 +621,17 @@ def _parse_csi(data: str, start: int) -> Tuple[_Item, int]:
             i + 1 - start,
         )
 
+    if not params and raw.endswith(BACK_TAB):
+        # "CSI Z" is shift and tab, and it is the one key the legacy
+        # encoding writes with a modifier inside it. `_encode_event`
+        # writes this form, so without reading it back pyte could not
+        # read its own output: a back tab reached a pane that speaks
+        # the protocol as three bytes of nothing.
+        return (
+            KeyEvent(KeyCode.TAB, Modifier.SHIFT, "u", "", (), EventType.PRESS),
+            i + 1 - start,
+        )
+
     if final in ("u", "~") or final in _LETTER_FINALS:
         # A key of the letter form carries no code of its own: the
         # first parameter is the one of the sequence, and it is one.
@@ -632,7 +651,7 @@ def _parse_ss3(data: str, start: int) -> Tuple[_Item, int]:
     if start + 2 >= len(data):
         return data[start:], len(data) - start
     char = data[start + 2]
-    if char in _LETTER_FINALS:
+    if char in _SS3_FINALS:
         return KeyEvent(1, 0, char), 3
     return data[start : start + 3], 3
 
