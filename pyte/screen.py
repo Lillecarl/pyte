@@ -79,17 +79,18 @@ from .colors import (
     COLOR_OF_A_BACKGROUND,
     COLOR_OF_A_FOREGROUND,
     DEFAULT_COLOR,
-    PALETTE,
     sgr_code_of,
     sgr_color,
     sgr_color_parameters,
 )
 from .osc import (
+    COLOR_BASE,
     DYNAMIC_COLOR_CODES,
     DYNAMIC_COLOR_RESET_OFFSET,
     FIRST_SPECIAL_COLOR,
     FORWARDED_OSC,
     SPECIAL_COLOR_NAMES,
+    ColorBase,
     ColorOverrides,
     Osc,
     PointerShapes,
@@ -236,6 +237,7 @@ class Screen:
         osc_func: Callable[[str, str], None] | None = None,
         resize_func: Callable[[int | None, int | None], None] | None = None,
         may_resize: Callable[[], bool] | None = None,
+        color_base: ColorBase | None = None,
     ) -> None:
         bell_func = bell_func or (lambda: None)
         get_history_limit = get_history_limit or (lambda: 2000)
@@ -273,6 +275,12 @@ class Screen:
         self.osc_func = osc_func
         self.resize_func = resize_func
         self.may_resize = may_resize
+
+        # The colours a pane starts with, before a program sets any. The
+        # embedder replaces it when it learns the theme of the terminal
+        # of the user, with `set_color_base`; a reset keeps it and takes
+        # the colours that a program set away. Lillecarl/pymux#283.
+        self.color_base = color_base or COLOR_BASE
 
         # Stack of kitty keyboard protocol flags. ("CSI > flags u" pushes,
         # "CSI < number u" pops. See `report_kitty_keyboard`.)
@@ -765,9 +773,10 @@ class Screen:
 
         # The colours that a program set with "OSC 4", "OSC 5" and
         # "OSC 10". A pane starts with nothing set and answers a query
-        # from the defaults. A reset gives a fresh one, so every colour
-        # a program asked for goes away together.
-        self.colors = ColorOverrides()
+        # from the base that the embedder set. A reset gives a fresh
+        # one on the same base, so every colour a program asked for
+        # goes away together, and what the embedder said stays.
+        self.colors = ColorOverrides(self.color_base)
 
         # Does the cursor wait to wrap? A character in the last column
         # of the line leaves the cursor one column further, and the
@@ -5017,7 +5026,7 @@ class Screen:
         elif code == Osc.SPECIAL_COLOR:
             self._reply_each(self.colors.read_indexed(code, param, FIRST_SPECIAL_COLOR))
         elif code == Osc.RESET_PALETTE_COLOR:
-            self.colors.reset_indexed(param, 0, len(PALETTE))
+            self.colors.reset_indexed(param, 0, len(self.color_base.palette))
         elif code == Osc.RESET_SPECIAL_COLOR:
             self.colors.reset_indexed(
                 param, FIRST_SPECIAL_COLOR, len(SPECIAL_COLOR_NAMES)
@@ -5078,6 +5087,21 @@ class Screen:
         if code == Osc.CLIPBOARD and asks_for_the_clipboard(param):
             return
         self.osc_func(code, param)
+
+    def set_color_base(self, base: ColorBase) -> None:
+        """
+        Say what colours a pane starts with, for an embedder that knows.
+
+        The terminal of the user paints the palette that a program asks
+        for by number, so a pane's answers ought to describe the same
+        table. This is what an embedder that learned the theme of a
+        client hands in. Lillecarl/pymux#283.
+
+        The colours that a program set stay: they are explicit asks,
+        and a different base does not take them back. A reset does.
+        """
+        self.color_base = base
+        self.colors.base = base
 
     def set_icon_name(self, param: str) -> None:
         '"OSC 0" and "OSC 1": the label of the icon.'

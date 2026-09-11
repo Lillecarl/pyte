@@ -24,7 +24,7 @@ Lillecarl/pymux#129.
 """
 
 from enum import StrEnum
-from typing import Dict, List, NamedTuple, Tuple
+from typing import Dict, List, Mapping, NamedTuple, Sequence, Tuple
 
 from .colors import DEFAULT_COLORS, PALETTE, Color, parse_color
 
@@ -40,6 +40,8 @@ __all__ = [
     "POINTER_SHAPE_ALIASES",
     "QUERY",
     "SPECIAL_COLOR_NAMES",
+    "COLOR_BASE",
+    "ColorBase",
     "ColorOverrides",
     "Osc",
     "PointerShapeRead",
@@ -439,6 +441,40 @@ class PointerShapes:
 QUERY = "?"
 
 
+class ColorBase(NamedTuple):
+    """
+    The colours a pane starts with, before a program sets any.
+
+    `palette` numbers the colours the way "OSC 4" does, and holds the
+    whole table: the indexes are what the wire names, so the cube and
+    the grey ramp belong here even when an embedder only learned the
+    sixteen ANSI colours, which are the only ones that differ between
+    terminals. `defaults` answers the dynamic colours ("OSC 10" is the
+    foreground, "OSC 11" the background) and the kitty query. A
+    default that this does not name falls back to the one `colors.py`
+    reports, so a pane answers the question it is asked whatever its
+    embedder said.
+
+    A pane starts on `COLOR_BASE`. An embedder that knows better -- a
+    pane is drawn on the terminal of the user, and that terminal holds
+    its own theme -- hands in its own with `Screen.set_color_base`.
+    Lillecarl/pymux#283.
+    """
+
+    palette: Sequence[Color]
+    defaults: Mapping[str, Color]
+
+
+#: The base a pane starts on. `colors.py` reports these as the honest
+#: answer for what a program will draw on when nobody knows better,
+#: and this is the answer for a pane whose embedder knows nothing
+#: either. The first sixteen are the only ones that differ between
+#: terminals; the cube and the grey ramp are convention, which is why
+#: an embedder asks for the theme of the terminal and not for every
+#: entry.
+COLOR_BASE = ColorBase(PALETTE, DEFAULT_COLORS)
+
+
 class ColorOverrides:
     """
     The colours that a program set, over the ones a pane starts with.
@@ -452,11 +488,28 @@ class ColorOverrides:
     Every method that answers a program returns the payloads to send
     and writes nothing. A pane has one screen of these, and a reset
     takes them all away.
+
+    `base` holds what a program sits on top of. It is read at answer
+    time and not copied in, so an embedder that learns the theme of
+    the terminal of the user mid-life swaps the base without losing
+    what a program set.
     """
 
-    __slots__ = ("by_index", "by_code")
+    __slots__ = ("base", "by_index", "by_code")
 
-    def __init__(self) -> None:
+    def __init__(self, base: ColorBase = COLOR_BASE) -> None:
+        if len(base.palette) != len(PALETTE):
+            # The indexes of "OSC 4" name a table of this length on the
+            # wire, and the special colours follow it at a number that
+            # assumes so. A shorter table would answer a cube query
+            # with the colour of the text.
+            raise ValueError(
+                "the palette of a ColorBase holds %i colours, not %i"
+                % (len(PALETTE), len(base.palette))
+            )
+        #: The colours that a program's sets sit on top of.
+        self.base = base
+
         #: What "OSC 4" and "OSC 5" set, by the index into the palette
         #: and the special colours after it.
         self.by_index: Dict[int, Color] = {}
@@ -476,8 +529,8 @@ class ColorOverrides:
         held = self.by_index.get(index)
         if held is not None:
             return held
-        if index < len(PALETTE):
-            return PALETTE[index]
+        if index < len(self.base.palette):
+            return self.base.palette[index]
         # A special colour that nobody set draws in the colour of the
         # text. xterm leaves such a colour unset and paints the text
         # colour, so that is the honest answer.
@@ -500,7 +553,9 @@ class ColorOverrides:
         for code, named in DYNAMIC_COLOR_CODES.items():
             if named == name and code in self.by_code:
                 return self.by_code[code]
-        return DEFAULT_COLORS[name]
+        # A base that does not name this colour hands the question on
+        # to the defaults: a pane answers, whatever its embedder said.
+        return self.base.defaults.get(name) or DEFAULT_COLORS[name]
 
     def read_indexed(self, code: str, param: str, offset: int) -> List[str]:
         """
@@ -565,9 +620,7 @@ class ColorOverrides:
             if number not in DYNAMIC_COLOR_CODES:
                 continue
             if value.strip() == QUERY:
-                color = self.by_code.get(
-                    number, DEFAULT_COLORS[DYNAMIC_COLOR_CODES[number]]
-                )
+                color = self.named(DYNAMIC_COLOR_CODES[number])
                 answers.append("%s;%s" % (number, color.spec))
             else:
                 color = parse_color(value)
@@ -596,10 +649,10 @@ class ColorOverrides:
         for key, is_query in keys:
             if not is_query:
                 continue
-            if key.isdigit() and int(key) < len(PALETTE):
+            if key.isdigit() and int(key) < len(self.base.palette):
                 color = self.color_of(int(key))
                 answers.append("%s=%s" % (key, color.spec))
-            elif key in DEFAULT_COLORS:
+            elif key in self.base.defaults or key in DEFAULT_COLORS:
                 answers.append("%s=%s" % (key, self.named(key).spec))
             else:
                 answers.append("%s=" % key)  # Not a colour that we hold.
