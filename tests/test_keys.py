@@ -187,9 +187,9 @@ def test_a_release_stops_at_a_pane_that_did_not_ask():
     assert translate_key_data(RELEASE, flags=REPORT_ALL) == ""
 
 
-def test_a_release_of_a_text_key_leaves_the_modifiers_empty():
-    "kitty writes the empty field rather than the value of no modifier."
-    assert translate_key_data("\x1b[97;:3u", flags=EVENT_TYPES) == "\x1b[97;:3u"
+def test_a_release_of_a_text_key_writes_modifier_one():
+    "The event type needs a modifier field, even when none is active."
+    assert translate_key_data("\x1b[97;1:3u", flags=EVENT_TYPES) == "\x1b[97;1:3u"
 
 
 def test_a_release_of_enter_needs_all_keys_as_escape_codes():
@@ -199,7 +199,7 @@ def test_a_release_of_enter_needs_all_keys_as_escape_codes():
     for every key as an escape code.
     """
     for code in (13, 9, 127):
-        release = "\x1b[%d;:3u" % code
+        release = "\x1b[%d;1:3u" % code
         assert translate_key_data(release, flags=EVENT_TYPES) == ""
         assert translate_key_data(release, flags=EVENT_TYPES | REPORT_ALL) == release
 
@@ -207,7 +207,7 @@ def test_a_release_of_enter_needs_all_keys_as_escape_codes():
 def test_a_repeat_without_the_flag_is_a_press():
     "That is what the key did, and the legacy encoding says no more."
     assert translate_key_data("\x1b[97;1:2u", flags=0) == "a"
-    assert translate_key_data("\x1b[97;1:2u", flags=EVENT_TYPES) == "\x1b[97;:2u"
+    assert translate_key_data("\x1b[97;1:2u", flags=EVENT_TYPES) == "\x1b[97;1:2u"
 
 
 def test_the_other_codes_of_a_key_reach_a_pane_that_asked():
@@ -243,16 +243,16 @@ def test_the_text_of_a_key_reaches_a_pane_that_asked():
 
 
 def test_a_legacy_key_answers_with_a_press_and_a_release():
-    assert translate_key_data("a", flags=EVENT_TYPES) == "a\x1b[97;:3u"
-    assert translate_key_data("a", flags=EVENT_TYPES | DISAMBIGUATE) == "a\x1b[97;:3u"
+    assert translate_key_data("a", flags=EVENT_TYPES) == "a\x1b[97;1:3u"
+    assert translate_key_data("a", flags=EVENT_TYPES | DISAMBIGUATE) == "a\x1b[97;1:3u"
     assert translate_key_data("\x01", flags=EVENT_TYPES) == "\x01\x1b[97;5:3u"
     assert translate_key_data("A", flags=EVENT_TYPES) == "A\x1b[97;2:3u"
 
 
 def test_a_made_up_release_keeps_the_form_of_the_key():
     "An arrow comes up in the form of an arrow, not of a text key."
-    assert translate_key_data("\x1b[D", flags=EVENT_TYPES) == "\x1b[D\x1b[1;:3D"
-    assert translate_key_data("\x1b[2~", flags=EVENT_TYPES) == ("\x1b[2~\x1b[2;:3~")
+    assert translate_key_data("\x1b[D", flags=EVENT_TYPES) == "\x1b[D\x1b[1;1:3D"
+    assert translate_key_data("\x1b[2~", flags=EVENT_TYPES) == ("\x1b[2~\x1b[2;1:3~")
 
 
 def test_enter_gets_no_made_up_release_either():
@@ -264,7 +264,7 @@ def test_enter_gets_no_made_up_release_either():
     assert translate_key_data("\r", flags=EVENT_TYPES) == "\r"
     assert translate_key_data("\t", flags=EVENT_TYPES) == "\t"
     assert translate_key_data("\r", flags=EVENT_TYPES | REPORT_ALL) == (
-        "\x1b[13u\x1b[13;:3u"
+        "\x1b[13u\x1b[13;1:3u"
     )
 
 
@@ -272,8 +272,8 @@ def test_a_keyboard_that_sends_its_own_release_is_left_alone():
     "Two releases for one key would be worse than none."
     assert translate_key_data("a", flags=EVENT_TYPES, source_flags=0b11111) == "a"
     assert (
-        translate_key_data("\x1b[97;:3u", flags=EVENT_TYPES, source_flags=0b11111)
-        == "\x1b[97;:3u"
+        translate_key_data("\x1b[97;1:3u", flags=EVENT_TYPES, source_flags=0b11111)
+        == "\x1b[97;1:3u"
     )
 
 

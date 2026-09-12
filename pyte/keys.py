@@ -740,8 +740,8 @@ def _serialize(
 
     The form is "CSI code:shifted:base ; mods:event ; text final". A
     field that holds its default stays empty, and a field at the end
-    that holds its default is left out. This follows the encoder of
-    kitty, so that a pane sees what a real kitty gives it.
+    that holds its default is left out. A non-press event must write
+    modifier 1, even when no modifier is active.
 
     **The number of a "~" key always goes out.** In every other form
     the number is 1 when there is nothing to say, so "CSI H" and
@@ -763,7 +763,7 @@ def _serialize(
         out += ":" + ":".join("" if slot is None else str(slot) for slot in alternates)
     if second or third:
         out += ";"
-        if mods_value != 1:
+        if mods_value != 1 or event != EventType.PRESS:
             out += str(mods_value)
         if event != EventType.PRESS:
             out += ":%d" % event
