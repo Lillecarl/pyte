@@ -126,6 +126,13 @@ DYNAMIC_COLOR_CODES: Dict[str, str] = {
     "19": "selection_foreground",
 }
 
+#: The same colours, by the names kitty's protocol asks them by: the
+#: "OSC 21" payload names a colour, and this is where its name turns
+#: into the code the pane holds it under.
+CODES_OF_DYNAMIC_COLOR_NAMES = {
+    name: code for code, name in DYNAMIC_COLOR_CODES.items()
+}
+
 #: The colours that a rendition asks for by name, in the order that
 #: xterm numbers them. "OSC 5 ; 0" is the first.
 SPECIAL_COLOR_NAMES = ["bold", "underline", "blink", "reverse", "italic"]
@@ -141,13 +148,15 @@ FIRST_SPECIAL_COLOR = len(PALETTE)
 DYNAMIC_COLOR_RESET_OFFSET = 100
 
 
-def parse_kitty_color_query(param: str) -> List[Tuple[str, bool]] | None:
+def parse_kitty_color_query(param: str) -> List[Tuple[str, str | None]] | None:
     """
     Split the payload of an "OSC 21" sequence into its keys.
 
-    Returns one (key, is_query) pair per part, or None when the payload
-    holds nothing to answer. A part with a "?" value is a query; every
-    other part sets a colour, which a pane cannot do.
+    Returns one (key, value) pair per part, or None when the payload
+    holds nothing. The value is `None` for a part that names a colour
+    and nothing else, QUERY for a query, and the colour to set for
+    everything else. A set reaches the same table a query reads, the
+    way the xterm sequences pair up. Lillecarl/pymux#286.
     """
     parts = [part for part in param.split(";") if part != ""]
     if not parts:
@@ -157,10 +166,25 @@ def parse_kitty_color_query(param: str) -> List[Tuple[str, bool]] | None:
     for part in parts:
         if "=" in part:
             key, value = part.split("=", 1)
-            result.append((key, value == "?"))
+            result.append((key, value))
         else:
-            result.append((part, False))
+            result.append((part, None))
     return result
+
+
+def a_key_an_answer_may_carry(key: str) -> bool:
+    """
+    Is this a key an answer may echo?
+
+    The protocol names colours in words and numbers. Anything else is
+    bytes that arrived from the program in the pane, and the answer
+    goes back into that pane -- kitty answered a query by reflecting
+    the key unguarded, and a newline in it ran commands in the shell
+    (CVE-2026-54057). A pane's answer reaches the program that asked,
+    and it does not carry the risk further by echoing what it did not
+    parse.
+    """
+    return key != "" and key.replace("_", "").isalnum()
 
 
 #: The longest hyperlink target that a pane may open. A URL longer than
@@ -639,23 +663,51 @@ class ColorOverrides:
         answer.
 
         kitty joins its answers into one sequence, which is what its
-        own protocol says. The xterm queries answer one at a time.
+        own protocol says. The xterm queries answer one at a time. A
+        part whose value is "?" asks; every other part sets, the way
+        the xterm sequences do, into the same table a query reads.
+        The protocol is kitty's, and ghostty speaks it too.
+        Lillecarl/pymux#286.
         """
         keys = parse_kitty_color_query(param)
         if keys is None:
             return None
 
         answers = []
-        for key, is_query in keys:
-            if not is_query:
-                continue
-            if key.isdigit() and int(key) < len(self.base.palette):
-                color = self.color_of(int(key))
-                answers.append("%s=%s" % (key, color.spec))
-            elif key in self.base.defaults or key in DEFAULT_COLORS:
-                answers.append("%s=%s" % (key, self.named(key).spec))
-            else:
-                answers.append("%s=" % key)  # Not a colour that we hold.
+        for key, value in keys:
+            if value == QUERY:
+                if not a_key_an_answer_may_carry(key):
+                    continue
+                if key.isdigit() and int(key) < len(self.base.palette):
+                    color = self.color_of(int(key))
+                    answers.append("%s=%s" % (key, color.spec))
+                elif key in self.base.defaults or key in DEFAULT_COLORS:
+                    answers.append("%s=%s" % (key, self.named(key).spec))
+                else:
+                    # The protocol answers a key it does not know with
+                    # a question mark, which is also the honest answer
+                    # for a colour the pane holds no value for.
+                    answers.append("%s=%s" % (key, QUERY))
+            elif value is not None:
+                self.set_a_kitty_colour(key, value)
         if not answers:
             return None
         return "21;%s" % ";".join(answers)
+
+    def set_a_kitty_colour(self, key: str, value: str) -> None:
+        """
+        Set the colour that an "OSC 21" payload names.
+
+        The same table the xterm sequences write: a number lands in
+        the palette, a name in the dynamic colours. A colour that
+        parses to nothing sets nothing, and a key that is neither a
+        name the pane holds nor a number in the palette is skipped.
+        """
+        color = parse_color(value)
+        if color is None:
+            return
+        code = CODES_OF_DYNAMIC_COLOR_NAMES.get(key)
+        if code is not None:
+            self.by_code[code] = color
+        elif key.isdigit() and int(key) < len(self.base.palette):
+            self.by_index[int(key)] = color

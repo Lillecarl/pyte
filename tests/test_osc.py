@@ -8,7 +8,13 @@ an answer: without it, it waits forever.
 import pytest
 
 from pyte.colors import DEFAULT_COLORS, PALETTE, Color
-from pyte.osc import COLOR_BASE, ColorBase, ColorOverrides, parse_kitty_color_query
+from pyte.osc import (
+    COLOR_BASE,
+    ColorBase,
+    ColorOverrides,
+    a_key_an_answer_may_carry,
+    parse_kitty_color_query,
+)
 from pyte.screen import Screen
 from pyte.streams import Stream
 from pyte.osc import Osc
@@ -47,13 +53,25 @@ def test_the_palette_has_the_full_256_colours():
 
 def test_reading_a_kitty_colour_query():
     assert parse_kitty_color_query("foreground=?;cursor=?") == [
-        ("foreground", True),
-        ("cursor", True),
+        ("foreground", "?"),
+        ("cursor", "?"),
     ]
-    assert parse_kitty_color_query("foreground=green") == [("foreground", False)]
-    assert parse_kitty_color_query("background") == [("background", False)]
+    assert parse_kitty_color_query("foreground=green") == [("foreground", "green")]
+    assert parse_kitty_color_query("background") == [("background", None)]
     assert parse_kitty_color_query("") is None
     assert parse_kitty_color_query(";;") is None
+
+
+def test_a_key_that_is_a_plain_name_is_the_only_one_an_answer_carries():
+    # kitty answered a query by reflecting the key unguarded, and a
+    # newline in it ran commands in the shell (CVE-2026-54057). The
+    # pane answers only keys that name a colour or number one.
+    assert a_key_an_answer_may_carry("foreground")
+    assert a_key_an_answer_may_carry("selection_background")
+    assert a_key_an_answer_may_carry("3")
+    assert not a_key_an_answer_may_carry("")
+    assert not a_key_an_answer_may_carry("foreground\n")
+    assert not a_key_an_answer_may_carry("a b")
 
 
 # ----------------------------------------------------------------------
@@ -157,16 +175,45 @@ def test_a_kitty_query_for_a_palette_entry():
 
 
 def test_a_kitty_query_for_a_colour_we_do_not_hold():
-    # An empty value is how a terminal says "not set".
+    # The protocol answers a key it does not know with a question
+    # mark, and a colour the pane holds no value for gets the same
+    # answer, which is the honest one.
     _screen, stream, responses = make_screen()
     stream.feed(osc(Osc.KITTY_COLORS, "visual_bell=?"))
-    assert responses == ["\x1b]21;visual_bell=\x1b\\"]
+    assert responses == ["\x1b]21;visual_bell=?\x1b\\"]
 
 
-def test_a_kitty_colour_set_is_ignored():
+def test_a_kitty_colour_set_reaches_the_query():
+    # A set answers nothing, and the colour is there when the next
+    # query asks.
+    _screen, stream, responses = make_screen()
+    stream.feed(osc(Osc.KITTY_COLORS, "background=#00ff00"))
+    assert responses == []
+    stream.feed(osc(Osc.KITTY_COLORS, "background=?"))
+    assert responses[-1] == "\x1b]21;background=%s\x1b\\" % Color(0, 0xFF, 0).spec
+
+
+def test_a_kitty_colour_set_of_a_name_the_pane_cannot_read_sets_nothing():
+    # A pane reads the specs XParseColor reads, and no path of it
+    # reads colour names -- the xterm sets ignore them the same way.
+    # "green" is not a spec, so nothing moves.
     _screen, stream, responses = make_screen()
     stream.feed(osc(Osc.KITTY_COLORS, "background=green"))
-    assert responses == []
+    stream.feed(osc(Osc.KITTY_COLORS, "background=?"))
+    assert responses[-1] == "\x1b]21;background=%s\x1b\\" % BLACK
+
+
+def test_a_kitty_colour_set_reads_back_through_the_xterm_query():
+    # The asymmetry the issue describes: the colour one protocol set,
+    # the other protocol reads. Lillecarl/pymux#286.
+    _screen, stream, responses = make_screen()
+    stream.feed(osc(Osc.KITTY_COLORS, "1=#00ff00"))
+    stream.feed(osc(Osc.PALETTE_COLOR, "1", "?", end=Terminator.BEL))
+    assert responses[-1] == "\x1b]4;1;%s\x1b\\" % Color(0, 0xFF, 0).spec
+
+    stream.feed(osc(Osc.KITTY_COLORS, "foreground=#ff0000"))
+    stream.feed(osc("10", "?", end=Terminator.BEL))
+    assert responses[-1] == "\x1b]10;%s\x1b\\" % Color(0xFF, 0, 0).spec
 
 
 # ----------------------------------------------------------------------
