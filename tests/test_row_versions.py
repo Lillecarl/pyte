@@ -107,7 +107,6 @@ def check(chunks, lines: int = 24, columns: int = 80, history=None) -> None:
     """
     screen = a_screen(columns=columns, lines=lines, history=history)
     stream = Stream(screen)
-    stream.attach(screen)
     reader = Believing(screen)
 
     # The frame before anything arrives. A reader that starts here is
@@ -249,7 +248,6 @@ def test_a_sequence_that_scrolls_out_of_the_history(chunks):
 def test_a_row_that_nothing_wrote_keeps_its_count():
     screen = a_screen(columns=10, lines=4)
     stream = Stream(screen)
-    stream.attach(screen)
 
     stream.feed("first\r\nsecond")
     before = dict(screen.written_at)
@@ -265,7 +263,6 @@ def test_the_count_only_goes_up():
     "It is never emptied, because nobody owns the emptying."
     screen = a_screen(columns=10, lines=4)
     stream = Stream(screen)
-    stream.attach(screen)
 
     seen = []
     for _ in range(5):
@@ -282,7 +279,6 @@ def test_a_resize_says_that_every_row_changed():
     """
     screen = a_screen(columns=10, lines=4)
     stream = Stream(screen)
-    stream.attach(screen)
     stream.feed("a line that is longer than ten columns\r\nand another")
 
     reader = Believing(screen)
@@ -300,7 +296,6 @@ def test_the_other_page_says_that_every_row_changed():
     "And so does coming back from it."
     screen = a_screen(columns=10, lines=4)
     stream = Stream(screen)
-    stream.attach(screen)
     stream.feed("the first screen")
 
     reader = Believing(screen)
@@ -325,7 +320,6 @@ def test_a_reader_that_attaches_late_draws_everything_once():
     """
     screen = a_screen(columns=10, lines=4)
     stream = Stream(screen)
-    stream.attach(screen)
     stream.feed("one\r\ntwo\r\nthree")
 
     reader = Believing(screen)
