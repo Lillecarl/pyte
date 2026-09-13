@@ -375,11 +375,20 @@ class TildeKey(IntEnum):
     DELETE = 3
     PAGE_UP = 5
     PAGE_DOWN = 6
-    #: F3 alone of the function row, because "CSI R" is the cursor
-    #: position report. kitty gives F3 this form and leaves F1, F2 and
-    #: F4 their letters (`csi_number_for_name` and `tilde_trailers` in
-    #: `kitty/key_encoding.py`). Lillecarl/pymux#242.
+    #: The function row, in the numbering rxvt uses. kitty sends only
+    #: F3 this way, because "CSI R" is the cursor position report and a
+    #: pane reading its own input cannot tell the two apart; it leaves
+    #: F1, F2 and F4 their letters (`csi_number_for_name` and
+    #: `tilde_trailers` in `kitty/key_encoding.py`).
+    #:
+    #: rxvt-unicode sends all four, so all four are read. They fold onto
+    #: the letter form, so nothing here writes them back: what a pane
+    #: gets is what kitty and every terminfo entry name.
+    #: Lillecarl/pymux#242, Lillecarl/pymux#243.
+    F1 = 11
+    F2 = 12
     F3 = 13
+    F4 = 14
 
 
 #: The first code point of the Private Use Area. A key numbered from
@@ -405,6 +414,17 @@ _SS3_FINALS = _LETTER_FINALS + "R"
 #: The number a key of the letter form carries. It is always one: the
 #: letter names the key, so the number has nothing to say.
 _LETTER_FORM_CODE = 1
+
+#: The letter each key of the function row takes, by the number rxvt
+#: gives it. One key has one event, so a sequence read in the tilde
+#: numbering comes out spelled the way the rest of the row is.
+#: Lillecarl/pymux#243.
+_FUNCTION_ROW_LETTER = {
+    TildeKey.F1: "P",
+    TildeKey.F2: "Q",
+    TildeKey.F3: "R",
+    TildeKey.F4: "S",
+}
 
 
 #: The most flag sets one screen keeps. The specification asks a
@@ -658,12 +678,13 @@ def _parse_csi(data: str, start: int) -> Tuple[_Item, int]:
         # A key of the letter form carries no code of its own: the
         # first parameter is the one of the sequence, and it is one.
         code = _first(keys, 1 if final in _LETTER_FINALS else 0)
-        if final == "~" and code == TildeKey.F3:
-            # F3, in the form kitty and rxvt send it. One key has one
-            # event, so it takes the spelling of the rest of the
-            # function row. "CSI 13 u" is Enter and stays Enter: the
-            # number is shared and the final byte is not.
-            code, final = _LETTER_FORM_CODE, "R"
+        if final == "~" and code in _FUNCTION_ROW_LETTER:
+            # The function row, in the form rxvt sends it and kitty
+            # sends F3 in. One key has one event, so each takes the
+            # spelling of the rest of the row. "CSI 13 u" is Enter and
+            # stays Enter: the number is shared and the final byte is
+            # not.
+            code, final = _LETTER_FORM_CODE, _FUNCTION_ROW_LETTER[code]
         text = "".join(chr(n) for n in rows[2] if n) if len(rows) > 2 else ""
         return (
             KeyEvent(code, mods, final, text, alternates, event),

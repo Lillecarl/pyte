@@ -524,6 +524,43 @@ def test_f3_takes_the_tilde_form_for_a_pane_that_speaks_the_protocol():
     assert translate_key_data("\x1bOP", flags=DISAMBIGUATE) == "\x1b[P"
 
 
+def test_the_rxvt_numbering_of_the_function_row_is_read():
+    """
+    rxvt-unicode numbers F1, F2 and F4 the way kitty numbers F3 alone.
+
+    Nothing writes that form to a pane, and a person typing on
+    rxvt-unicode sends it: `CSI 11~` is F1 there. pyte read it as a
+    tilde key of its own and wrote it straight back out, so pymux could
+    not name the key once it carried a modifier -- `_TILDE_KEYS` has no
+    11, 12 or 14, so a modified one was dropped in silence and ctrl+F1
+    did nothing and said nothing.
+
+    Read, and folded onto the letter form: one key has one event, and
+    what reaches a pane is what kitty and every terminfo entry name.
+    Lillecarl/pymux#243.
+    """
+    # A pane that speaks the protocol gets the letters kitty uses.
+    assert translate_key_data("\x1b[11~", flags=DISAMBIGUATE) == "\x1b[P"
+    assert translate_key_data("\x1b[12~", flags=DISAMBIGUATE) == "\x1b[Q"
+    assert translate_key_data("\x1b[14~", flags=DISAMBIGUATE) == "\x1b[S"
+
+    # And a modifier survives, which is the whole complaint.
+    assert translate_key_data("\x1b[11;5~", flags=DISAMBIGUATE) == "\x1b[1;5P"
+    assert translate_key_data("\x1b[12;5~", flags=DISAMBIGUATE) == "\x1b[1;5Q"
+    assert translate_key_data("\x1b[14;5~", flags=DISAMBIGUATE) == "\x1b[1;5S"
+
+    # F3 still numbers, for the reason the test above gives.
+    assert translate_key_data("\x1b[13~", flags=DISAMBIGUATE) == "\x1b[13~"
+
+
+def test_the_rxvt_function_row_reaches_a_legacy_pane_as_its_letters():
+    "A legacy pane gets what pyte's terminfo entry promises: `kf1=\\EOP`."
+    assert translate_key_data("\x1b[11~", flags=0) == "\x1bOP"
+    assert translate_key_data("\x1b[12~", flags=0) == "\x1bOQ"
+    assert translate_key_data("\x1b[14~", flags=0) == "\x1bOS"
+    assert translate_key_data("\x1b[11;5~", flags=0) == "\x1b[1;5P"
+
+
 def test_f3_keeps_its_letter_for_a_legacy_pane():
     """
     Eight terminfo entries against one. xterm, xterm-256color, foot,
