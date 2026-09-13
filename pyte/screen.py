@@ -172,6 +172,11 @@ _Savepoint = namedtuple(
         # The marks that SPA and DECSCA set. They belong to the cursor,
         # the way the rendition does, so a save remembers them.
         "protection",
+        # Whether the cursor was waiting to wrap. It is part of where
+        # the cursor is -- one column past the last it wrote -- so a
+        # save that folded it away made "ESC 7 ESC 8" move the screen.
+        # Lillecarl/pymux#88.
+        "pending_wrap",
     ],
 )
 
@@ -1807,6 +1812,12 @@ class Screen:
             )
             row = self.pt_cursor_position.y - self.line_offset
             column = self.pt_cursor_position.x
+            # The wait travels with the cursor it belongs to.
+            # `pending_wrap` is a swap variable, so the screen that
+            # comes back would otherwise bring the wait it was taken
+            # with -- which is the wait of a cursor that is not the one
+            # being kept. Lillecarl/pymux#35.
+            waiting = self.pending_wrap
 
             # The screen that is given back is kept, not thrown away:
             # a terminal has one alternate screen for its whole life
@@ -1845,10 +1856,18 @@ class Screen:
             else:
                 # "?47" and "?1047" save no cursor, so the cursor stays
                 # where the program that drew the alternate screen left
-                # it.
+                # it -- and a cursor that waits to wrap keeps waiting.
                 self.pt_cursor_position.y = row + self.line_offset
                 self.pt_cursor_position.x = column
                 self.ensure_bounds()
+
+                # And then the wait, for the reason `restore_cursor`
+                # gives: `ensure_bounds` is the one place that says a
+                # move ends the wait, and it folds the column in with
+                # it. Giving a screen back is not a move.
+                if waiting:
+                    self.pt_cursor_position.x = column
+                    self.pending_wrap = True
 
     #: The private modes that name the alternate screen. "?1049" also
     #: saves the cursor; the two older ones do not.
@@ -1997,7 +2016,18 @@ class Screen:
             else:
                 edge = columns
 
-            if char_width > 0 and cursor_position_x + char_width > edge:
+            # A cursor that waits to wrap wraps, wherever it stands.
+            # Almost always it stands one past the edge and the test
+            # above says the same thing; a tab stop move is the one
+            # thing that moves a waiting cursor without ending the
+            # wait, and then the flag is the only thing that knows.
+            # xterm reads it this way: after `CSI Z` the cursor really
+            # is a tab stop back -- a `CSI D` from there lands one
+            # column left of it -- and the next character wraps anyway.
+            # Lillecarl/pymux#106.
+            if char_width > 0 and (
+                waiting_to_wrap or cursor_position_x + char_width > edge
+            ):
                 if PrivateMode.AUTOWRAP.flag in self.mode:
                     # The moves below read the cursor from the screen,
                     # and this loop keeps it in a local. Write it back
@@ -2124,10 +2154,18 @@ class Screen:
         With a right margin the wait sits one column after the margin,
         which is a column of the screen like any other. So the flag
         says where the cursor came from, and the place does not.
+
+        **Only a cursor that is really past the edge comes back.** A
+        tab stop move carries the wait to a column that is not the
+        edge (Lillecarl/pymux#106), and folding there would take a
+        column off a cursor that never gained one.
         """
         if self.pending_wrap:
-            self.pt_cursor_position.x -= 1
+            _left, right = self.left_right
+            if self.pt_cursor_position.x == right + 1:
+                self.pt_cursor_position.x -= 1
             self.pending_wrap = False
+
 
     def carriage_return(self) -> None:
         """
@@ -2534,6 +2572,17 @@ class Screen:
 
         The first column stops the cursor, the way the last column
         stops a tab.
+
+        **A tab stop move leaves the wait to wrap alone**, which is
+        what `tab` does for the same reason: every other cursor move
+        ends the wait, and these two do not. So the cursor really does
+        go back a tab stop -- a `CSI D` from there lands one column
+        left of it -- and the next character wraps anyway. xterm reads
+        it this way, and Alacritty, Ghostty and xterm.js draw the same
+        screen. Lillecarl/pymux#106.
+
+        Nothing here clears the flag, which is the whole of it: this is
+        one of the two moves that never reach `ensure_bounds`.
         """
         for _ in range(count or 1):
             for stop in sorted(self.tabstops, reverse=True):
@@ -2690,6 +2739,13 @@ class Screen:
                 # cursor that "ESC 7" remembers.
                 self._rendition,
                 self.protection,
+                # A character in the last column leaves the cursor
+                # waiting to wrap, and the wait is where the cursor is
+                # rather than a thing beside it. Without this a save
+                # and a restore with nothing between them moved the
+                # next character a row up. xterm, Alacritty, Ghostty
+                # and WezTerm all bring it back. Lillecarl/pymux#88.
+                self.pending_wrap,
             )
         ]
 
@@ -2730,6 +2786,16 @@ class Screen:
             # cursor, so a save from before it is usually above the top
             # margin. kitty and xterm both keep it there.
             self.ensure_bounds()
+
+            # And then the wait, because `ensure_bounds` ends one: it
+            # is the one place that says a move of the cursor ends the
+            # wait, and a restore is not a move. The column comes back
+            # with it, since a cursor that waits sits one past the last
+            # column and the bounds folded it in.
+            # Lillecarl/pymux#88.
+            if savepoint.pending_wrap:
+                self.pt_cursor_position.x = savepoint.cursor_x
+                self.pending_wrap = True
         else:
             # Nothing was saved, so the restore brings back the state
             # that a terminal starts with: the home position, no origin
@@ -3094,6 +3160,13 @@ class Screen:
         one column at a time. `backspace` says what the two modes do.
         """
         count = count or 1
+
+        # A cursor that waits to wrap is not folded back first. xterm
+        # does fold: a "CSI D" after the wait lands two columns left of
+        # where the wait sat. Every judge of the panel lands one column
+        # left, which is what falls out of `ensure_bounds`, and a panel
+        # that agrees against xterm alone is the panel's to win.
+        # Lillecarl/pymux#106.
         if self._reverse_wrap_mode() is not None:
             self._walk_back(count)
             return
