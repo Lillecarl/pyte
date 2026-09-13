@@ -54,5 +54,21 @@ dependencies = [
     "wcwidth",
 ]
 
+[project.optional-dependencies]
+# What a check installs, beside what pyte itself needs. hypothesis
+# generates the sequences that `test_row_versions.py` puts through a
+# screen: a recording holds what one program happened to write, and the
+# paths that move whole ranges of rows are the ones a recording is least
+# likely to reach.
+#
+# `[dependency-groups] dev` above is upstream's list and says nearly the
+# same thing. It is not this: a group is for a person with `uv`, and an
+# extra is what an installer resolves. `nix/checks.nix` reads this one.
+# Lillecarl/pymux#319.
+test = [
+    "pytest",
+    "hypothesis",
+]
+
 [project.urls]
 Homepage = "https://github.com/selectel/pyte"

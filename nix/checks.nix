@@ -3,34 +3,25 @@
 # It declares its own inputs, so `default.nix` holds the package and does not
 # carry arguments that only a test needs.
 #
-# `package` and `testSources` come from `default.nix`: the first because a
+# `testEnv` and `testSources` come from `default.nix`: the first because a
 # suite runs against the installed package, the second because it knows where
 # the repository root is and this file does not.
 #
 # `nix/suite.nix` says why a check is two derivations.
 {
-  python,
-  pytest,
-  hypothesis,
+  # The python every suite runs on: a virtualenv of pyte, what pyte
+  # declares, and its `test` extra. `default.nix` builds it from
+  # `pyproject.toml`, so what a suite may import is what the package
+  # declares and there is no second list here. Lillecarl/pymux#319.
+  testEnv,
   callPackage,
   ncurses,
   xorg-server,
   libx11,
-  package,
   testSources,
 }:
 let
   inherit (callPackage ./suite.nix { }) suite;
-
-  # hypothesis generates the sequences that `test_row_versions.py` puts
-  # through a screen. A recording holds what one program happened to
-  # write, and the paths that move whole ranges of rows are the ones a
-  # recording is least likely to reach.
-  pythonWithTests = python.withPackages (ps: [
-    package
-    pytest
-    hypothesis
-  ]);
 
   # Narrow a run to one file or one test while hunting:
   #
@@ -91,7 +82,7 @@ in
   unit = suite {
     name = "pyte-unit";
     inputs = [
-      pythonWithTests
+      testEnv
       ncurses
     ];
     env = { inherit selection; };
@@ -114,7 +105,7 @@ in
   # the way a test file lands in a group by what it imports.
   roaming = suite {
     name = "pyte-roaming";
-    inputs = [ pythonWithTests ];
+    inputs = [ testEnv ];
     env = { inherit selection seed; };
     setup = prepare + ''
       export PYTE_GROUP=unit
@@ -134,7 +125,7 @@ in
   xcms = suite {
     name = "pyte-xcms";
     inputs = [
-      pythonWithTests
+      testEnv
       xorg-server
     ];
     env = { inherit selection; };
