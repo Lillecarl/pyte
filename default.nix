@@ -26,26 +26,11 @@
   ncurses,
 }:
 let
-  # What the wheel is built from, and nothing else. A denylist would carry
-  # `tests`, `docs`, `examples`, the `__pycache__` beside every module and
-  # the `.hypothesis` directory a local property run writes, and a source
-  # that a test run changes rebuilds everything above it.
-  # Lillecarl/pymux#320.
-  projectRoot = lib.fileset.toSource {
-    root = ./.;
-    fileset = lib.fileset.unions [
-      # Not only the `.py` files: `py.typed` is what tells a checker that
-      # the annotations here are meant to be read.
-      (lib.fileset.fileFilter (file: file.hasExt "py" || file.name == "py.typed") ./pyte)
-      ./pyproject.toml
-      ./README.rst
-      ./LICENSE
-    ];
-  };
-
   package =
     (mkProject {
-      inherit projectRoot python;
+      root = ./.;
+      inherit python;
+      packages = [ "pyte" ];
       extra = rendered: {
         # `tic` compiles the entry that describes this screen. It runs at
         # build time only, so ncurses reaches no closure that runs.
