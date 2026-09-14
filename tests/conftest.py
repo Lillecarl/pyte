@@ -15,6 +15,7 @@ Run as one derivation, a change to any test pays for all of it. So
 
     unit    nothing but python, and ncurses for the terminfo entry
     xcms    Xvfb and libX11, for the colour specs
+    xterm   xterm's own source, for the character set tables
 
 **A file is not listed anywhere.** A list would be forgotten the first
 time somebody adds a test. The group comes from what the file imports:
@@ -49,11 +50,15 @@ from hypothesis import HealthCheck, settings
 #: The module that reads a colour with the real Xlib.
 XCMS_ORACLES = ("xlib_oracle",)
 
+#: The module that reads the character set tables out of xterm's own
+#: source. It needs that source unpacked, which only its check has.
+XTERM_ORACLES = ("xterm_tables",)
+
 #: Which group this run is. Empty means every group, which is what a
 #: run outside the build does.
 GROUP = os.environ.get("PYTE_GROUP", "")
 
-GROUPS = ("unit", "xcms")
+GROUPS = ("unit", "xcms", "xterm")
 
 
 # ----------------------------------------------------------------------
@@ -114,6 +119,8 @@ def group_of(path: Path) -> str:
     source = path.read_text(errors="replace")
     if _imports(source, XCMS_ORACLES):
         return "xcms"
+    if _imports(source, XTERM_ORACLES):
+        return "xterm"
     return "unit"
 
 

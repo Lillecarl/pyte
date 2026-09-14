@@ -18,6 +18,10 @@
   ncurses,
   xorg-server,
   libx11,
+  # The source, not the program. `tests/xterm_tables.py` reads the
+  # character set tables out of `charsets.h`, because that file is the
+  # only published list of the DEC national sets there is.
+  xterm,
   testSources,
 }:
 let
@@ -132,6 +136,28 @@ in
     setup = prepare + display + ''
       python -c "import sys; sys.path.insert(0, 'tests'); import xlib_oracle; assert xlib_oracle.xlib_color('rgb:f/f/f') == (255, 255, 255)"
       export PYTE_GROUP=xcms
+    '';
+  } runPytest;
+
+  # The character set tables, judged against xterm's own.
+  #
+  # `pyte/charsets.py` holds the national replacement sets and the DEC
+  # technical set: a hundred and thirty odd positions, and an error in
+  # one draws the wrong letter in somebody's language without a word.
+  # Nobody publishes them as data -- Unicode's vendor mappings have no
+  # DEC directory and no python package carries them -- so xterm's
+  # `charsets.h` is the list, and a port is only right if something
+  # says so against the original. The same argument as `xcms`.
+  # Lillecarl/pymux#111.
+  xterm-tables = suite {
+    name = "pyte-xterm-tables";
+    inputs = [ testEnv ];
+    env = { inherit selection; };
+    setup = prepare + ''
+      tar xf ${xterm.src}
+      export PYTE_XTERM_SOURCE="$PWD/$(ls -d xterm-*/ | head -1)"
+      test -f "$PYTE_XTERM_SOURCE/charsets.h"
+      export PYTE_GROUP=xterm
     '';
   } runPytest;
 }
