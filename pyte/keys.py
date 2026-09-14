@@ -83,6 +83,28 @@ __all__ = [
 ]
 
 
+# Why the two flag sets below hand their arithmetic back to `int`.
+#
+# `Flag.__and__` calls `_get_value` on both operands and builds a
+# member for the answer. Measured on one key press: 1,359 bytecode
+# instructions, 11% of the whole key stage, and none of it decides
+# anything -- every answer here is tested for truth or used as a
+# number.
+#
+# One `&` costs 449ns between two members, and **686ns with an int on
+# one side**, because `int.__and__` answers NotImplemented and python
+# dispatches to the member a second time. Against int's own operators
+# it is 52ns.
+#
+# **So testing against `.value` would be slower, not faster**, unless
+# every site and every flags value went int in the same move. Handing
+# the operators back cannot be half done, and no call site changes.
+#
+# What it gives up: `a | b` is an int, not a member, so it reprs as a
+# number. Nothing reads a name off a combination -- `key_spelling.py`
+# takes `.name` off one member at a time. Lillecarl/pymux#359.
+
+
 class Modifier(IntFlag):
     """
     The modifier keys held down with a key.
@@ -111,6 +133,12 @@ class Modifier(IntFlag):
     CAPS_LOCK = 64
     NUM_LOCK = 128
 
+    # The comment above says why. Lillecarl/pymux#359.
+    __and__ = __rand__ = int.__and__
+    __or__ = __ror__ = int.__or__
+    __xor__ = __rxor__ = int.__xor__
+    __invert__ = int.__invert__
+
 
 class KeyboardFlag(IntFlag):
     """
@@ -125,6 +153,12 @@ class KeyboardFlag(IntFlag):
     REPORT_ALTERNATE_KEYS = 0b100
     REPORT_ALL_KEYS = 0b1000
     REPORT_ASSOCIATED_TEXT = 0b10000
+
+    # The comment above `Modifier` says why. Lillecarl/pymux#359.
+    __and__ = __rand__ = int.__and__
+    __or__ = __ror__ = int.__or__
+    __xor__ = __rxor__ = int.__xor__
+    __invert__ = int.__invert__
 
 
 class EventType(IntEnum):
