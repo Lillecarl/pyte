@@ -338,6 +338,17 @@ class Screen:
         # whole state; see `reset` and `set_mode`.)
         self.graphics = GraphicsState()
 
+        #: The size of one cell, in pixels. A screen holds no pixels of
+        #: its own, so this is what the thing that draws it says a cell
+        #: is. It decides what "CSI 14/16/18 t" report, how "CSI 4 t"
+        #: turns pixels into cells, and how many cells an image covers.
+        #:
+        #: `ASSUMED_CELL_WIDTH` by `ASSUMED_CELL_HEIGHT` until somebody
+        #: says otherwise, because a screen with nobody drawing it has
+        #: to answer those queries all the same.
+        self.cell_width = ASSUMED_CELL_WIDTH
+        self.cell_height = ASSUMED_CELL_HEIGHT
+
         self.reset()
 
     # ------------------------------------------------------------------
@@ -1194,6 +1205,32 @@ class Screen:
     # A resize lays the buffer out again at the new width; `_reflow` at
     # the end of this file does that work.
 
+    def set_cell_size(self, width: int, height: int) -> None:
+        """
+        Say how big one cell is, in pixels, on the thing that draws
+        this screen.
+
+        **The placements that were worked out are worked out again.** A
+        placement that named no "c" and no "r" covers
+        `ceil(pixels / cell)` cells, and that count is only as good as
+        the cell it was counted against. A placement the program sized
+        itself is left alone: it asked for cells, and cells are what it
+        still gets. Lillecarl/pymux#369.
+
+        tmux throws every image away instead (`image_free_all`, on any
+        resize). **Counting again rather than dropping is what makes
+        the first report safe**: a pane starts at the assumed cell, its
+        client answers "CSI 16 t" a moment later, and a program that
+        drew in between would lose its picture for good.
+        """
+        if width <= 0 or height <= 0:
+            return
+        if (width, height) == (self.cell_width, self.cell_height):
+            return
+        self.cell_width = width
+        self.cell_height = height
+        self.graphics.count_the_cells_again(self)
+
     def resize(self, lines: int | None = None, columns: int | None = None) -> None:
         # Save the dimensions.
         lines = lines if lines is not None else self.lines
@@ -1342,8 +1379,8 @@ class Screen:
             % (
                 self.lines,
                 self.columns,
-                self.lines * ASSUMED_CELL_HEIGHT,
-                self.columns * ASSUMED_CELL_WIDTH,
+                self.lines * self.cell_height,
+                self.columns * self.cell_width,
             )
         )
 
@@ -2165,7 +2202,6 @@ class Screen:
             if self.pt_cursor_position.x == right + 1:
                 self.pt_cursor_position.x -= 1
             self.pending_wrap = False
-
 
     def carriage_return(self) -> None:
         """
@@ -4808,7 +4844,7 @@ class Screen:
             self.titles.pop(which)
         elif what == WindowOp.REPORT_CELL_SIZE_PIXELS:
             # Cell size in pixels: height first, then width.
-            self.reply_csi("6;%i;%it" % (ASSUMED_CELL_HEIGHT, ASSUMED_CELL_WIDTH))
+            self.reply_csi("6;%i;%it" % (self.cell_height, self.cell_width))
         elif what == WindowOp.REPORT_TEXT_AREA_CHARS:
             # Size of the text area, in cells.
             self.reply_csi("8;%i;%it" % (self.lines, self.columns))
@@ -4816,7 +4852,7 @@ class Screen:
             # Size of the text area, in pixels.
             self.reply_csi(
                 "4;%i;%it"
-                % (self.lines * ASSUMED_CELL_HEIGHT, self.columns * ASSUMED_CELL_WIDTH)
+                % (self.lines * self.cell_height, self.columns * self.cell_width)
             )
         elif what == WindowOp.REPORT_SCREEN_SIZE_CHARS:
             # How much room there is, in cells.
@@ -4835,7 +4871,7 @@ class Screen:
             # The same room, counted in pixels.
             self.reply_csi(
                 "5;%i;%it"
-                % (self.lines * ASSUMED_CELL_HEIGHT, self.columns * ASSUMED_CELL_WIDTH)
+                % (self.lines * self.cell_height, self.columns * self.cell_width)
             )
 
     def _resize_in_cells(self, params: Tuple[int, ...]) -> None:
@@ -4855,10 +4891,11 @@ class Screen:
         """
         "CSI 4 ; Ph ; Pw t": as many cells as fit in Ph by Pw pixels.
 
-        A pane holds no pixels, so it counts them in the cell size that
-        `pyte.images` assumes. That is the same size the pane
-        reports for a cell, so a program that divides gets back what it
-        asked for.
+        A pane holds no pixels, so it counts them in the cell size it
+        was told. **That has to be the size the pane reports for a
+        cell**, which is why both read `cell_width` and `cell_height`:
+        a program asks "CSI 16 t", multiplies, and asks for that many
+        pixels, and it must get back the cells it worked out.
         """
         lines = self._wanted(params, 1, None)
         columns = self._wanted(params, 2, None)
@@ -4867,12 +4904,12 @@ class Screen:
             if lines == 0
             else None
             if lines is None
-            else max(1, lines // ASSUMED_CELL_HEIGHT),
+            else max(1, lines // self.cell_height),
             self.MAX_COLUMNS
             if columns == 0
             else None
             if columns is None
-            else max(1, columns // ASSUMED_CELL_WIDTH),
+            else max(1, columns // self.cell_width),
         )
 
     @staticmethod

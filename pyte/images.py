@@ -53,9 +53,11 @@ class PixelFormat(IntEnum):
     PNG = 100
 
 
-# Cell size in pixels assumed when a placement does not specify its
-# size in cells. (A terminal that renders text only does not know
-# pixel sizes; applications that care ask with "CSI 16 t".)
+# The cell size a screen carries until somebody tells it one. A
+# screen holds cells and not pixels, so it cannot measure this; what
+# draws it can. `Screen.set_cell_size` is how it is told, and the
+# reservation reads `screen.cell_width` and `screen.cell_height`, never
+# these. Lillecarl/pymux#369.
 ASSUMED_CELL_WIDTH = 10
 ASSUMED_CELL_HEIGHT = 20
 
@@ -111,6 +113,7 @@ class GraphicsPlacement:
         "rows",
         "z",
         "virtual",
+        "asked_for_the_box",
     )
 
     def __init__(
@@ -123,6 +126,7 @@ class GraphicsPlacement:
         rows: int,
         z: int = 0,
         virtual: bool = False,
+        asked_for_the_box: bool = True,
     ) -> None:
         self.image_id = image_id
         self.placement_id = placement_id
@@ -132,6 +136,19 @@ class GraphicsPlacement:
         self.rows = rows
         self.z = z
         self.virtual = virtual  # "U=1": no cells are occupied
+
+        #: Whether the program named "c" and "r" itself.
+        #:
+        #: **A box the program asked for is a request, and a box the
+        #: terminal worked out is an artefact.** "c=3,r=2" with a two
+        #: pixel image means "draw it over three cells by two", and
+        #: stretching it there is the answer. The same counts reached
+        #: by `ceil(pixels / cell)` mean only "this is the room it
+        #: needs", and stretching the image to fill them is the
+        #: resampling of Lillecarl/pymux#369.
+        #:
+        #: Sixel never names a box, so `add_sixel` clears this.
+        self.asked_for_the_box = asked_for_the_box
 
 
 def parse_control_data(data: str) -> Tuple[Dict[str, str], str]:
@@ -458,11 +475,12 @@ class GraphicsState:
         placement_id = self._int(keys, "p")
         columns = self._int(keys, "c")
         rows = self._int(keys, "r")
+        asked_for_the_box = columns > 0 or rows > 0
 
         if columns <= 0 and _image.width:
-            columns = -(-_image.width // ASSUMED_CELL_WIDTH)
+            columns = -(-_image.width // screen.cell_width)
         if rows <= 0 and _image.height:
-            rows = -(-_image.height // ASSUMED_CELL_HEIGHT)
+            rows = -(-_image.height // screen.cell_height)
         if columns <= 0 or rows <= 0:
             raise GraphicsError("EINVAL", "invalid placement size")
 
@@ -484,7 +502,7 @@ class GraphicsState:
                     self.placements.remove(existing)
 
         placement = GraphicsPlacement(
-            image_id, placement_id, x, y, columns, rows, z, virtual
+            image_id, placement_id, x, y, columns, rows, z, virtual, asked_for_the_box
         )
         self.placements.append(placement)
 
@@ -622,12 +640,20 @@ class GraphicsState:
         image_id = self._new_image_id()
         self.images_by_id[image_id] = GraphicsImage(32, width, height, data)
 
-        columns = max(1, -(-width // ASSUMED_CELL_WIDTH))
-        rows = max(1, -(-height // ASSUMED_CELL_HEIGHT))
+        columns = max(1, -(-width // screen.cell_width))
+        rows = max(1, -(-height // screen.cell_height))
 
         cursor = screen.pt_cursor_position
         self.placements.append(
-            GraphicsPlacement(image_id, 0, cursor.x, cursor.y, columns, rows)
+            GraphicsPlacement(
+                image_id,
+                0,
+                cursor.x,
+                cursor.y,
+                columns,
+                rows,
+                asked_for_the_box=False,  # Sixel names no box.
+            )
         )
         self._clear_cells(screen, cursor.x, cursor.y, columns, rows)
 
@@ -643,6 +669,35 @@ class GraphicsState:
     def remove_all_placements(self) -> None:
         "Remove every placement. (Image data is kept.)"
         self.placements = []
+
+    def count_the_cells_again(self, screen) -> None:
+        """
+        Work out the cells of every placement again, for a screen whose
+        cell size has changed.
+
+        Only the placements that carry no box of their own: a program
+        that named "c" and "r" asked for cells, and cells do not change
+        when a pixel does. `Screen.set_cell_size` is the caller and
+        says why this counts again rather than dropping.
+        """
+        for placement in self.placements:
+            if placement.asked_for_the_box:
+                continue
+            image = self.images_by_id.get(placement.image_id)
+            if image is None or not image.width or not image.height:
+                continue
+
+            columns = max(1, -(-image.width // screen.cell_width))
+            rows = max(1, -(-image.height // screen.cell_height))
+            if (columns, rows) == (placement.columns, placement.rows):
+                continue
+
+            placement.columns = columns
+            placement.rows = rows
+            if not placement.virtual and placement.z >= 0:
+                # The box may have grown, and the cells it reaches now
+                # still hold whatever was under them.
+                self._clear_cells(screen, placement.x, placement.y, columns, rows)
 
     @property
     def has_virtual_placements(self) -> bool:
