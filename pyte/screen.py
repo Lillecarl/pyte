@@ -164,9 +164,8 @@ _Savepoint = namedtuple(
         "cursor_x",
         # The row within the screen, not within the buffer.
         "cursor_y",
-        "g0_charset",
-        "g1_charset",
-        "charset",
+        "g_charsets",
+        "gl",
         "origin",
         "rendition",
         # The marks that SPA and DECSCA set. They belong to the cursor,
@@ -197,13 +196,12 @@ class Screen:
     #: kitty both work that way.
     swap_variables = [
         "mode",
-        "charset",
+        "gl",
         # The cursor that "ESC 7" saves belongs to one screen. A
         # restore on the alternate screen may not read the one that the
         # first screen holds.
         "savepoints",
-        "g0_charset",
-        "g1_charset",
+        "g_charsets",
         "tabstops",
         "pointer_shapes",
         "data_buffer",
@@ -840,13 +838,19 @@ class Screen:
         # erasing of a whole screen from looking at every cell.
         self._protected_chars = False
 
-        # G1 holds ASCII as well until a program names something
-        # else. pyte starts it on the line drawing set, and a stray
-        # shift out then turned every letter into a box character.
-        self.charset = 0
-        # self.g0_charset = cs.IBMPC_MAP
-        self.g0_charset = cs.LAT1_MAP
-        self.g1_charset = cs.LAT1_MAP
+        # The four slots a program designates a character set into, and
+        # which of them the letters come from.
+        #
+        # **Every one of them starts on ASCII.** pyte started G1 on the
+        # line drawing set, and a stray shift out then turned every
+        # letter into a box character.
+        self.gl = 0
+        self.g_charsets = [cs.LAT1_MAP] * 4
+
+        #: The slot a single shift named, for the next character only.
+        #: `draw` takes one character from it and puts this back.
+        #: Lillecarl/pymux#373.
+        self.single_shift: int | None = None
 
         # From ``man terminfo`` -- "... hardware tabs are initially
         # set every `n` spaces when the terminal is powered up. Since
@@ -904,9 +908,9 @@ class Screen:
         # is there rather than making a new one.
         self.savepoints = []
 
-        self.charset = 0
-        self.g0_charset = cs.LAT1_MAP
-        self.g1_charset = cs.LAT1_MAP
+        self.gl = 0
+        self.g_charsets = [cs.LAT1_MAP] * 4
+        self.single_shift = None
 
         # A soft reset takes the mark off what a program draws next.
         # The cells that carry one already keep it.
@@ -1645,13 +1649,17 @@ class Screen:
     # Two slots and a shift between them. `draw` translates through the
     # one that is in, so `charsets.py` holds the tables.
 
+    #: The slot that each designator names. ``ESC ( <name>`` puts a set
+    #: into G0, and so on up to ``ESC + <name>`` and G3.
+    SLOTS = {"(": 0, ")": 1, "*": 2, "+": 3}
+
     def define_charset(self, code: str, mode: str = "(") -> None:
-        """Define the ``G0`` or the ``G1`` charset.
+        """Put a character set into one of the four slots.
 
         :param str code: the name of the set, from ``charsets.MAPS``
                          -- anything else is ignored.
-        :param str mode: if ``"("`` ``G0`` charset is set, if
-                         ``")"`` -- we operate on ``G1``.
+        :param str mode: ``"("``, ``")"``, ``"*"`` or ``"+"``, which
+                         name G0, G1, G2 and G3.
 
         ``ESC ( 0`` picks the line drawing set of the DEC terminals,
         which is how a program without a Unicode font draws a box.
@@ -1667,12 +1675,9 @@ class Screen:
 
         .. warning:: User-defined charsets are currently not supported.
         """
-        if code in cs.MAPS:
-            charset_map = cs.MAPS[code]
-            if mode == "(":
-                self.g0_charset = charset_map
-            elif mode == ")":
-                self.g1_charset = charset_map
+        slot = self.SLOTS.get(mode)
+        if slot is not None and code in cs.MAPS:
+            self.g_charsets[slot] = cs.MAPS[code]
 
     # ------------------------------------------------------------------
     # Turning a mode on and off.
@@ -1933,12 +1938,34 @@ class Screen:
         return bool(self._original_screen)
 
     def shift_in(self) -> None:
-        "Activates ``G0`` character set."
-        self.charset = 0
+        "SI, also called LS0: the letters come from G0."
+        self.gl = 0
 
     def shift_out(self) -> None:
-        "Activates ``G1`` character set."
-        self.charset = 1
+        "SO, also called LS1: the letters come from G1."
+        self.gl = 1
+
+    def locking_shift_2(self) -> None:
+        'LS2 ("ESC n"): the letters come from G2.'
+        self.gl = 2
+
+    def locking_shift_3(self) -> None:
+        'LS3 ("ESC o"): the letters come from G3.'
+        self.gl = 3
+
+    def single_shift_2(self) -> None:
+        """
+        SS2 ("ESC N"): the **next character alone** comes from G2.
+
+        `draw` spends it. A single shift that nothing draws after it
+        stays waiting, which is what a VT220 does: the shift belongs to
+        the next graphic character and not to the next byte.
+        """
+        self.single_shift = 2
+
+    def single_shift_3(self) -> None:
+        'SS3 ("ESC O"): the next character alone comes from G3.'
+        self.single_shift = 3
 
     # ------------------------------------------------------------------
     # Drawing.
@@ -2016,10 +2043,17 @@ class Screen:
             self.last_character = chars[-1]
 
         # Translating a given character.
-        if self.charset:
-            chars = chars.translate(self.g1_charset)
+        #
+        # The single shift is tested and not the slot, so the usual
+        # path is one comparison against None and the same `translate`
+        # this always did.
+        if self.single_shift is None:
+            chars = chars.translate(self.g_charsets[self.gl])
         else:
-            chars = chars.translate(self.g0_charset)
+            chars = chars[0].translate(
+                self.g_charsets[self.single_shift]
+            ) + chars[1:].translate(self.g_charsets[self.gl])
+            self.single_shift = None
 
         # The column after the last one a character may take. The loop
         # works it out for each character it draws.
@@ -2772,9 +2806,11 @@ class Screen:
                 # between the save and the restore must not drag the
                 # cursor back into the history.
                 self.pt_cursor_position.y - self.line_offset,
-                self.g0_charset,
-                self.g1_charset,
-                self.charset,
+                # A copy: the list on the screen is written in place
+                # when a program designates a set, and a savepoint that
+                # shared it would change under the restore.
+                list(self.g_charsets),
+                self.gl,
                 PrivateMode.ORIGIN.flag in self.mode,
                 # DECAWM is not here. xterm does not bring the wrap
                 # back on a restore, and its own suite asks for that:
@@ -2804,9 +2840,8 @@ class Screen:
         if self.savepoints:
             savepoint = self.savepoints[-1]
 
-            self.g0_charset = savepoint.g0_charset
-            self.g1_charset = savepoint.g1_charset
-            self.charset = savepoint.charset
+            self.g_charsets = list(savepoint.g_charsets)
+            self.gl = savepoint.gl
             self._rendition = savepoint.rendition
             self.protection = savepoint.protection
             self._rebuild_appearance()
@@ -2847,9 +2882,8 @@ class Screen:
             # mode and the character sets of the start. kitty does the
             # same. :todo: DECAWM?
             self.reset_mode(PrivateMode.ORIGIN.flag)
-            self.g0_charset = cs.LAT1_MAP
-            self.g1_charset = cs.LAT1_MAP
-            self.charset = 0
+            self.g_charsets = [cs.LAT1_MAP] * 4
+            self.gl = 0
             self.cursor_position()
 
     def _erase_row(self, row: int) -> None:

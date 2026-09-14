@@ -435,13 +435,13 @@ def test_byte_stream_define_charset_unknown():
     screen = a_screen(3, 3)
     stream = pyte.ByteStream(screen)
     stream.select_other_charset("@")
-    default_g0_charset = screen.g0_charset
+    default_g0_charset = screen.g_charsets[0]
     # ``"!"`` names no set in any terminal, so expect a noop. It was
     # ``"Z"`` until Lillecarl/pymux#111, which made that Spanish.
     assert "!" not in cs.MAPS
     stream.feed((ctrl.ESC + "(!").encode())
     assert display(screen)[0] == " " * 3
-    assert screen.g0_charset == default_g0_charset
+    assert screen.g_charsets[0] == default_g0_charset
 
 
 @pytest.mark.parametrize("charset,mapping", cs.MAPS.items())
@@ -451,7 +451,7 @@ def test_byte_stream_define_charset(charset, mapping):
     stream.select_other_charset("@")
     stream.feed((ctrl.ESC + "(" + charset).encode())
     assert display(screen)[0] == " " * 3
-    assert screen.g0_charset == mapping
+    assert screen.g_charsets[0] == mapping
 
 
 def test_byte_stream_select_other_charset():

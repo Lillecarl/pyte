@@ -168,6 +168,10 @@ class Stream:
         Escape.DECID: "report_device_attributes",
         Escape.DECKPAM: "set_application_keypad",
         Escape.DECKPNM: "reset_application_keypad",
+        Escape.LS2: "locking_shift_2",
+        Escape.LS3: "locking_shift_3",
+        Escape.SS2: "single_shift_2",
+        Escape.SS3: "single_shift_3",
     }
 
     #: "sharp" escape sequences -- ``ESC # <N>``.
@@ -501,13 +505,17 @@ class Stream:
                         space_dispatch[(yield None)]()
                     elif char == "%":
                         self.select_other_charset((yield None))
-                    elif char in "()":
+                    elif char in "()*+":
                         # "ESC ( 0" names the line drawing set of the
                         # DEC terminals, which is how ncurses draws a
                         # box. xterm and kitty both read it in UTF-8
                         # mode, so this does too. The Unicode FAQ says
                         # to drop it there, but a program that draws a
                         # box then shows letters.
+                        #
+                        # "*" and "+" name G2 and G3, which a locking
+                        # or a single shift then brings in.
+                        # Lillecarl/pymux#373.
                         code = yield None
                         # "ESC ( % 6" names the Portuguese national
                         # set. A name that does not fit in one byte

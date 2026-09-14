@@ -115,10 +115,10 @@ def test_selecting_a_set_that_is_not_named_changes_nothing(pane):
     """
     screen, stream, _responses = pane
 
-    was = screen.g0_charset
+    was = screen.g_charsets[0]
     stream.feed("\x1b(!")
 
-    assert screen.g0_charset is was
+    assert screen.g_charsets[0] is was
 
 
 def test_a_da_with_a_parameter_that_is_not_zero_is_ignored(pane):

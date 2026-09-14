@@ -96,6 +96,24 @@ class Escape(StrEnum):
     #: Normal keypad, the other half of the pair. terminfo's `rmkx`.
     DECKPNM = ">"
 
+    #: Locking shift 2. G2 is what the letters come from, until
+    #: something says otherwise. SI and SO are the same thing for G0
+    #: and G1, and they are control characters rather than escapes
+    #: because a VT100 had only those two.
+    LS2 = "n"
+
+    #: Locking shift 3.
+    LS3 = "o"
+
+    #: Single shift 2. **The next character alone** comes from G2, and
+    #: then the letters come from wherever they came from before. This
+    #: is what a program uses to draw one character out of a set it
+    #: does not want to stay in.
+    SS2 = "N"
+
+    #: Single shift 3.
+    SS3 = "O"
+
 
 class Sharp(StrEnum):
     """
