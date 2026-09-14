@@ -931,12 +931,7 @@ def _folded(event: KeyEvent, flags: int) -> KeyEvent | None:
     speaks the legacy encoding does not hear it. kitty does the same.
     Lillecarl/pymux#166.
     """
-    carries_the_number = flags & (
-        KeyboardFlag.DISAMBIGUATE
-        | KeyboardFlag.REPORT_ALL_KEYS
-        | KeyboardFlag.REPORT_ASSOCIATED_TEXT
-    )
-    if carries_the_number:
+    if _carries_the_number(flags):
         return event
     if event.final != "u" or event.code < FIRST_FUNCTIONAL_KEY:
         return event
