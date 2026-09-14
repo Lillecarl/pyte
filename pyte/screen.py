@@ -1648,13 +1648,22 @@ class Screen:
     def define_charset(self, code: str, mode: str = "(") -> None:
         """Define the ``G0`` or the ``G1`` charset.
 
-        :param str code: character set code, should be a character
-                         from ``"B0UK"`` -- otherwise ignored.
+        :param str code: the name of the set, from ``charsets.MAPS``
+                         -- anything else is ignored.
         :param str mode: if ``"("`` ``G0`` charset is set, if
                          ``")"`` -- we operate on ``G1``.
 
         ``ESC ( 0`` picks the line drawing set of the DEC terminals,
         which is how a program without a Unicode font draws a box.
+        ``ESC ( A`` and the eleven names beside it pick a national
+        replacement set, and ``ESC ( >`` the DEC technical set.
+
+        **A national set applies whatever DECNRCM says.** kitty,
+        WezTerm, libvterm, Ghostty and xterm.js all draw the pound
+        sign for ``ESC ( A #`` with the mode off; xterm alone gates it
+        and Alacritty has no national sets at all. Five against one is
+        a rule and not a choice, the same reading `charsets.py` makes
+        of the newline symbol. Lillecarl/pymux#111.
 
         .. warning:: User-defined charsets are currently not supported.
         """

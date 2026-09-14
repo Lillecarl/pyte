@@ -508,7 +508,14 @@ class Stream:
                         # mode, so this does too. The Unicode FAQ says
                         # to drop it there, but a program that draws a
                         # box then shows letters.
-                        listener.define_charset((yield None), mode=char)
+                        code = yield None
+                        # "ESC ( % 6" names the Portuguese national
+                        # set. A name that does not fit in one byte
+                        # starts with "%", and the byte after it
+                        # finishes the name. Lillecarl/pymux#111.
+                        if code == "%":
+                            code += yield None
+                        listener.define_charset(code, mode=char)
                     else:
                         escape_dispatch[char]()
                     continue  # Don't go to CSI.

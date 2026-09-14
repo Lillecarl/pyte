@@ -436,9 +436,10 @@ def test_byte_stream_define_charset_unknown():
     stream = pyte.ByteStream(screen)
     stream.select_other_charset("@")
     default_g0_charset = screen.g0_charset
-    # ``"Z"`` is not supported by Linux terminal, so expect a noop.
-    assert "Z" not in cs.MAPS
-    stream.feed((ctrl.ESC + "(Z").encode())
+    # ``"!"`` names no set in any terminal, so expect a noop. It was
+    # ``"Z"`` until Lillecarl/pymux#111, which made that Spanish.
+    assert "!" not in cs.MAPS
+    stream.feed((ctrl.ESC + "(!").encode())
     assert display(screen)[0] == " " * 3
     assert screen.g0_charset == default_g0_charset
 
