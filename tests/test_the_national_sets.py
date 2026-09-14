@@ -47,9 +47,11 @@ def test_a_national_set_applies_with_no_mode_asked_for():
     kitty, WezTerm, libvterm, Ghostty and xterm.js all draw the pound
     sign here. xterm alone waits for DECNRCM, and Alacritty has no
     national sets at all. `ptterm/tests/DEVIATIONS.md` holds the vote.
+
+    "CSI ? 42 l" turns the mode off, so this asks with it off and not
+    merely unasked for.
     """
-    assert "\x1b[?42h" not in "\x1b(A#"
-    assert _drawn("\x1b(A#") == "£"
+    assert _drawn("\x1b[?42l\x1b(A#") == "£"
 
 
 def test_the_german_set_moves_eight_positions():
