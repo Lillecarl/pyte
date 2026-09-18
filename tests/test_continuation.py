@@ -173,18 +173,35 @@ def test_a_scroll_up_ends_the_wrap_under_the_blank_row():
     assert not _continues(screen, 3)
 
 
+def test_a_region_at_the_top_ends_the_wrap_under_its_blank_row():
+    """
+    The same question for the region that slides the screen instead.
+
+    That path moves no row of the region and writes the blank one at
+    the bottom of it by hand, so it has to take the mark off the row
+    below by hand too. Lillecarl/pymux#423.
+    """
+    screen = _screen(
+        "a" * 32 + csi(escape.DECSTBM, 1, 3) + csi(escape.CUP, 3, 1) + csi(Csi.SU)
+    )
+
+    # The row the scroll blanked, and the fixed row under it.
+    assert not _continues(screen, 2)
+    assert not _continues(screen, 3)
+
+
 # ----------------------------------------------------------------------
 # A move that drops the row a line continued. Lillecarl/pymux#188.
 
 
-def test_a_scroll_up_ends_the_wrap_on_the_row_it_brings_to_the_top():
+def test_a_scroll_up_inside_a_region_ends_the_wrap_on_its_top_row():
     """
-    SU drops the rows that leave the region, so the row that lands at
-    the top continues a row that is gone.
+    A region below the first row drops the rows that leave it, so the
+    row that lands at the top continues a row that is gone.
 
-    Four rows of "a" over eight columns, and the whole screen scrolled
-    up by one. Row zero holds what row one held, and the row it
-    continued went with the scroll. Nothing is above it now.
+    Four rows of "a" over eight columns, and the last three scrolled up
+    by one. Row one holds what row two held, and the row it continued
+    went with the scroll. Nothing is above it now.
 
     **xterm keeps the mark here and that is right for xterm**, which
     never lays a screen out again: `ScrnDeleteLine` moves the
@@ -194,9 +211,25 @@ def test_a_scroll_up_ends_the_wrap_on_the_row_it_brings_to_the_top():
     `ptterm/tests/test_a_scroll_and_the_wrap_mark.py`, which is where a
     resize can see the mark at all.
     """
+    screen = _screen("a" * 32 + csi(escape.DECSTBM, 2, 4) + csi(Csi.SU))
+
+    assert not _continues(screen, 1)
+    assert _continues(screen, 2)
+
+
+def test_a_scroll_up_that_keeps_the_history_keeps_the_mark():
+    """
+    A region that starts at the first row, or none at all, puts the row
+    that leaves into the history, where it is still there to continue.
+
+    So the row at the top of the screen keeps its mark. This is the
+    opposite answer to the one above, and it is the same rule: the mark
+    goes when the row it names goes. Lillecarl/pymux#423.
+    """
     screen = _screen("a" * 32 + csi(Csi.SU))
 
-    assert not _continues(screen, 0)
+    assert _continues(screen, 0)
+    assert screen.is_wrapped(screen.line_offset - 1) is False
     assert _continues(screen, 1)
     assert _continues(screen, 2)
 
@@ -215,17 +248,17 @@ def test_deleting_lines_ends_the_wrap_on_the_row_that_moves_up():
 
 def test_the_rows_under_it_keep_their_marks():
     """
-    Only the row at the top loses one.
+    Only the row at the top of the region loses one.
 
     The rows under it continue rows that are still there, so a line
     that survives a scroll whole is still one line. Without this the
     fix above would take a wrapped line apart every time it moved.
     """
-    screen = _screen("a" * 32 + csi(Csi.SU))
+    screen = _screen("a" * 32 + csi(escape.DECSTBM, 2, 4) + csi(Csi.SU))
 
     assert [_continues(screen, row) for row in range(4)] == [
         False,
-        True,
+        False,
         True,
         False,
     ]

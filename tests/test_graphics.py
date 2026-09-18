@@ -364,6 +364,47 @@ def test_a_torn_placement_is_dropped():
     assert placement_rows(screen) == []
 
 
+def _a_full_screen(screen, stream):
+    """
+    Write on every row, so that the screen can slide over the buffer.
+
+    A region that starts at the first row keeps the rows it scrolls
+    away, and `line_offset` can only grow once `max_y` has reached the
+    last row. Lillecarl/pymux#423.
+    """
+    stream.feed("\r\n".join("row %d" % row for row in range(screen.lines)))
+
+
+def test_a_region_at_the_top_carries_the_images_under_it():
+    "The rows under the region are fixed on the screen, so the image is too."
+    screen, stream, _ = make_screen()
+    _a_full_screen(screen, stream)
+    stream.feed(csi(escape.CUP, 20, 1))  # Row 19, under the region.
+    place(screen, stream, 1)
+    stream.feed(csi(escape.DECSTBM, 1, 18))  # Margins: rows 0..17.
+    stream.feed(csi(escape.CUP, 18, 1))  # Bottom margin.
+    stream.feed("\n")
+
+    # One row of history, so the screen starts one row further down the
+    # buffer and the image keeps its row of the screen.
+    assert screen.line_offset == 1
+    assert placement_rows(screen) == [(1, 20)]
+
+
+def test_an_image_that_leaves_a_region_at_the_top_becomes_history():
+    "It scrolled off the screen, not out of the world."
+    screen, stream, _ = make_screen()
+    _a_full_screen(screen, stream)
+    stream.feed(csi(escape.CUP, 1, 1))  # Row 0.
+    place(screen, stream, 1)
+    stream.feed(csi(escape.DECSTBM, 1, 18))
+    stream.feed(csi(escape.CUP, 18, 1))
+    stream.feed("\n")
+
+    assert screen.line_offset == 1
+    assert placement_rows(screen) == [(1, 0)]
+
+
 def test_erase_saved_lines_removes_placements():
     screen, stream, _ = make_screen()
     place(screen, stream, 1)

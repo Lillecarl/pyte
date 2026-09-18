@@ -2264,8 +2264,10 @@ class Screen:
     # ------------------------------------------------------------------
     # Moving the screen over the buffer.
     #
-    # Outside a scrolling region the screen slides down and the rows it
-    # leaves become the history. Inside one the rows themselves move.
+    # A region that starts at the first row scrolls the top of the
+    # screen away, so the screen slides down and the rows it leaves
+    # become the history. Any other region carries a rectangle, and the
+    # rows inside it move with nothing kept.
     # The history is pruned from `history_floor` and never walked whole.
 
     def index(self) -> None:
@@ -2330,7 +2332,7 @@ class Screen:
             if self.pt_cursor_position.y - self.line_offset != bottom:
                 self.cursor_down()
             elif self._cursor_is_between_the_left_and_right_margins():
-                self._move_rows(top, bottom, 1)
+                self._scroll_the_region_up(top, bottom, 1)
             # Outside the columns of the region the cursor stays where
             # it is, and nothing scrolls.
 
@@ -2364,11 +2366,122 @@ class Screen:
         Move the lines of the scrolling region by `amount`.
 
         A positive amount moves them up, which is what SU asks for. The
-        lines that come in are empty, and the ones that go out are
-        dropped, so this keeps no history.
+        lines that come in are empty.
         """
         top, bottom = self.margins or Margins(0, self.lines - 1)
-        self._move_rows(top, bottom, amount)
+        if amount > 0:
+            self._scroll_the_region_up(top, bottom, amount)
+        else:
+            self._move_rows(top, bottom, amount)
+
+    def _scroll_the_region_up(self, top: int, bottom: int, amount: int) -> None:
+        """
+        Move the rows of the region up by `amount`, and keep the rows
+        that leave the top of the screen as the history.
+
+        **A region that starts at the first row feeds the scrollback.**
+        Every terminal that holds one says so: kitty takes
+        `margin_top == 0` on the main screen (`screen.c`,
+        `add_to_history`), xterm `top_marg == 0` with no left or right
+        margin (`util.c`, `scroll_all_lines`), Alacritty
+        `region.start == 0` (`grid/mod.rs`, `scroll_up`), Ghostty
+        `scrolling_region.top == 0` (`Terminal.zig`, `index` and
+        `scrollUp`) and libvterm `rect.start_row == 0` over the full
+        width (`screen.c`, `premove`). A region below the first row
+        keeps nothing, and neither does a left or a right margin,
+        because that carries a rectangle and not whole lines.
+
+        **Neither does the alternate screen.** Nothing above it can be
+        read, so sliding the screen over the buffer there only makes
+        rows for the prune to take again, one per scrolled row.
+        Ghostty says it in as many words (`Terminal.zig`: "creating
+        scrollback is pure overhead"), and kitty gates on
+        `linebuf == main_linebuf`. vim measures it: 641 scrolls of a
+        region on the alternate screen, and each one paid for a row
+        that nobody would ever see.
+
+        This is what codex needs. Its ratatui viewport prints a
+        finished message by setting a region from the first row to the
+        row above the composer and feeding lines at the bottom of it,
+        so every line of the transcript leaves through the top of a
+        region. Lillecarl/pymux#423.
+        """
+        if (
+            top == 0
+            and self.horizontal_margins is None
+            and self._original_screen is None
+        ):
+            self._slide_the_screen_under_the_region(bottom, amount)
+        else:
+            self._move_rows(top, bottom, amount)
+
+    def _slide_the_screen_under_the_region(self, bottom: int, amount: int) -> None:
+        """
+        Scroll the region from the first row to `bottom` up by `amount`,
+        and leave the rows that go out of the top as history.
+
+        The screen slides down over the buffer, the way it does with no
+        region at all, so the rows of the region need no move: they are
+        the same rows of the buffer, one row higher on the screen. The
+        rows under the region are fixed on the screen, so each of them
+        moves one row down the buffer to stay where it is.
+
+        A count past the height of the region stops at that height,
+        which is what `_move_rows` does and what xterm (`util.c`,
+        `limit = bot_marg - top_marg + 1`), Alacritty (`grid/mod.rs`,
+        `min(lines, region.end - region.start)`) and Ghostty
+        (`Terminal.zig`, `@min(count, region_height)`) do. kitty alone
+        counts rows rather than the region and puts the rest in the
+        history as blanks.
+        """
+        lines = self.lines
+        data_buffer = self.data_buffer
+        cursor_position = self.pt_cursor_position
+
+        for _step in range(min(amount, bottom + 1)):
+            if self.max_y < lines - 1:
+                # The screen has not filled once, so there is no room
+                # above it: `line_offset` is pinned to zero until
+                # `max_y` reaches the last row. The rows move instead,
+                # and the one that leaves the region is dropped.
+                self._move_rows(0, bottom, 1)
+                continue
+
+            line_offset = self.line_offset
+            self.max_y += 1
+            cursor_position.y += 1
+
+            # From the bottom, so that a row is read before the row
+            # above it takes its place.
+            for row in range(lines - 1, bottom, -1):
+                line = data_buffer.get(row + line_offset)
+                if line is None:
+                    data_buffer.pop(row + line_offset + 1, None)
+                else:
+                    data_buffer[row + line_offset + 1] = line
+            self.touch_rows(range(bottom + line_offset + 1, lines + line_offset + 1))
+
+            # The row that comes in at the bottom of the region, and
+            # the row under it, whose predecessor that blank row now is.
+            self._erase_row(bottom + line_offset + 1)
+            self._forget_the_wrap_marks([bottom + line_offset + 2])
+
+            # The row at the top of the region keeps its mark, because
+            # the line above it went into the history and is still
+            # there to continue. That is the whole point of this path.
+
+            # The images of the fixed rows move with them. The range is
+            # where they land, so that one on the last row is not read
+            # as having scrolled out.
+            self.graphics.scroll(bottom + line_offset + 1, lines + line_offset, -1)
+
+            # Only the first screen reaches here, so this is the count
+            # `index` keeps and never the alternate screen's prune on
+            # every row.
+            self._history_cleanup_counter += 1
+            if self._history_cleanup_counter == 100:
+                self._remove_old_lines_from_history()
+                self._history_cleanup_counter = 0
 
     def _move_rows(self, top: int, bottom: int, amount: int) -> None:
         """
