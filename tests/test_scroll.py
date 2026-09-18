@@ -57,6 +57,8 @@ def test_scrolling_stays_inside_the_margins():
 
 
 def test_the_cursor_does_not_move():
+    "Its row of the screen, that is: SU moves the screen under it."
     screen, stream = _screen()
     stream.feed("a\r\nb" + csi(escape.CUP, 1, 3) + csi(Csi.SU, 1))
-    assert (screen.pt_cursor_position.x, screen.pt_cursor_position.y) == (2, 0)
+    row = screen.pt_cursor_position.y - screen.line_offset
+    assert (screen.pt_cursor_position.x, row) == (2, 0)

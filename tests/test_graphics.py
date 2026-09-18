@@ -294,6 +294,21 @@ def placement_rows(screen):
     )
 
 
+def placement_screen_rows(screen):
+    """
+    The same, counted from the top of the screen.
+
+    A scroll that keeps history moves the screen down the buffer and
+    leaves the rows where they are, so an absolute row says nothing
+    about where a person sees the image. Lillecarl/pymux#423.
+    """
+    offset = screen.line_offset
+    return sorted(
+        (placement.image_id, placement.y - offset)
+        for placement in screen.graphics.placements
+    )
+
+
 def test_plain_scrolling_keeps_placement_rows():
     # Without margins the data buffer keeps growing, so absolute rows
     # stay valid and placements need no adjustment.
@@ -311,13 +326,38 @@ def test_scroll_region_moves_placements_up():
     place(screen, stream, 1)
     stream.feed(csi(escape.CUP, 10, 1))  # Bottom margin; the next linefeed scrolls.
     stream.feed("\n")
-    assert placement_rows(screen) == [(1, 3)]
+
+    # The region starts at the first row, so the screen moves and the
+    # image stays where it is in the buffer. A person sees it one row
+    # higher, which is what the scroll asked for.
+    assert placement_screen_rows(screen) == [(1, 3)]
 
 
-def test_placement_scrolled_out_of_the_region_is_dropped():
+def test_a_placement_that_leaves_a_region_at_the_top_goes_to_the_history():
+    """
+    It left the screen, not the world.
+
+    A region that starts at the first row scrolls the top of the screen
+    away and the rows go to the scrollback, so the image goes with
+    them: it is above the screen now, and `prune_above` takes it when
+    the history is trimmed. Lillecarl/pymux#423.
+    """
     screen, stream, _ = make_screen()
     stream.feed(csi(escape.DECSTBM, 1, 10))
     stream.feed(csi(escape.CUP, 1, 1))  # Top of the region.
+    place(screen, stream, 1)
+    stream.feed(csi(escape.CUP, 10, 1))
+    stream.feed("\n")
+
+    assert placement_screen_rows(screen) == [(1, -1)]
+    assert placement_rows(screen)[0][1] < screen.line_offset
+
+
+def test_a_placement_that_leaves_a_region_below_the_first_row_is_dropped():
+    "That region carries a rectangle, and nothing above it is kept."
+    screen, stream, _ = make_screen()
+    stream.feed(csi(escape.DECSTBM, 2, 10))  # Margins: rows 1..9.
+    stream.feed(csi(escape.CUP, 2, 1))  # Top of the region.
     place(screen, stream, 1)
     stream.feed(csi(escape.CUP, 10, 1))
     stream.feed("\n")

@@ -127,6 +127,26 @@ def test_a_count_past_the_region_stops_at_the_height_of_it():
     assert _screen_rows(screen) == ["", "", "", "", "row4", "row5"]
 
 
+def test_a_screen_that_has_not_filled_once_still_keeps_the_row():
+    """
+    The buffer is sparse, so a fresh screen has no room above it:
+    `line_offset` is `max_y - lines + 1` and `max_y` is still low. That
+    is ours alone. Every other terminal holds `lines` rows whatever has
+    been drawn, and keeps the row that leaves a region at the top.
+
+    A program that scrolls a region is using the whole height anyway:
+    the rows under the region are on the screen, and the row that
+    leaves the top of it has to go somewhere. Lillecarl/pymux#424.
+    """
+    screen, stream = _screen()
+    # Two rows written, four never touched.
+    stream.feed("row0\r\nrow1")
+    stream.feed(_at_the_bottom_of_the_region() + "\n")
+
+    assert _history(screen) == ["row0"]
+    assert _screen_rows(screen)[:2] == ["row1", ""]
+
+
 def test_a_region_below_the_first_row_keeps_nothing():
     screen, stream = _screen()
     _fill(stream)

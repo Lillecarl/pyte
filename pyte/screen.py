@@ -2438,15 +2438,21 @@ class Screen:
         data_buffer = self.data_buffer
         cursor_position = self.pt_cursor_position
 
-        for _step in range(min(amount, bottom + 1)):
-            if self.max_y < lines - 1:
-                # The screen has not filled once, so there is no room
-                # above it: `line_offset` is pinned to zero until
-                # `max_y` reaches the last row. The rows move instead,
-                # and the one that leaves the region is dropped.
-                self._move_rows(0, bottom, 1)
-                continue
+        # There is no room above the screen until `max_y` reaches the
+        # last row, because `line_offset` is `max_y - lines + 1`. A
+        # program that scrolls a region is using the whole height of
+        # the screen, though: the rows under the region are on it, and
+        # the row that leaves the top of it has to go somewhere. So say
+        # the screen has filled, and then it has room.
+        #
+        # Without this the first scrolls of a fresh screen dropped
+        # their rows, where every other terminal kept them: a screen is
+        # always `lines` rows tall to them, and this "not filled once"
+        # state is ours alone. Lillecarl/pymux#424.
+        if self.max_y < lines - 1:
+            self.max_y = lines - 1
 
+        for _step in range(min(amount, bottom + 1)):
             line_offset = self.line_offset
             self.max_y += 1
             cursor_position.y += 1

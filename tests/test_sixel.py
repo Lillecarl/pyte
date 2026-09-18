@@ -255,4 +255,8 @@ def test_a_sixel_image_scrolls_with_the_text():
 
     stream.feed(csi(escape.CUP, 10, 1))
     stream.feed("\n")
-    assert screen.graphics.placements[0].y == 3
+
+    # The region starts at the first row, so the screen moves down the
+    # buffer and the image keeps its row of it. One row higher on the
+    # screen, which is what the scroll asked for.
+    assert screen.graphics.placements[0].y - screen.line_offset == 3
