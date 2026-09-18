@@ -2465,7 +2465,10 @@ class Screen:
                     data_buffer.pop(row + line_offset + 1, None)
                 else:
                     data_buffer[row + line_offset + 1] = line
-            self.touch_rows(range(bottom + line_offset + 1, lines + line_offset + 1))
+            # From the row after the blank one: `_erase_row` touches
+            # that one itself, and a row counted twice is a row every
+            # reader rebuilds twice.
+            self.touch_rows(range(bottom + line_offset + 2, lines + line_offset + 1))
 
             # The row that comes in at the bottom of the region, and
             # the row under it, whose predecessor that blank row now is.
