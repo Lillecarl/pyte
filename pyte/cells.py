@@ -112,6 +112,15 @@ class Cell:
 
     __slots__ = ("char", "appearance", "width")
 
+    #: Whether a program put the character here, or an erase left it.
+    #:
+    #: **A class attribute and not a field.** It is the same answer for
+    #: every cell of a kind, so it costs no memory per cell, and a
+    #: front end asks it once per cell of every frame: `isinstance`
+    #: against `WrittenCell` was 0.36 s of a 12 s frame of moving
+    #: output at 400x150. Lillecarl/pymux#434.
+    written = False
+
     def __init__(self, char: str, appearance: "Appearance") -> None:
         self.char = char
         self.appearance = appearance
@@ -166,6 +175,8 @@ class WrittenCell(Cell):
     """
 
     __slots__ = ()
+
+    written = True
 
 
 class Protection(IntFlag):
