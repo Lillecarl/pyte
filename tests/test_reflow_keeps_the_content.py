@@ -24,9 +24,12 @@ reflow at all: a resize cuts it down and the cells that no longer fit
 are gone, which is what five of the seven judges of the panel do and
 what Lillecarl/pymux#192 landed. Losing content is the whole of that
 trade, so a property saying a resize loses none cannot describe it. The
-generated chunks can turn the alternate screen on, so the two property
-tests below say `assume` and leave those examples to
-`ptterm/tests/test_the_alternate_screen_reflow.py`.
+generated chunks can turn the alternate screen on, so every property
+test below says `assume` and leaves those examples to
+`ptterm/tests/test_the_alternate_screen_reflow.py`, where the panel
+votes on them. `test_the_alternate_screen_loses_what_no_longer_fits`
+below is the one case of it written down here, because a reader who
+comes back from a roaming failure comes back to this file.
 
 **The very first resize counts.** These held the lines from after one
 resize for a while, because a reflow read the cell the cursor stood on
@@ -41,12 +44,13 @@ from hypothesis import strategies as st
 
 from a_screen import a_screen
 from pyte.cells import PLAIN_APPEARANCE, WrittenCell
+from pyte.modes import PrivateMode
 from pyte.streams import Stream
 
 from test_row_versions import a_chunk
 from pyte import escape
 from pyte.sequences import esc
-from pyte.sequences import Csi, csi
+from pyte.sequences import Csi, csi, set_mode
 
 
 def _trimmed(cells):
@@ -221,11 +225,55 @@ def test_a_size_change_keeps_every_line(chunks, sizes):
     """
     screen = a_screen(columns=10, lines=6)
     Stream(screen).feed("".join(chunks))
+    assume(not screen.in_alternate_screen)
 
     before = logical_lines(screen)
     for lines, columns in sizes:
         screen.resize(lines, columns)
         assert logical_lines(screen) == before
+
+
+def test_the_alternate_screen_loses_what_no_longer_fits():
+    """
+    The example that read as a lost line, and is the trade instead.
+
+    A wrapped line on the alternate screen, and a resize to one row
+    four columns wide. `_clip` keeps the bottom row of the screen and
+    forgets the wrap marks, so a line of 51 characters comes back as
+    the one character the last row held. The height takes all of it
+    here; `_clip` cuts a row to the new width as well.
+
+    That is Lillecarl/pymux#192, and this is the case the panel never
+    saw: every row of
+    `ptterm/tests/test_the_alternate_screen_reflow.py` fills its screen
+    exactly, so none of them wraps.
+
+    **It is not in the `@example` corpus above**, where
+    Lillecarl/pymux#426 asked for it. The property now says `assume`,
+    so hypothesis marks an explicit example of it invalid and asserts
+    nothing. A test that says what the resize does says more.
+    """
+    screen = a_screen(columns=10, lines=6)
+    Stream(screen).feed(
+        set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR)
+        + "wider text that wraps around the end of a short row"
+    )
+    assert screen.in_alternate_screen
+
+    assert logical_lines(screen) == (
+        tuple(
+            (char, PLAIN_APPEARANCE)
+            for char in "wider text that wraps around the end of a short row"
+        ),
+    )
+
+    screen.resize(1, 4)
+
+    # The bottom of the wrapped run, and no wrap mark on it: the row is
+    # a line of its own now, so a reader that lays it out again makes
+    # one row of it and not six.
+    assert logical_lines(screen) == ((("w", PLAIN_APPEARANCE),),)
+    assert screen.line_offset == 5
 
 
 @given(st.lists(a_chunk(), min_size=1, max_size=40), WIDTHS)
