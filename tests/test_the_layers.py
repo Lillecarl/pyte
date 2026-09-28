@@ -38,6 +38,7 @@ PURE = {
     "colors",
     "control",
     "escape",
+    "html",
     "images",
     "keys",
     "modes",
@@ -81,6 +82,11 @@ MAY_IMPORT = {
     "colorsys",
     "enum",
     "functools",
+    # `html.escape`, which is a table and three replacements. `html.py`
+    # writes a document and every character a program wrote goes into
+    # it, so the escaping is the one thing there that must not be
+    # written by hand.
+    "html",
     "inspect",
     "itertools",
     "math",
