@@ -150,6 +150,11 @@ class PrivateMode(IntEnum):
     #: Report the mouse the way SGR writes it.
     SGR_MOUSE = 1006
 
+    #: On the alternate screen, with no mouse reporting, the wheel
+    #: sends up and down arrows. That screen has no history to scroll,
+    #: and a pager or a transcript on it scrolls on arrows.
+    ALTERNATE_SCROLL = 1007
+
     #: Report the mouse the way urxvt writes it.
     URXVT_MOUSE = 1015
 

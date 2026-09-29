@@ -379,6 +379,18 @@ class Screen:
         return PrivateMode.SGR_MOUSE.flag in self.mode
 
     @property
+    def wheel_sends_arrows(self) -> bool:
+        """
+        Does a wheel that no mouse mode reports go to the program as
+        arrows? Only on the alternate screen, with "?1007" set; that is
+        the rule of xterm (`scrollbar.c`), Ghostty and Alacritty.
+        """
+        return (
+            self.in_alternate_screen
+            and PrivateMode.ALTERNATE_SCROLL.flag in self.mode
+        )
+
+    @property
     def bracketed_paste_enabled(self) -> bool:
         return PrivateMode.BRACKETED_PASTE.flag in self.mode
 
@@ -818,6 +830,10 @@ class Screen:
             PrivateMode.AUTOWRAP.flag,
             # Text cursor enable mode. (default enabled).
             PrivateMode.SHOW_CURSOR.flag,
+            # On in Ghostty and Alacritty, and kitty and WezTerm send
+            # the arrows with no mode at all; off in xterm alone. codex
+            # sets it anyway; `less` does not ask, and scrolls on arrows.
+            PrivateMode.ALTERNATE_SCROLL.flag,
         }
 
         # According to VT220 manual and ``linux/drivers/tty/vt.c``
@@ -899,9 +915,13 @@ class Screen:
         self.margins = None
         self.horizontal_margins = None
 
-        alternate = self.mode.intersection(self._ALTERNATE_SCREEN_MODES)
+        # xterm's DECSTR leaves the wheel alone too: alternate scroll is
+        # a setting of the person's, not of the program's.
+        kept = self.mode.intersection(
+            [*self._ALTERNATE_SCREEN_MODES, PrivateMode.ALTERNATE_SCROLL.flag]
+        )
         self.mode = {PrivateMode.AUTOWRAP.flag, PrivateMode.SHOW_CURSOR.flag}
-        self.mode.update(alternate)
+        self.mode.update(kept)
         self.page.show_cursor = True
 
         # A list of its own, because a save writes into the list that
@@ -4623,6 +4643,7 @@ class Screen:
             PrivateMode.REVERSE_WRAP_ANYWHERE,
             PrivateMode.MOUSE_REPORTING,
             PrivateMode.SGR_MOUSE,
+            PrivateMode.ALTERNATE_SCROLL,
             PrivateMode.URXVT_MOUSE,
             PrivateMode.ALTERNATE_SCREEN_AGAIN,
             PrivateMode.SAVE_CURSOR,
