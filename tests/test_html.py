@@ -19,6 +19,7 @@ from pyte.cells import PLAIN, Rendition, appearance_of
 from pyte.colors import PALETTE, Color, SgrColor
 from pyte.html import (
     CSS,
+    Drawn,
     SAFE_SCHEMES,
     SCREEN_CLASS,
     THEMED,
@@ -39,18 +40,26 @@ from pyte.streams import Stream
 
 
 class _Read(HTMLParser):
-    "Every piece of text of a document, with the style that draws it."
+    """
+    Every piece of text of a document, with what draws it.
+
+    Both halves of that, because a span carries its classes and its
+    attribute and a reader cannot know which half a rendition took.
+    Lillecarl/pymux#460.
+    """
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
-        #: (text, style, href) for each piece, in order.
-        self.pieces: List[Tuple[str, str, str]] = []
-        self._styles: List[str] = []
+        #: (text, drawn, href) for each piece, in order.
+        self.pieces: List[Tuple[str, Drawn, str]] = []
+        self._styles: List[Drawn] = []
         self._hrefs: List[str] = []
 
     def handle_starttag(self, tag, attrs):
         held = dict(attrs)
-        self._styles.append(held.get("style") or "")
+        self._styles.append(
+            Drawn(held.get("class") or "", held.get("style") or "")
+        )
         self._hrefs.append(held.get("href") or "")
 
     def handle_endtag(self, tag):
@@ -63,7 +72,7 @@ class _Read(HTMLParser):
         self.pieces.append(
             (
                 data,
-                self._styles[-1] if self._styles else "",
+                self._styles[-1] if self._styles else Drawn("", ""),
                 self._hrefs[-1] if self._hrefs else "",
             )
         )
@@ -133,102 +142,188 @@ def test_the_colour_of_the_terminal_is_the_property_of_its_slot():
 # One appearance.
 
 
-def _style(**fields) -> str:
+def _style(**fields) -> "Drawn":
     return style_of(appearance_of[Rendition(**fields), "", ""], False)
 
 
-def test_a_plain_cell_has_no_style_at_all():
+def test_a_plain_cell_has_nothing_to_say():
     "Nothing to say, so nothing is written and the cell needs no span."
-    assert _style() == ""
+    assert _style() == Drawn("", "")
+    assert not _style()
+
+
+# ----------------------------------------------------------------------
+# What carries no value is a class.
+#
+# Each of these was a declaration on every span that had it, and a
+# screen of underlined text repeated the same forty characters per run.
+# Lillecarl/pymux#460.
 
 
 @pytest.mark.parametrize(
     "fields, expected",
     [
-        ({"bold": True}, "font-weight:bold"),
-        ({"italic": True}, "font-style:italic"),
-        ({"underline": True}, "text-decoration-line:underline"),
-        ({"strike": True}, "text-decoration-line:line-through"),
-        ({"hidden": True}, "color:transparent"),
-        ({"blink": True}, "animation:pyte-blink 1s step-end infinite"),
-        ({"baseline": "superscript"}, "vertical-align:super"),
-        ({"baseline": "subscript"}, "vertical-align:sub"),
+        ({"bold": True}, "pyte-bold"),
+        ({"italic": True}, "pyte-italic"),
+        ({"underline": True}, "pyte-underline"),
+        ({"strike": True}, "pyte-strike"),
+        ({"hidden": True}, "pyte-hidden"),
+        ({"blink": True}, "pyte-blink"),
+        ({"baseline": "superscript"}, "pyte-superscript"),
+        ({"baseline": "subscript"}, "pyte-subscript"),
     ],
 )
-def test_each_part_of_a_rendition_reaches_the_style(fields, expected):
-    assert expected in _style(**fields)
+def test_each_part_of_a_rendition_with_no_value_is_a_class(fields, expected):
+    drawn = _style(**fields)
+    assert expected in drawn.classes.split()
+    # And nothing at all is left for the attribute.
+    assert drawn.style == ""
 
 
-def test_underline_and_strike_share_one_property():
-    "CSS holds both lines in `text-decoration-line`, so one may not lose."
-    style = _style(underline=True, strike=True)
-    assert "text-decoration-line:underline line-through" in style
+def test_underline_and_strike_are_one_class_and_not_two():
+    """
+    CSS holds both lines in `text-decoration-line`, so two rules that
+    each set it do not add up: the later one wins and the other line is
+    lost. The pair has a class of its own.
+    """
+    assert _style(underline=True, strike=True).classes == "pyte-underline-strike"
 
 
 @pytest.mark.parametrize(
     "shape, drawn",
     [("double", "double"), ("curly", "wavy"), ("dotted", "dotted"), ("dashed", "dashed")],
 )
-def test_the_shape_of_an_underline_reaches_the_style(shape, drawn):
+def test_the_shape_of_an_underline_is_a_class(shape, drawn):
     "What Rich cannot carry (Lillecarl/pymux#82), a browser draws."
-    style = _style(underline=True, underline_style=shape)
-    assert "text-decoration-style:" + drawn in style
+    assert "pyte-" + drawn in _style(underline=True, underline_style=shape).classes
 
 
 def test_a_plain_underline_names_no_shape():
     "Solid is what CSS draws anyway, and this travels with every such cell."
-    style = _style(underline=True)
-    assert style == "text-decoration-line:underline"
+    assert _style(underline=True) == Drawn("pyte-underline", "")
 
 
-def test_the_colour_of_an_underline_reaches_the_style():
-    style = _style(
+def test_a_hidden_cell_is_given_no_colour_to_cover():
+    """
+    `color:transparent` was written last so that it beat the colour
+    above it. A class cannot do that -- an attribute beats every class,
+    and two classes are settled by the order of the stylesheet -- so
+    nothing paints the glyph of a hidden cell in the first place.
+    """
+    drawn = _style(hidden=True, color=SgrColor(index=1))
+    assert drawn.style == ""
+    assert "pyte-fg-1" not in drawn.classes
+
+
+def test_a_hidden_cell_keeps_its_background():
+    '"SGR 8" hides the character and not the space it sits in.'
+    assert "pyte-bg-2" in _style(hidden=True, bgcolor=SgrColor(index=2)).classes
+
+
+# ----------------------------------------------------------------------
+# What carries a value stays in the attribute.
+
+
+def test_the_colour_of_an_underline_stays_in_the_attribute():
+    drawn = _style(
         underline=True, underline_color=SgrColor(rgb=Color(0xFF, 0x00, 0x00))
     )
-    assert "text-decoration-color:#ff0000" in style
+    assert "text-decoration-color:#ff0000" in drawn.style
 
 
 def test_an_underline_colour_nobody_draws_is_left_out():
     "It would travel with every cell for a line that is not there."
-    style = _style(underline_color=SgrColor(rgb=Color(0xFF, 0x00, 0x00)))
-    assert "text-decoration-color" not in style
+    assert "text-decoration-color" not in _style(
+        underline_color=SgrColor(rgb=Color(0xFF, 0x00, 0x00))
+    ).style
+
+
+def test_a_themed_colour_is_a_class():
+    "The sixteen a theme answers, which is most of what a program uses."
+    assert _style(color=SgrColor(index=1)) == Drawn("pyte-fg-1", "")
+
+
+def test_a_colour_above_the_theme_carries_its_value():
+    "A place in the cube is the same number everywhere, and needs no rule."
+    assert _style(color=SgrColor(index=208)).style == "color:#ff8700"
+
+
+def test_a_colour_a_program_named_carries_its_value():
+    drawn = _style(color=SgrColor(rgb=Color(0x1E, 0xAA, 0x5A)))
+    assert drawn.style == "color:#1eaa5a"
+    assert drawn.classes == ""
 
 
 def test_reverse_swaps_the_two_colours():
-    style = _style(
-        color=SgrColor(index=1), bgcolor=SgrColor(index=2), reverse=True
-    )
-    assert "color:var(--pyte-2)" in style
-    assert "background-color:var(--pyte-1)" in style
+    drawn = _style(color=SgrColor(index=1), bgcolor=SgrColor(index=2), reverse=True)
+    assert drawn.classes == "pyte-fg-2 pyte-bg-1"
 
 
 def test_reverse_with_no_colours_names_both_of_the_terminal():
     """
     A cell that asked for neither colour still swaps, and the two
-    properties of the terminal are what it swaps.
+    properties of the terminal are what it swaps. They stay in the
+    attribute: the pair appears only on a reversed cell that named no
+    colour, which is not where the bytes are.
     """
-    style = _style(reverse=True)
-    assert "color:var(--pyte-bg)" in style
-    assert "background-color:var(--pyte-fg)" in style
+    drawn = _style(reverse=True)
+    assert "color:var(--pyte-bg)" in drawn.style
+    assert "background-color:var(--pyte-fg)" in drawn.style
 
 
 def test_a_reversed_cell_in_reverse_video_comes_back_round():
     "Two reversals are none, which is what DECSCNM means for such a cell."
     appearance = appearance_of[Rendition(reverse=True), "", ""]
-    assert style_of(appearance, True) == ""
+    assert not style_of(appearance, True)
 
 
 def test_reverse_video_reverses_a_plain_cell():
-    plain = appearance_of[PLAIN, "", ""]
-    style = style_of(plain, True)
-    assert "color:var(--pyte-bg)" in style
-    assert "background-color:var(--pyte-fg)" in style
+    drawn = style_of(appearance_of[PLAIN, "", ""], True)
+    assert "color:var(--pyte-bg)" in drawn.style
+    assert "background-color:var(--pyte-fg)" in drawn.style
 
 
 def test_dim_mixes_the_colour_towards_the_background():
     "The one part of a rendition no spelling here draws exactly."
-    style = _style(dim=True, color=SgrColor(index=7))
-    assert "color:color-mix(in srgb, var(--pyte-7) 50%, var(--pyte-bg))" in style
+    drawn = _style(dim=True, color=SgrColor(index=7))
+    assert "color:color-mix(in srgb, var(--pyte-7) 50%, var(--pyte-bg))" in drawn.style
+
+
+# ----------------------------------------------------------------------
+# The stylesheet answers every class.
+
+
+def test_every_class_a_cell_can_take_has_a_rule():
+    """
+    A class with no rule draws nothing, and nothing says so: the span
+    is there, the word is there, and the cell comes out plain. So every
+    way of drawing is asked what it takes, and the stylesheet is asked
+    for each of them.
+    """
+    ways = [
+        {"bold": True},
+        {"italic": True},
+        {"underline": True},
+        {"strike": True},
+        {"underline": True, "strike": True},
+        {"hidden": True},
+        {"blink": True},
+        {"baseline": "superscript"},
+        {"baseline": "subscript"},
+    ]
+    ways += [
+        {"underline": True, "underline_style": shape}
+        for shape in ("double", "curly", "dotted", "dashed")
+    ]
+    ways += [{"color": SgrColor(index=index)} for index in range(THEMED)]
+    ways += [{"bgcolor": SgrColor(index=index)} for index in range(THEMED)]
+
+    missing = []
+    for fields in ways:
+        for name in _style(**fields).classes.split():
+            if ".pyte-screen .%s {" % (name,) not in CSS:
+                missing.append(name)
+    assert missing == []
 
 
 # ----------------------------------------------------------------------
@@ -400,7 +495,7 @@ def test_a_hyperlink_keeps_the_style_of_its_cells():
     "The anchor is what carries it, so a link is drawn as the program asked."
     screen = _screen(2, 20, "\x1b[1m\x1b]8;;https://x/\x1b\\bold\x1b]8;;\x1b\\")
     reader = _read(html_of_row(screen.page.data_buffer[0], 20))
-    assert "font-weight:bold" in reader.pieces[0][1]
+    assert "pyte-bold" in reader.pieces[0][1].classes
 
 
 # ----------------------------------------------------------------------

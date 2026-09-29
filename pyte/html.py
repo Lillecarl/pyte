@@ -35,7 +35,7 @@ this puts between rows have to go.
 import re
 from functools import lru_cache
 from html import escape
-from typing import TYPE_CHECKING, List, Tuple
+from typing import TYPE_CHECKING, List, NamedTuple, Tuple
 
 from .cells import PLAIN_APPEARANCE, appearance_of
 from .colors import DEFAULT_COLORS, PALETTE, SgrColor
@@ -48,6 +48,7 @@ if TYPE_CHECKING:
 
 __all__ = (
     "CSS",
+    "Drawn",
     "SAFE_SCHEMES",
     "SCREEN_CLASS",
     "THEMED",
@@ -147,15 +148,79 @@ def color_value(color: SgrColor, background: bool = False) -> str:
     return PALETTE[color.index].hex
 
 
-def _spelled(appearance: "Appearance", reverse_video: bool) -> str:
+class Drawn(NamedTuple):
     """
-    The CSS declarations that draw one cell.
+    How one cell is drawn: the classes it takes, and what is left over.
+
+    **Most of a rendition has no value in it.** Bold, italic, blink,
+    hidden, the two baselines, the two lines and the five underline
+    shapes are each one fixed declaration, so each is a rule in `CSS`
+    and a word here instead of forty characters on every span that has
+    it. Measured on a real pane: 134 styled spans in one frame, polled
+    twice a second for each viewer. Lillecarl/pymux#460.
+
+    What is left in `style` is what carries a value: a colour past the
+    themed sixteen, a colour a program named itself, and the mix that
+    draws a dim cell.
+
+    A page can then allow `style-src-attr 'unsafe-inline'` for that
+    last case alone, or drop it and lose truecolour.
+    """
+
+    classes: str
+    style: str
+
+    def __bool__(self) -> bool:
+        return bool(self.classes or self.style)
+
+
+#: What every class of a cell begins with.
+_CLASS = "pyte-"
+
+#: The class for the lines through a cell.
+#:
+#: **Three of them and not two.** One property carries both lines, so
+#: two rules that each set `text-decoration-line` do not add up -- the
+#: later one wins and the other line is lost. The pair has a class of
+#: its own for that reason.
+_LINE_CLASSES = {
+    (True, False): _CLASS + "underline",
+    (False, True): _CLASS + "strike",
+    (True, True): _CLASS + "underline-strike",
+}
+
+#: What the classes of the themed sixteen begin with, on each side of a
+#: cell. A colour above them and a colour a program named itself carry a
+#: value, so those stay in the attribute.
+_FOREGROUND_CLASS = _CLASS + "fg"
+_BACKGROUND_CLASS = _CLASS + "bg"
+
+
+def _color_class(color: SgrColor, paints_background: bool) -> str:
+    """
+    The class that paints one of the themed sixteen, or nothing.
+
+    `paints_background` says which side of the cell this colour ends up
+    on, which a reverse cell has already swapped. It is not the
+    question `color_value` asks: that one is about which colour the
+    terminal's own means here.
+    """
+    if color.rgb is not None or color.index is None or color.index >= THEMED:
+        return ""
+    under = _BACKGROUND_CLASS if paints_background else _FOREGROUND_CLASS
+    return "%s-%d" % (under, color.index)
+
+
+def _spelled(appearance: "Appearance", reverse_video: bool) -> Drawn:
+    """
+    How one cell is drawn.
 
     `style_of` is this function with the answers remembered. Nothing
     calls this one directly.
     """
     rendition = appearance.rendition
     declarations: List[str] = []
+    classes: List[str] = []
 
     # **Reverse is a swap and not a property.** CSS has nothing that
     # exchanges the two colours, so the exchange happens here, and a
@@ -174,38 +239,50 @@ def _spelled(appearance: "Appearance", reverse_video: bool) -> str:
         foreground = color_value(color)
         background = color_value(bgcolor, background=True)
 
-    if rendition.dim:
+    if rendition.hidden:
+        # **Nothing paints the glyph of a hidden cell**, so no colour is
+        # written for it at all. It used to be painted and then covered
+        # by a `color:transparent` written last, which a class cannot
+        # do: an attribute beats every class, and two classes are
+        # settled by the order of the stylesheet. Saying nothing is
+        # exact and needs no order. "SGR 8" hides the character and not
+        # the space it sits in, so the background below still goes.
+        classes.append(_CLASS + "hidden")
+    elif rendition.dim:
         # Mixed here rather than left to the cascade: the mix needs both
         # colours, and the cell is the only place that knows them.
         declarations.append(
             "color:color-mix(in srgb, %s %d%%, %s)" % (foreground, _DIM, background)
         )
     elif rendition.color or rendition.reverse != reverse_video:
-        declarations.append("color:" + foreground)
+        painted = _color_class(color, paints_background=False)
+        if painted:
+            classes.append(painted)
+        else:
+            declarations.append("color:" + foreground)
 
     if rendition.bgcolor or rendition.reverse != reverse_video:
-        declarations.append("background-color:" + background)
+        painted = _color_class(bgcolor, paints_background=True)
+        if painted:
+            classes.append(painted)
+        else:
+            declarations.append("background-color:" + background)
 
     if rendition.bold:
-        declarations.append("font-weight:bold")
+        classes.append(_CLASS + "bold")
     if rendition.italic:
-        declarations.append("font-style:italic")
+        classes.append(_CLASS + "italic")
 
-    # One property carries both lines, so they are gathered before it is
-    # written.
-    lines = []
+    if rendition.underline or rendition.strike:
+        classes.append(
+            _LINE_CLASSES[(bool(rendition.underline), bool(rendition.strike))]
+        )
     if rendition.underline:
-        lines.append("underline")
-    if rendition.strike:
-        lines.append("line-through")
-    if lines:
-        declarations.append("text-decoration-line:" + " ".join(lines))
-    if rendition.underline:
-        # A plain underline is what CSS draws without being told, and
-        # this travels with every cell that has one.
+        # The class is the CSS keyword, so the rule and the word cannot
+        # drift. A solid line is what CSS draws without being told.
         shape = _UNDERLINE_STYLES[rendition.underline_style]
         if shape != "solid":
-            declarations.append("text-decoration-style:" + shape)
+            classes.append(_CLASS + shape)
         # The colour of a line that nobody draws would travel with every
         # cell for nothing.
         if rendition.underline_color:
@@ -214,21 +291,12 @@ def _spelled(appearance: "Appearance", reverse_video: bool) -> str:
             )
 
     if rendition.blink:
-        # The animation itself is in `CSS`: a keyframe rule cannot be
-        # written inline.
-        declarations.append("animation:pyte-blink 1s step-end infinite")
+        classes.append(_CLASS + "blink")
 
     if rendition.baseline:
-        declarations.append("vertical-align:" + _BASELINES[rendition.baseline])
-        declarations.append("font-size:smaller")
+        classes.append(_CLASS + rendition.baseline)
 
-    if rendition.hidden:
-        # Last, so that it wins over the colour above it. The cell keeps
-        # its background: "SGR 8" hides the character and not the space
-        # it sits in.
-        declarations.append("color:transparent")
-
-    return ";".join(declarations)
+    return Drawn(" ".join(classes), ";".join(declarations))
 
 
 #: The CSS declarations that draw one cell, answered once for each way
@@ -367,16 +435,21 @@ def html_of_row(row: "Row", columns: int, reverse_video: bool = False) -> str:
 
     for appearance, run in runs_of_row(row, columns, reverse_video):
         content = escape(run)
-        style = style_of(appearance, reverse_video)
+        drawn = style_of(appearance, reverse_video)
         link = href_of(appearance.hyperlink)
-        if link and style:
-            pieces.append('<a href="%s" style="%s">%s</a>' % (link, style, content))
-        elif link:
-            pieces.append('<a href="%s">%s</a>' % (link, content))
-        elif style:
-            pieces.append('<span style="%s">%s</span>' % (style, content))
-        else:
+        if not link and not drawn:
             pieces.append(content)
+            continue
+
+        attributes = ""
+        if link:
+            attributes += ' href="%s"' % (link,)
+        if drawn.classes:
+            attributes += ' class="%s"' % (drawn.classes,)
+        if drawn.style:
+            attributes += ' style="%s"' % (drawn.style,)
+        tag = "a" if link else "span"
+        pieces.append("<%s%s>%s</%s>" % (tag, attributes, content, tag))
 
     return "".join(pieces)
 
@@ -429,9 +502,56 @@ def _theme() -> str:
 #: cell that a program underlined is underlined, and one it did not is
 #: not. And the keyframes are the blink, which cannot be written inline.
 #:
+def _renditions() -> str:
+    """
+    One rule for each part of a rendition that carries no value.
+
+    Every one of these was a declaration on the span that had it, and
+    each span that had one carried the whole spelling. `Drawn` says
+    what that cost. Lillecarl/pymux#460.
+
+    The rules are written from the same tables the classes are, so a
+    name here and a name there cannot drift.
+    """
+    rules = [
+        ("bold", "font-weight: bold;"),
+        ("italic", "font-style: italic;"),
+        ("blink", "animation: pyte-blink 1s step-end infinite;"),
+        # The glyph goes and the cell keeps its background, which is
+        # what "SGR 8" means. No colour is written for such a cell, so
+        # nothing here has to win over one.
+        ("hidden", "color: transparent;"),
+    ]
+    for (underline, strike), name in _LINE_CLASSES.items():
+        lines = " ".join(
+            ["underline"] * underline + ["line-through"] * strike
+        )
+        rules.append((name[len(_CLASS) :], "text-decoration-line: %s;" % (lines,)))
+    for shape in set(_UNDERLINE_STYLES.values()) - {"solid"}:
+        rules.append((shape, "text-decoration-style: %s;" % (shape,)))
+    for baseline, where in _BASELINES.items():
+        rules.append(
+            (baseline, "vertical-align: %s;\n  font-size: smaller;" % (where,))
+        )
+    for index in range(THEMED):
+        value = "var(%s)" % (_PROPERTY % index,)
+        rules.append(("fg-%d" % index, "color: %s;" % (value,)))
+        rules.append(("bg-%d" % index, "background-color: %s;" % (value,)))
+
+    # A descendant of the screen, so that a colour here beats the one
+    # the screen itself sets.
+    return "\n".join(
+        ".%s .%s%s { %s }" % (SCREEN_CLASS, _CLASS, name, body)
+        for name, body in rules
+    )
+
+
 #: The custom properties are the theme, and a page that wants another
 #: one redefines them on `.pyte-screen`. The values here are the
 #: palette this package already holds, so there is one copy of them.
+#:
+#: The rules under it answer the classes a span takes. `Drawn` says why
+#: a span takes one rather than carrying the declaration itself.
 CSS = """.%s {
 %s
   white-space: pre;
@@ -448,12 +568,15 @@ CSS = """.%s {
 @keyframes pyte-blink {
   50%% { visibility: hidden; }
 }
+
+%s
 """ % (
     SCREEN_CLASS,
     _theme(),
     _FOREGROUND,
     _BACKGROUND,
     SCREEN_CLASS,
+    _renditions(),
 )
 
 
