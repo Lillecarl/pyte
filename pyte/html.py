@@ -35,7 +35,7 @@ this puts between rows have to go.
 import re
 from functools import lru_cache
 from html import escape
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Tuple
 
 from .cells import PLAIN_APPEARANCE, appearance_of
 from .colors import DEFAULT_COLORS, PALETTE, SgrColor
@@ -52,8 +52,10 @@ __all__ = (
     "SCREEN_CLASS",
     "THEMED",
     "color_value",
+    "href_of",
     "html_of_page",
     "html_of_row",
+    "runs_of_row",
     "style_of",
     "theme_css",
     "visible_char",
@@ -273,9 +275,14 @@ def visible_char(char: str) -> str:
 _SCHEME = re.compile(r"[A-Za-z][A-Za-z0-9+.\-]*")
 
 
-def _href(hyperlink: str) -> str:
+def href_of(hyperlink: str) -> str:
     """
     The `href` for a link a program opened, or empty for one to refuse.
+
+    **Everything that puts a program's "OSC 8" into a document goes
+    through this**, and not only the markup here. A caller that sends a
+    cell to a browser another way owes its reader the same refusal, so
+    the allowlist lives in one function rather than in each of them.
 
     **It refuses everything it does not recognise**, which is why the
     whole of the part before the colon has to match. A browser drops a
@@ -308,35 +315,60 @@ def _draws(cell: "Cell", reverse_video: bool) -> bool:
     return visible_char(cell.char) not in ("", " ")
 
 
-def html_of_row(row: "Row", columns: int, reverse_video: bool = False) -> str:
+def runs_of_row(
+    row: "Row", columns: int, reverse_video: bool = False
+) -> List[Tuple["Appearance", str]]:
     """
-    One row of a screen, as the spans that draw it.
+    One row, as the stretches of it that draw the same way.
 
-    Cells that draw the same way become one span, because a screen is
-    mostly runs of one appearance and a span for each cell of a wide
-    screen is sixty thousand elements a frame.
+    Cells that draw the same way are one run, because a screen is mostly
+    runs of one appearance: a run for each cell of a wide screen is
+    sixty thousand of whatever the caller makes per frame.
 
-    **The blanks at the end of a row are left out.** Nothing draws
-    them, so they would only put trailing spaces into anything copied
-    out of the page. A blank a program wrote stays if it carries a
-    background, and in reverse video every cell draws.
+    **The blanks at the end of a row are left out.** Nothing draws them,
+    so they would only put trailing spaces into anything copied out. A
+    blank a program wrote stays if it carries a background, and in
+    reverse video every cell draws.
+
+    This is where a row ends and what a blank is worth, and it is one
+    function because more than one thing asks: the markup below, and a
+    caller that sends the cells somewhere else. Lillecarl/pymux#461.
     """
     last = columns - 1
     while last >= 0 and not _draws(row[last], reverse_video):
         last -= 1
     if last < 0:
-        return ""
+        return []
 
-    pieces: List[str] = []
+    runs: List[Tuple["Appearance", str]] = []
     text: List[str] = []
     appearance = row[0].appearance
 
-    def close() -> None:
-        if not text:
-            return
-        content = escape("".join(text))
+    for column in range(last + 1):
+        cell = row[column]
+        # Identity, not equality: `pyte.cells` hands out one
+        # `Appearance` for each way of drawing, so a run is a pointer
+        # comparison.
+        if cell.appearance is not appearance:
+            if text:
+                runs.append((appearance, "".join(text)))
+                text.clear()
+            appearance = cell.appearance
+        text.append(visible_char(cell.char))
+
+    if text:
+        runs.append((appearance, "".join(text)))
+    return runs
+
+
+def html_of_row(row: "Row", columns: int, reverse_video: bool = False) -> str:
+    "One row of a screen, as the spans that draw it."
+    pieces: List[str] = []
+
+    for appearance, run in runs_of_row(row, columns, reverse_video):
+        content = escape(run)
         style = style_of(appearance, reverse_video)
-        link = _href(appearance.hyperlink)
+        link = href_of(appearance.hyperlink)
         if link and style:
             pieces.append('<a href="%s" style="%s">%s</a>' % (link, style, content))
         elif link:
@@ -345,19 +377,7 @@ def html_of_row(row: "Row", columns: int, reverse_video: bool = False) -> str:
             pieces.append('<span style="%s">%s</span>' % (style, content))
         else:
             pieces.append(content)
-        text.clear()
 
-    for column in range(last + 1):
-        cell = row[column]
-        # Identity, not equality: `pyte.cells` hands out one
-        # `Appearance` for each way of drawing, so a run is a pointer
-        # comparison.
-        if cell.appearance is not appearance:
-            close()
-            appearance = cell.appearance
-        text.append(visible_char(cell.char))
-
-    close()
     return "".join(pieces)
 
 

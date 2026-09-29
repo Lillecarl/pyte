@@ -23,8 +23,10 @@ from pyte.html import (
     SCREEN_CLASS,
     THEMED,
     color_value,
+    href_of,
     html_of_page,
     html_of_row,
+    runs_of_row,
     style_of,
     theme_css,
     visible_char,
@@ -399,6 +401,75 @@ def test_a_hyperlink_keeps_the_style_of_its_cells():
     screen = _screen(2, 20, "\x1b[1m\x1b]8;;https://x/\x1b\\bold\x1b]8;;\x1b\\")
     reader = _read(html_of_row(screen.page.data_buffer[0], 20))
     assert "font-weight:bold" in reader.pieces[0][1]
+
+
+# ----------------------------------------------------------------------
+# The runs, which the markup and every other reader share.
+
+
+def _runs(text: str, columns: int = 20, reverse_video: bool = False):
+    "The runs of the first row, as (text, style) pairs."
+    screen = _screen(3, columns, text)
+    row = screen.page.data_buffer[0]
+    return [
+        (run, style_of(appearance, reverse_video))
+        for appearance, run in runs_of_row(row, columns, reverse_video)
+    ]
+
+
+def test_cells_that_draw_alike_are_one_run():
+    assert [run for run, _style in _runs("hello")] == ["hello"]
+
+
+def test_a_change_of_appearance_starts_a_run():
+    assert [run for run, _style in _runs("ab\x1b[1mcd\x1b[0mef")] == ["ab", "cd", "ef"]
+
+
+def test_the_blanks_at_the_end_of_a_row_are_not_a_run():
+    "Where the row ends, decided once for every reader."
+    assert [run for run, _style in _runs("hi")] == ["hi"]
+
+
+def test_a_row_that_draws_nothing_has_no_runs():
+    assert _runs("") == []
+
+
+def test_every_cell_is_a_run_in_reverse_video():
+    "Nothing is blank when the screen is reversed, so the row is full."
+    runs = _runs("hi", columns=5, reverse_video=True)
+    assert "".join(run for run, _style in runs) == "hi   "
+
+
+def test_the_markup_is_built_from_the_runs():
+    """
+    The markup is one caller of `runs_of_row` and not a second copy of
+    the rule. A row whose runs are known says what its markup holds.
+    """
+    row = _screen(3, 20, "ab\x1b[1mcd\x1b[0m").page.data_buffer[0]
+    runs = runs_of_row(row, 20)
+    markup = html_of_row(row, 20)
+
+    assert [run for _appearance, run in runs] == ["ab", "cd"]
+    assert markup.count("<span") == 1, markup
+    assert markup.endswith("cd</span>"), markup
+
+
+# ----------------------------------------------------------------------
+# The link allowlist, which every reader owes its own reader.
+
+
+def test_a_scheme_that_is_allowed_comes_back_escaped():
+    assert href_of("https://example.com/?a=1&b=2") == (
+        "https://example.com/?a=1&amp;b=2"
+    )
+
+
+@pytest.mark.parametrize(
+    "target",
+    ["javascript:alert(1)", "java\tscript:alert(1)", "//example.com/x", "/x", "x"],
+)
+def test_a_target_a_program_must_not_choose_is_refused(target):
+    assert href_of(target) == ""
 
 
 # ----------------------------------------------------------------------
