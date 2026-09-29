@@ -43,18 +43,28 @@ from .placeholders import PLACEHOLDER
 
 if TYPE_CHECKING:
     from .cells import Appearance, Cell
+    from .osc import ColorOverrides
     from .page import Page, Row
 
 __all__ = (
     "CSS",
     "SAFE_SCHEMES",
+    "SCREEN_CLASS",
     "THEMED",
     "color_value",
     "html_of_page",
     "html_of_row",
     "style_of",
+    "theme_css",
     "visible_char",
 )
+
+#: The class on the element that holds a page.
+#:
+#: Every rule of `CSS` is written under it and `theme_css` redefines the
+#: properties there, so a caller that builds the element writes this and
+#: not a copy of it.
+SCREEN_CLASS = "pyte-screen"
 
 #: How many colours of the palette a theme is asked about.
 #:
@@ -402,7 +412,7 @@ def _theme() -> str:
 #: The custom properties are the theme, and a page that wants another
 #: one redefines them on `.pyte-screen`. The values here are the
 #: palette this package already holds, so there is one copy of them.
-CSS = """.pyte-screen {
+CSS = """.%s {
 %s
   white-space: pre;
   font-family: monospace;
@@ -410,7 +420,7 @@ CSS = """.pyte-screen {
   background-color: var(%s);
 }
 
-.pyte-screen a {
+.%s a {
   color: inherit;
   text-decoration: inherit;
 }
@@ -419,7 +429,35 @@ CSS = """.pyte-screen {
   50%% { visibility: hidden; }
 }
 """ % (
+    SCREEN_CLASS,
     _theme(),
     _FOREGROUND,
     _BACKGROUND,
+    SCREEN_CLASS,
 )
+
+
+def theme_css(colors: "ColorOverrides") -> str:
+    """
+    The rule that makes a page draw in one screen's own colours.
+
+    `CSS` answers the sixteen properties and the two defaults with the
+    palette this package holds. A screen holds its own: the theme its
+    embedder set with `set_color_base`, and whatever the program on it
+    changed with "OSC 4" or "OSC 10". This writes those over the top,
+    so it goes after `CSS` and under the same selector, where the later
+    rule wins.
+
+    The cube past `THEMED` is not in it, for the reason `THEMED` gives.
+    A program that sets one of those with "OSC 4" does not reach a
+    browser, and Lillecarl/pymux#452 holds that.
+    """
+    lines = [
+        "  %s: %s;" % (_FOREGROUND, colors.named("foreground").hex),
+        "  %s: %s;" % (_BACKGROUND, colors.named("background").hex),
+    ]
+    for index in range(THEMED):
+        color = colors.color_of(index)
+        if color is not None:
+            lines.append("  %s: %s;" % (_PROPERTY % index, color.hex))
+    return ".%s {\n%s\n}\n" % (SCREEN_CLASS, "\n".join(lines))

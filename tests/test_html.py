@@ -20,11 +20,13 @@ from pyte.colors import PALETTE, Color, SgrColor
 from pyte.html import (
     CSS,
     SAFE_SCHEMES,
+    SCREEN_CLASS,
     THEMED,
     color_value,
     html_of_page,
     html_of_row,
     style_of,
+    theme_css,
     visible_char,
 )
 from pyte.screen import Screen
@@ -425,3 +427,51 @@ def test_the_stylesheet_holds_the_three_rules_that_are_not_decoration():
 def test_the_stylesheet_takes_its_colours_from_the_palette():
     "One copy of the palette, and this is not it."
     assert "--pyte-1: %s;" % PALETTE[1].hex in CSS
+
+
+def test_every_rule_is_written_under_the_one_class():
+    "A caller that builds the element writes `SCREEN_CLASS` and not a copy."
+    assert ".%s {" % SCREEN_CLASS in CSS
+    assert ".%s a {" % SCREEN_CLASS in CSS
+
+
+# ----------------------------------------------------------------------
+# One screen's own colours.
+
+
+def test_a_theme_rule_answers_the_same_properties_the_stylesheet_does():
+    """
+    It goes after `CSS` and wins, so anything it leaves out keeps the
+    conventional colour and anything it names has to match.
+    """
+    rule = theme_css(_screen(3, 10, "").colors)
+
+    for index in range(THEMED):
+        assert "--pyte-%d:" % index in rule
+    assert "--pyte-fg:" in rule
+    assert "--pyte-bg:" in rule
+    assert rule.startswith(".%s {" % SCREEN_CLASS)
+
+
+def test_a_theme_rule_carries_what_a_program_set():
+    'A program that sets colour one with "OSC 4" reaches the browser.'
+    screen = _screen(3, 10, "\x1b]4;1;rgb:12/34/56\x1b\\")
+
+    assert "--pyte-1: #123456;" in theme_css(screen.colors)
+
+
+def test_a_theme_rule_carries_the_two_a_program_names_by_name():
+    'The foreground and the background, which "OSC 10" and "OSC 11" set.'
+    screen = _screen(3, 10, "\x1b]10;#ff0000\x1b\\\x1b]11;#0000ff\x1b\\")
+    rule = theme_css(screen.colors)
+
+    assert "--pyte-fg: #ff0000;" in rule
+    assert "--pyte-bg: #0000ff;" in rule
+
+
+def test_a_theme_rule_on_a_fresh_screen_says_what_the_stylesheet_says():
+    "So a caller may always send it, and a screen nobody changed draws the same."
+    rule = theme_css(_screen(3, 10, "").colors)
+
+    for index in range(THEMED):
+        assert "--pyte-%d: %s;" % (index, PALETTE[index].hex) in rule
