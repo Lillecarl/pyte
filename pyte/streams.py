@@ -708,6 +708,52 @@ class Stream:
         # A noop since all input is Unicode-only.
 
 
+class GroundTimer:
+    """
+    Bound how long a stream may stay out of plain text.
+
+    A program can write a partial escape and then stop. `Stream` then
+    reads every later byte as part of that sequence, and the screen
+    shows the wrong thing until something resets the parser. This does
+    that: bytes arriving `timeout` seconds after the parser left plain
+    text drop the unfinished sequence (`Stream.ground_timer_expired`),
+    which wastes only its own bytes.
+
+    **The embedder owns the clock.** `now` returns the current time,
+    so an embedder passes `time.monotonic` and this layer still
+    imports no `time`. Lillecarl/pymux#390, Lillecarl/pymux#484.
+    """
+
+    def __init__(
+        self,
+        stream: Stream,
+        timeout: float,
+        now: Callable[[], float],
+    ) -> None:
+        self.stream = stream
+        self.timeout = timeout
+        self.now = now
+
+        #: When the parser stopped being plain text, or `None` when it
+        #: is reading plain text.
+        self.since: float | None = None
+
+    def feed(self, data: str) -> None:
+        "Feed the stream, dropping a sequence that stayed open too long."
+        now = self.now()
+
+        if self.since is not None and now - self.since >= self.timeout:
+            self.stream.ground_timer_expired()
+
+        self.stream.feed(data)
+
+        if self.stream.ground_timer_active:
+            if self.since is None:
+                self.since = now
+        else:
+            self.since = None
+
+
 class ByteStream(Stream):
     """A stream which takes bytes as input.
 

@@ -565,3 +565,37 @@ def test_expiring_the_ground_timer_keeps_what_was_drawn():
     assert not stream.ground_timer_active
     stream.feed("ok")
     assert display(screen)[0].strip() == "abcok"
+
+
+def test_the_ground_timer_drops_a_sequence_that_stayed_open():
+    """
+    A program that writes a partial escape and stops must not leave
+    the parser reading every later byte through the wrong state.
+    Lillecarl/pymux#390.
+    """
+    now = [0.0]
+    screen = a_screen(20, 1)
+    stream = pyte.Stream(screen)
+    timer = pyte.GroundTimer(stream, 5, lambda: now[0])
+
+    timer.feed("abc" + ctrl.CSI + "1;")
+    assert stream.ground_timer_active
+
+    now[0] = 6.0  # The timeout passed with no byte.
+    timer.feed("def")
+
+    assert not stream.ground_timer_active
+    assert display(screen)[0].strip() == "abcdef"
+
+
+def test_the_ground_timer_keeps_a_sequence_still_arriving():
+    now = [0.0]
+    screen = a_screen(20, 1)
+    stream = pyte.Stream(screen)
+    timer = pyte.GroundTimer(stream, 5, lambda: now[0])
+
+    timer.feed(ctrl.CSI + "1;")
+    now[0] = 3.0
+    timer.feed("5m")  # Within the timeout, so the sequence stands.
+
+    assert not stream.ground_timer_active
