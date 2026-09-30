@@ -374,6 +374,24 @@ class Stream:
         self._parser = self._parser_fsm()
         self._taking_plain_text = next(self._parser)
 
+    @property
+    def ground_timer_active(self) -> bool:
+        "Is the parser part-way through a sequence, and not reading plain text?"
+        return not self._taking_plain_text
+
+    def ground_timer_expired(self) -> None:
+        """
+        Drop an incomplete sequence and return the parser to plain text.
+
+        The embedder calls this when a sequence has stayed open too
+        long: a program that writes a partial escape and then stops
+        would otherwise leave the parser reading every later byte
+        through the wrong state. The screen keeps everything it drew;
+        only the bytes of the sequence that never finished go.
+        Lillecarl/pymux#390.
+        """
+        self._initialize_parser()
+
     def _parser_fsm(self) -> ParserGenerator:
         """An FSM implemented as a coroutine.
 

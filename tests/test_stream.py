@@ -535,3 +535,33 @@ def test_hpa_reads_the_backquote():
     stream = pyte.Stream(screen)
     stream.feed(ctrl.CSI + "5`")
     assert screen.pt_cursor_position.x == 4
+
+
+def test_the_ground_timer_is_active_in_a_sequence():
+    "The parser is not in plain text while a sequence is open."
+    screen = a_screen(20, 1)
+    stream = pyte.Stream(screen)
+    assert not stream.ground_timer_active
+
+    stream.feed(ctrl.CSI + "1;")
+    assert stream.ground_timer_active
+
+    stream.feed("5m")  # Completes the SGR sequence.
+    assert not stream.ground_timer_active
+
+
+def test_expiring_the_ground_timer_keeps_what_was_drawn():
+    """
+    Dropping an unfinished sequence wastes only its own bytes. The
+    program that left it open does not lose the screen it drew.
+    The embedder carries the clock and calls this.
+    Lillecarl/pymux#390.
+    """
+    screen = a_screen(20, 1)
+    stream = pyte.Stream(screen)
+    stream.feed("abc" + ctrl.CSI + "10;")
+    stream.ground_timer_expired()
+
+    assert not stream.ground_timer_active
+    stream.feed("ok")
+    assert display(screen)[0].strip() == "abcok"
