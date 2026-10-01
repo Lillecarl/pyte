@@ -159,8 +159,8 @@ def test_a_restore_leaves_the_wrap_alone(save, restore):
     assert screen.pt_cursor_position.y == 0
 
 
-#: The private modes that name the alternate screen. Only "?1049"
-#: saves the cursor, and only it puts the cursor home on the way in.
+#: The two older alternate screens. Neither saves the cursor; "?1049"
+#: does, and the live cursor is tested on its own.
 OLDER_ALTERNATE_MODES = ["47", "1047"]
 
 
@@ -187,13 +187,24 @@ def test_the_cursor_stays_on_a_second_visit(mode):
     assert (screen.pt_cursor_position.y, screen.pt_cursor_position.x) == (1, 2)
 
 
-def test_the_mode_that_saves_the_cursor_puts_it_home():
-    '"?1049" saves the cursor first, so it can send it home.'
+def test_the_mode_that_saves_the_cursor_leaves_it_where_it_stands():
+    """
+    "?1049" saves the cursor and leaves the live one alone.
+
+    It used to send it home, on the argument that a program using the
+    pair never has to know where it stood in between. Alacritty,
+    Ghostty, libvterm and xterm.js leave it, and xterm describes the
+    mode as a save, a switch and a clear with no move.
+    Lillecarl/pymux#34.
+    """
     screen, stream = _screen(lines=4, columns=8)
     stream.feed(
         csi(escape.CUP, 2, 3) + set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR)
     )
-    assert (screen.pt_cursor_position.y, screen.pt_cursor_position.x) == (0, 0)
+    assert (screen.pt_cursor_position.y, screen.pt_cursor_position.x) == (1, 2)
+
+    # Moving on the alternate screen does not touch the save.
+    stream.feed(csi(escape.CUP, 1, 1))
     stream.feed(reset_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR))
     assert (screen.pt_cursor_position.y, screen.pt_cursor_position.x) == (1, 2)
 

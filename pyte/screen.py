@@ -1821,19 +1821,14 @@ class Screen:
             self.margins = margins
             self.horizontal_margins = horizontal_margins
 
-            # "?47" and "?1047" leave the cursor where it stands.
-            # xterm does, and so do WezTerm, Alacritty, libvterm,
-            # Ghostty and xterm.js; only kitty puts it home.
-            #
-            # "?1049" does put it home here, and that is a choice and
-            # not an answer: kitty and WezTerm put it home, and
-            # Alacritty, Ghostty, libvterm and xterm.js leave it.
-            # Entry 17 of `tests/DEVIATIONS.md` holds the argument, and
-            # Lillecarl/pymux#34 holds the question.
-            if PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR.flag not in taken_by:
-                self.pt_cursor_position.x = held_column
-                self.pt_cursor_position.y = held_row + self.line_offset
-                self.ensure_bounds()
+            # Every one of the three leaves the cursor where it
+            # stands. xterm does, and its own description of "?1049"
+            # is a save, a switch and a clear, with no move. Alacritty,
+            # Ghostty, libvterm and xterm.js leave it too; kitty and
+            # WezTerm put it home. Lillecarl/pymux#34.
+            self.pt_cursor_position.x = held_column
+            self.pt_cursor_position.y = held_row + self.line_offset
+            self.ensure_bounds()
 
     def reset_mode(self, *modes_args, **kwargs) -> None:
         """Resets (disables) a given list of modes.

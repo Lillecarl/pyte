@@ -126,6 +126,9 @@ def test_the_page_that_is_showing_is_not_disturbed():
     screen.draw("A" * (WIDE - 1))
 
     stream.feed(ALTERNATE)
+    # "?1049" leaves the cursor where it stood, so put it home before
+    # drawing: this test is about the resize, not where it starts.
+    stream.feed("\x1b[H")
     screen.draw("B" * (WIDE - 1))
     screen.resize(columns=NARROW)
 
