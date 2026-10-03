@@ -47,6 +47,9 @@ def feed(stream, code, param):
         ("22", "pointer"),  # The shape of the pointer.
         ("1337", "OpenURL=:aHR0cHM6Ly9leGFtcGxlLmNvbQ=="),  # Open a browser.
         ("1337", "File=name=t.png;inline=1:AAAA"),  # An image of iTerm2's kind.
+        ("7", "file://host/home"),  # The working directory, as a file URL.
+        ("133", "A"),  # The shell integration marks of FinalTerm.
+        ("133", "D;0"),  # A command that finished well.
     ],
 )
 def test_a_sequence_for_the_user_leaves_the_pane(code, param):
@@ -58,7 +61,7 @@ def test_a_sequence_for_the_user_leaves_the_pane(code, param):
 
 def test_the_forwarded_codes_are_the_ones_of_the_user():
     "The palette and the title belong to the pane; the rest goes out."
-    assert FORWARDED_OSC == {"22", "52", "99", "1337"}
+    assert FORWARDED_OSC == {"22", "52", "99", "1337", "7", "133"}
 
 
 def test_a_clipboard_query_stays_inside_the_pane():
@@ -87,7 +90,6 @@ def test_a_clipboard_write_that_looks_like_a_query_still_leaves():
         ("4", "1;?"),  # A palette query: the pane answers it.
         ("11", "?"),  # A background query: the pane answers it.
         ("21", "background=?"),  # A kitty colour query.
-        ("7", "file:///home"),  # The working directory.
         ("8", ";https://example.com"),  # A hyperlink.
         ("777", "notify;title;body"),  # The rxvt notification.
     ],
