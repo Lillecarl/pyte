@@ -24,6 +24,8 @@
   mkProject,
   callPackage,
   ncurses,
+  # The linter and formatter that the `ruff` check runs.
+  ruff,
 }:
 let
   package =
@@ -105,6 +107,13 @@ let
     fileset = lib.fileset.unions [
       ./tests
       ./tools
+      # The `ruff` check reads the package and its config, where the
+      # suites above read the installed package and never look here.
+      ./pyte
+      ./pyproject.toml
+      ./examples
+      ./benchmark.py
+      ./docs/conf.py
     ];
   };
 
@@ -112,6 +121,6 @@ let
   # extra beside them in the same file.
   testEnv = mkVirtualEnv "pyte-test-env" { pyte = [ "test" ]; };
 
-  checks = callPackage ./nix/checks.nix { inherit testEnv testSources; };
+  checks = callPackage ./nix/checks.nix { inherit testEnv testSources ruff; };
 in
 package

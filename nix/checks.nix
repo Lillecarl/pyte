@@ -23,6 +23,8 @@
   # only published list of the DEC national sets there is.
   xterm,
   testSources,
+  # The linter and formatter that the `ruff` check runs.
+  ruff,
 }:
 let
   inherit (callPackage ./suite.nix { }) suite;
@@ -59,6 +61,18 @@ let
     export HOME="$TMPDIR"
     export LANG=C.UTF-8
     export PYTHONDONTWRITEBYTECODE=1
+  '';
+
+  # What the `ruff` check reads beside the tests: the package, its
+  # config, and the scripts around it. Kept out of `prepare` above
+  # on purpose -- a `pyte/` beside the tests shadows the installed
+  # package, and `test_the_entry_of_the_package_is_the_one_that_is_used`
+  # fails the suite that finds it. The `ruff` check never imports.
+  lintSources = ''
+    cp -r ${testSources}/pyte ${testSources}/examples .
+    cp ${testSources}/benchmark.py ${testSources}/pyproject.toml .
+    mkdir -p docs
+    cp ${testSources}/docs/conf.py docs/
   '';
 
   # `-displayfd` makes the server say which display it took, once it is
@@ -160,4 +174,30 @@ in
       export PYTE_GROUP=xterm
     '';
   } runPytest;
+
+  # The style of pyte, held by the linter and the formatter rather
+  # than by a run.
+  #
+  # `ruff check` holds the selected rules and `ruff format --check`
+  # holds the layout at width 120, both read from the `pyproject.toml`
+  # beside them. Neither can see the one thing the lazy annotations
+  # rest on -- the presence of `from __future__ import annotations`
+  # in every file -- so a grep holds that: UP037 unquotes only where
+  # the import made the annotation lazy, and stays silent without it.
+  # `ruff.toml` beside the umbrella says what each rule is for.
+  ruff = suite {
+    name = "pyte-ruff";
+    inputs = [ ruff ];
+    setup = prepare + lintSources;
+  } ''
+    export RUFF_CACHE_DIR="$TMPDIR/ruff"
+    ruff check pyte tests tools examples benchmark.py docs
+    ruff format --check pyte tests tools examples benchmark.py docs
+    missing=$(grep -rL '^from __future__ import annotations' --include='*.py' --exclude-dir='.*' --exclude-dir='__pycache__' pyte tests tools examples benchmark.py docs || true)
+    if [ -n "$missing" ]; then
+      echo "files without the future import:"
+      echo "$missing"
+      exit 1
+    fi
+  '';
 }
