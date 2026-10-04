@@ -763,10 +763,7 @@ class ByteStream(Stream):
         self.utf8_decoder = codecs.getincrementaldecoder("utf-8")("replace")
 
     def feed(self, data: bytes) -> None:  # type: ignore[override]
-        if self.use_utf8:
-            data_str = self.utf8_decoder.decode(data)
-        else:
-            data_str = "".join(map(chr, data))
+        data_str = self.utf8_decoder.decode(data) if self.use_utf8 else "".join(map(chr, data))
 
         super().feed(data_str)
 

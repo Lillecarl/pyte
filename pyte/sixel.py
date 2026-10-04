@@ -159,10 +159,7 @@ class _Canvas:
         `background` fills the pixels that the body never wrote. `None`
         leaves them transparent.
         """
-        if background is None:
-            empty = _pack(0, 0, 0, 0)
-        else:
-            empty = _pack(background[0], background[1], background[2], 255)
+        empty = _pack(0, 0, 0, 0) if background is None else _pack(background[0], background[1], background[2], 255)
 
         lookup = array("I", [empty])
         lookup.extend(_pack(r, g, b, 255) for r, g, b in palette)

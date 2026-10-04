@@ -834,10 +834,7 @@ def _uvy_to_hvc(u_prime: float, v_prime: float, cap_y: float) -> Hvc:
     while theta >= high:
         theta -= _QUADRANT
 
-    if cap_y < _LOW_Y:
-        value = cap_y * _LIGHTNESS_SLOPE
-    else:
-        value = _cube_root(cap_y) * 116.0 - 16.0
+    value = cap_y * _LIGHTNESS_SLOPE if cap_y < _LOW_Y else _cube_root(cap_y) * 116.0 - 16.0
     chroma = value * _CHROMA_SCALE * _square_root(u * u + v * v)
     if chroma < 0.0:
         theta = 0.0

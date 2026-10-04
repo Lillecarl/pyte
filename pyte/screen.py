@@ -3258,14 +3258,11 @@ class Screen:
         # (Following code is faster than calling `self.ensure_bounds`.)
         top, bottom = margins
         row = cursor_position.y - self.line_offset
-        if row < top or row > bottom:
-            # Outside the region the bottom of the screen stops the
-            # cursor, not the margin. Below the region the margin would
-            # move the cursor up, which a move down never does. Above
-            # the region it would stop the cursor too early.
-            limit = self.lines - 1
-        else:
-            limit = bottom
+        # Outside the region the bottom of the screen stops the
+        # cursor, not the margin. Below the region the margin would
+        # move the cursor up, which a move down never does. Above
+        # the region it would stop the cursor too early.
+        limit = self.lines - 1 if row < top or row > bottom else bottom
         cursor_position.y = min(cursor_position.y + (count or 1), limit + self.line_offset)
 
         self.max_y = max(self.max_y, cursor_position.y)
@@ -3572,10 +3569,7 @@ class Screen:
         cursor_position = self.pt_cursor_position
         _left, right = self.left_right
         # A cursor that waits to wrap stands on the column before it.
-        if self.pending_wrap:
-            column = cursor_position.x - 1
-        else:
-            column = min(cursor_position.x, self.columns - 1)
+        column = cursor_position.x - 1 if self.pending_wrap else min(cursor_position.x, self.columns - 1)
 
         if column == right:
             top, bottom = self.margins or Margins(0, self.lines - 1)
@@ -4215,10 +4209,7 @@ class Screen:
 
         replace: dict[str, object] = {}
 
-        if not attrs_tuple:
-            attrs = [0]
-        else:
-            attrs = list(attrs_tuple[::-1])
+        attrs = [0] if not attrs_tuple else list(attrs_tuple[::-1])
 
         while attrs:
             attr = attrs.pop()
@@ -4682,14 +4673,11 @@ class Screen:
             known = (
                 number in self._known_private_modes or number in self._remembered_private_modes
             ) and self._embedder_carries(number)
-            if number == PrivateMode.CURSOR_BLINK:
-                # DECSCUSR writes this one as well, and the alternate
-                # screen carries a `mode` of its own. So the answer
-                # comes from the shape, which is the one value that
-                # both sequences write.
-                enabled = self.cursor_blinks
-            else:
-                enabled = flag_of(number) in self.mode
+            # DECSCUSR writes this one as well, and the alternate
+            # screen carries a `mode` of its own. So the answer
+            # comes from the shape, which is the one value that
+            # both sequences write.
+            enabled = self.cursor_blinks if number == PrivateMode.CURSOR_BLINK else flag_of(number) in self.mode
         else:
             permanent = number in self._permanently_reset_ansi_modes
             known = number in self._known_ansi_modes or number in self._remembered_ansi_modes
