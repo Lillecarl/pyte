@@ -37,8 +37,8 @@ from .escape import SM as _SM
 from .modes import AnsiMode, PrivateMode
 
 __all__ = (
-    "Escape",
     "Csi",
+    "Escape",
     "Sharp",
     "Terminator",
     "announce",

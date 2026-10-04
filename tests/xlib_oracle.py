@@ -22,7 +22,7 @@ from __future__ import annotations
 import ctypes
 import os
 
-__all__ = ["xlib_is_available", "xlib_color"]
+__all__ = ["xlib_color", "xlib_is_available"]
 
 
 class _XColor(ctypes.Structure):

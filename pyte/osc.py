@@ -32,6 +32,7 @@ from typing import NamedTuple
 from .colors import DEFAULT_COLORS, PALETTE, Color, parse_color
 
 __all__ = [
+    "COLOR_BASE",
     "DYNAMIC_COLOR_CODES",
     "DYNAMIC_COLOR_RESET_OFFSET",
     "FIRST_SPECIAL_COLOR",
@@ -43,7 +44,6 @@ __all__ = [
     "POINTER_SHAPE_ALIASES",
     "QUERY",
     "SPECIAL_COLOR_NAMES",
-    "COLOR_BASE",
     "ColorBase",
     "ColorOverrides",
     "Osc",

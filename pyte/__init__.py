@@ -46,7 +46,7 @@ from __future__ import annotations
 
 __version__ = "0.8.3.dev"
 
-__all__ = ("Screen", "Stream", "ByteStream", "DebugScreen", "GroundTimer")
+__all__ = ("ByteStream", "DebugScreen", "GroundTimer", "Screen", "Stream")
 
 from .debug import DebugScreen
 from .screen import Screen

@@ -27,10 +27,10 @@ from .xcms import SPACES, intensity_to_value, screen_rgb
 __all__ = [
     "COLOR_OF_A_BACKGROUND",
     "COLOR_OF_A_FOREGROUND",
-    "Color",
     "DEFAULT_COLOR",
     "DEFAULT_COLORS",
     "PALETTE",
+    "Color",
     "SgrColor",
     "parse_color",
     "sgr_code_of",
