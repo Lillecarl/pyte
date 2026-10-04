@@ -29,7 +29,7 @@ if __name__ == "__main__":
 
     p_pid, master_fd = pty.fork()
     if p_pid == 0:  # Child.
-        os.execvpe(sys.argv[1], sys.argv[1:], env=dict(TERM="linux", COLUMNS="80", LINES="24"))
+        os.execvpe(sys.argv[1], sys.argv[1:], env={"TERM": "linux", "COLUMNS": "80", "LINES": "24"})
 
     while True:
         try:

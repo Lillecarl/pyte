@@ -26,7 +26,7 @@ if __name__ == "__main__":
     p_pid, master_fd = pty.fork()
     if p_pid == 0:  # Child.
         env = os.environ.copy()
-        env.update(dict(TERM="linux", COLUMNS="80", LINES="24"))
+        env.update({"TERM": "linux", "COLUMNS": "80", "LINES": "24"})
         os.execvpe(argv[0], argv, env=env)
 
     with open(output_path, "wb") as handle:

@@ -169,7 +169,7 @@ def test_reset_clears_stack():
 
 def test_stack_size_is_limited():
     screen, stream, responses = make_screen()
-    for i in range(keys.MAX_FLAGS_STACK + 10):
+    for _i in range(keys.MAX_FLAGS_STACK + 10):
         stream.feed("\x1b[>1u")
     assert len(screen.kitty_flags_stack) == keys.MAX_FLAGS_STACK
 

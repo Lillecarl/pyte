@@ -111,12 +111,12 @@ class TerminalEmulator(App):
         pid, fd = pty.fork()
         if pid == 0:
             argv = shlex.split("bash")
-            env = dict(
-                TERM="linux",
-                LC_ALL="en_GB.UTF-8",
-                COLUMNS=str(self.ncol),
-                LINES=str(self.nrow),
-            )
+            env = {
+                "TERM": "linux",
+                "LC_ALL": "en_GB.UTF-8",
+                "COLUMNS": str(self.ncol),
+                "LINES": str(self.nrow),
+            }
             os.execvpe(argv[0], argv, env)
         return fd
 
