@@ -22,8 +22,8 @@ one of those wrong is a passing test that asserts the wrong thing.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from enum import StrEnum
-from typing import Iterable, Sequence
 
 from .control import BEL as _BEL
 from .control import CSI as _CSI

@@ -58,8 +58,9 @@ pane sees what a real kitty gives it.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from enum import IntEnum, IntFlag
-from typing import NamedTuple, Sequence
+from typing import NamedTuple
 
 __all__ = [
     "translate_key_data",

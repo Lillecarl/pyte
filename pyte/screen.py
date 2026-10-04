@@ -20,11 +20,7 @@ different, and is now simply what this package does:
 from __future__ import annotations
 
 from collections import namedtuple
-from typing import (
-    Callable,
-    Iterable,
-    Sequence,
-)
+from collections.abc import Callable, Iterable, Sequence
 
 from . import charsets as cs
 from . import keys

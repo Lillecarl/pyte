@@ -6,7 +6,8 @@ thousand.
 from __future__ import annotations
 
 from collections import deque
-from typing import Callable, Hashable, TypeVar
+from collections.abc import Callable, Hashable
+from typing import TypeVar
 
 __all__ = ("FastDictCache",)
 

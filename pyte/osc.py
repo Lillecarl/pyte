@@ -25,8 +25,9 @@ Lillecarl/pymux#129.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from enum import StrEnum
-from typing import Mapping, NamedTuple, Sequence
+from typing import NamedTuple
 
 from .colors import DEFAULT_COLORS, PALETTE, Color, parse_color
 

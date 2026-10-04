@@ -31,7 +31,7 @@ a cell imports it, and `tests/test_the_layers.py` says so.
 from __future__ import annotations
 
 import os
-from typing import MutableMapping
+from collections.abc import MutableMapping
 
 from .terminfo import PARENT, TERMINAL_NAME
 

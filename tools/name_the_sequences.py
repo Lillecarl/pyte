@@ -50,8 +50,9 @@ import difflib
 import re
 import sys
 from collections import Counter
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator, NamedTuple
+from typing import NamedTuple
 
 REPOSITORY = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPOSITORY / "pyte"))
