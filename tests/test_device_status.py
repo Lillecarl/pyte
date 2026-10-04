@@ -30,7 +30,7 @@ def _screen(lines=8, columns=20):
 
 
 @pytest.mark.parametrize(
-    "query, answer",
+    ("query", "answer"),
     [
         # DSRPrinterPort: no printer.
         (csi(escape.DSR, 15, private="?"), csi(escape.DSR, 13, private="?")),

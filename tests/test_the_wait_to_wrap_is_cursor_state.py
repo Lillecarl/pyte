@@ -92,7 +92,7 @@ PAIRS = [
 ]
 
 
-@pytest.mark.parametrize("save, restore", PAIRS)
+@pytest.mark.parametrize(("save", "restore"), PAIRS)
 def test_a_save_and_a_restore_bring_the_wait_back(save, restore):
     """
     The cursor moves away between the two, so the restore has to put
@@ -104,7 +104,7 @@ def test_a_save_and_a_restore_bring_the_wait_back(save, restore):
     assert _where(screen, "b") == (1, 0)
 
 
-@pytest.mark.parametrize("save, restore", PAIRS)
+@pytest.mark.parametrize(("save", "restore"), PAIRS)
 def test_a_save_and_a_restore_with_no_move_change_nothing(save, restore):
     """
     The case that is hard to argue about: with nothing in between, a

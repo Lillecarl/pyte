@@ -444,7 +444,7 @@ def test_the_two_ansi_modes_that_are_kept_report_one_or_two():
 
 
 @pytest.mark.parametrize(
-    "sequence, name, answer",
+    ("sequence", "name", "answer"),
     [
         # DECSACE: what DECCARA and DECRARA reach. Zero and one both
         # name the stream, and the answer gives back the one it was

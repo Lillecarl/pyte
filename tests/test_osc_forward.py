@@ -40,7 +40,7 @@ def feed(stream, code, param):
 
 
 @pytest.mark.parametrize(
-    "code,param",
+    ("code", "param"),
     [
         ("52", "c;aGVsbG8="),  # Set the clipboard.
         ("52", "p;"),  # Clear the primary selection.
@@ -86,7 +86,7 @@ def test_a_clipboard_write_that_looks_like_a_query_still_leaves():
 
 
 @pytest.mark.parametrize(
-    "code,param",
+    ("code", "param"),
     [
         ("4", "1;?"),  # A palette query: the pane answers it.
         ("11", "?"),  # A background query: the pane answers it.

@@ -24,7 +24,7 @@ from pyte.colors import Color, sgr_color, sgr_color_parameters
 
 #: How many parameters each form takes, counting the "38" itself.
 @pytest.mark.parametrize(
-    "parameters, count",
+    ("parameters", "count"),
     [
         ([38, 5, 200], 3),
         ([38, 2, 1, 2, 3], 5),

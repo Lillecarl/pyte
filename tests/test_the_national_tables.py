@@ -20,7 +20,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-@pytest.mark.parametrize("name, macro", sorted(xterm_tables.MACROS.items()))
+@pytest.mark.parametrize(("name", "macro"), sorted(xterm_tables.MACROS.items()))
 def test_a_table_is_what_xterm_has(name, macro):
     ours = cs.TECHNICAL if name == ">" else cs.NATIONAL[name]
     assert ours == xterm_tables.table_of(macro)

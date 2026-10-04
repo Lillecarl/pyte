@@ -80,7 +80,7 @@ def test_a_pane_in_the_legacy_encoding_reads_these_whole(event):
 
 
 @pytest.mark.parametrize(
-    "event,lost,reason",
+    ("event", "lost", "reason"),
     [
         (
             KeyEvent(ord("a"), Modifier.SUPER, "u"),

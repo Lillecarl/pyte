@@ -39,7 +39,7 @@ def pane():
 
 
 @pytest.mark.parametrize(
-    "spec, color",
+    ("spec", "color"),
     [
         # A hash spec pads each component with zeros on the right. "#fff"
         # is 0xf000 and not 0xffff, which is the trap in this form.
@@ -62,7 +62,7 @@ def test_a_spec_reads_as_the_colour_it_names(spec, color):
 
 
 @pytest.mark.parametrize(
-    "spec, color",
+    ("spec", "color"),
     [
         # "rgbi:" names light and not values, and a display does not
         # answer a request for light in a straight line. The three
@@ -79,7 +79,7 @@ def test_an_intensity_spec_reads_through_the_xcms_tables(spec, color):
 
 
 @pytest.mark.parametrize(
-    "spec, color",
+    ("spec", "color"),
     [
         # The six spaces of CIE, checked against what xterm answers. Every
         # one of these goes through the screen description of Xcms, so a
@@ -99,7 +99,7 @@ def test_a_cie_spec_reads_the_way_xterm_reads_it(spec, color):
 
 
 @pytest.mark.parametrize(
-    "spec,color",
+    ("spec", "color"),
     [
         # A screen shows only part of what the eye sees, and these fall
         # outside it. Xcms answers them by pulling the colour in, keeping

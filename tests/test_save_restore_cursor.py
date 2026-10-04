@@ -44,14 +44,14 @@ def _position(screen):
     return screen.pt_cursor_position.x, screen.pt_cursor_position.y
 
 
-@pytest.mark.parametrize("save, restore", PAIRS)
+@pytest.mark.parametrize(("save", "restore"), PAIRS)
 def test_a_restore_brings_the_place_back(save, restore):
     screen, stream = _screen()
     stream.feed(csi(escape.CUP, 3, 5) + save + csi(escape.CUP, 1, 1) + restore)
     assert _position(screen) == (4, 2)
 
 
-@pytest.mark.parametrize("save, restore", PAIRS)
+@pytest.mark.parametrize(("save", "restore"), PAIRS)
 def test_a_restore_brings_the_rendition_back(save, restore):
     screen, stream = _screen()
     stream.feed(csi(escape.SGR, 31) + save + csi(escape.SGR, 0) + restore + "x")
@@ -59,7 +59,7 @@ def test_a_restore_brings_the_rendition_back(save, restore):
     assert cell.appearance.rendition.color == SgrColor(index=1)
 
 
-@pytest.mark.parametrize("save, restore", PAIRS)
+@pytest.mark.parametrize(("save", "restore"), PAIRS)
 def test_a_restore_brings_the_mark_of_decsca_back(save, restore):
     screen, stream = _screen()
     stream.feed(csi(Csi.DECSCA, 1) + save + csi(Csi.DECSCA, 0) + restore)
@@ -110,7 +110,7 @@ def test_a_plain_csi_u_is_not_the_keyboard_protocol():
     assert screen.kitty_keyboard_flags == 0
 
 
-@pytest.mark.parametrize("save, restore", PAIRS)
+@pytest.mark.parametrize(("save", "restore"), PAIRS)
 def test_a_restore_takes_origin_mode_off_again(save, restore):
     """
     Origin mode comes back the way it was saved, both ways.
@@ -124,7 +124,7 @@ def test_a_restore_takes_origin_mode_off_again(save, restore):
     assert screen.data_buffer[0][0].char == "X"
 
 
-@pytest.mark.parametrize("save, restore", PAIRS)
+@pytest.mark.parametrize(("save", "restore"), PAIRS)
 def test_a_restore_leaves_the_wrap_alone(save, restore):
     """
     DECAWM is not part of the saved cursor.
@@ -187,7 +187,7 @@ def test_the_mode_that_saves_the_cursor_leaves_it_where_it_stands():
     assert (screen.pt_cursor_position.y, screen.pt_cursor_position.x) == (1, 2)
 
 
-@pytest.mark.parametrize("save, restore", PAIRS)
+@pytest.mark.parametrize(("save", "restore"), PAIRS)
 def test_a_reset_forgets_the_saved_cursor(save, restore):
     """
     RIS ("ESC c") is the power-up state, and a terminal that has just
@@ -204,7 +204,7 @@ def test_a_reset_forgets_the_saved_cursor(save, restore):
     assert _position(screen) == (0, 0)
 
 
-@pytest.mark.parametrize("save, restore", PAIRS)
+@pytest.mark.parametrize(("save", "restore"), PAIRS)
 def test_a_soft_reset_forgets_it_too(save, restore):
     "DECSTR is the weaker reset, and it has always emptied the list."
     screen, stream = _screen()

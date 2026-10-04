@@ -41,7 +41,7 @@ def _drawn(sequence, columns=20):
     return "".join((line[column].char or " ") for column in range(columns)).rstrip()
 
 
-@pytest.mark.parametrize("designator, slot", sorted(Screen.SLOTS.items(), key=lambda pair: pair[1]))
+@pytest.mark.parametrize(("designator", "slot"), sorted(Screen.SLOTS.items(), key=lambda pair: pair[1]))
 def test_each_designator_names_its_own_slot(designator, slot):
     screen, stream = _screen()
     stream.feed("\x1b%s0" % (designator,))

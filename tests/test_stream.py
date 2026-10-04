@@ -243,7 +243,7 @@ def test_control_characters():
 
 
 @pytest.mark.parametrize(
-    "osc,st",
+    ("osc", "st"),
     [
         (ctrl.OSC_C0, ctrl.ST_C0),
         (ctrl.OSC_C0, ctrl.ST_C1),
@@ -382,7 +382,7 @@ def test_an_unknown_announcer_is_eaten_as_well():
 
 
 @pytest.mark.parametrize(
-    "input,expected",
+    ("input", "expected"),
     [
         (b"foo", [["draw", ["foo"], {}]]),
         (
@@ -447,7 +447,7 @@ def test_byte_stream_define_charset_unknown():
     assert screen.g_charsets[0] == default_g0_charset
 
 
-@pytest.mark.parametrize("charset,mapping", cs.MAPS.items())
+@pytest.mark.parametrize(("charset", "mapping"), cs.MAPS.items())
 def test_byte_stream_define_charset(charset, mapping):
     screen = a_screen(3, 3)
     stream = pyte.ByteStream(screen)

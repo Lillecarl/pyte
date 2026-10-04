@@ -160,7 +160,7 @@ def test_a_plain_cell_has_nothing_to_say():
 
 
 @pytest.mark.parametrize(
-    "fields, expected",
+    ("fields", "expected"),
     [
         ({"bold": True}, "pyte-bold"),
         ({"italic": True}, "pyte-italic"),
@@ -189,7 +189,7 @@ def test_underline_and_strike_are_one_class_and_not_two():
 
 
 @pytest.mark.parametrize(
-    "shape, drawn",
+    ("shape", "drawn"),
     [("double", "double"), ("curly", "wavy"), ("dotted", "dotted"), ("dashed", "dashed")],
 )
 def test_the_shape_of_an_underline_is_a_class(shape, drawn):

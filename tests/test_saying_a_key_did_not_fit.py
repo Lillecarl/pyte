@@ -34,7 +34,7 @@ def said_about(data: str, flags: int = 0, **kw) -> list:
 
 
 @pytest.mark.parametrize(
-    "data,lost",
+    ("data", "lost"),
     [
         # super+a, from a terminal that speaks the protocol.
         ("\x1b[97;9u", Modifier.SUPER),

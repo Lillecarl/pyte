@@ -87,7 +87,7 @@ def test_g1_takes_a_national_set_too():
     assert _drawn("\x1b)A\x0e#\x0f#") == "£#"
 
 
-@pytest.mark.parametrize("alias, name", sorted(cs.NATIONAL_ALIASES.items()))
+@pytest.mark.parametrize(("alias", "name"), sorted(cs.NATIONAL_ALIASES.items()))
 def test_every_alias_names_the_same_table(alias, name):
     "DEC gave several of these two or three names over the models."
     assert cs.MAPS[alias] is cs.MAPS[name]
