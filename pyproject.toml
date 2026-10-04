@@ -28,7 +28,7 @@ dynamic = ["version"]
 description = "Simple VTXXX-compatible terminal emulator."
 readme = "README.rst"
 license = "LGPL-3.0-only"
-requires-python = ">=3.10"
+requires-python = ">=3.14"
 authors = [
     { name = "Sergei Lebedev", email = "superbobry@gmail.com" },
 ]
@@ -44,10 +44,7 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Terminals :: Terminal Emulators/X Terminals",
 ]
 dependencies = [
@@ -78,9 +75,8 @@ Homepage = "https://github.com/selectel/pyte"
 # sees only this tree, so discovery from a file under it must end
 # here. Keep the two in step; the why lives up there.
 #
-# The floor here is 3.10, not the umbrella's 3.14: the same rules,
-# applied for what this interpreter runs.
-target-version = "py310"
+# The floor is 3.14, like the umbrella's.
+target-version = "py314"
 # Pinned: a ruff upgrade must never silently reflow the tree.
 line-length = 120
 

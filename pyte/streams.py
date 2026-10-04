@@ -70,7 +70,7 @@ def fit_parameters(handler: Callable[..., None]) -> Callable[..., None]:
     """
     try:
         signature = inspect.signature(handler)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return handler
 
     defaults: list[Any] = []

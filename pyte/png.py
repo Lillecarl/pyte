@@ -171,7 +171,7 @@ def decode_png(data: bytes) -> tuple[int, int, bytes] | None:
     try:
         raw = zlib.decompress(bytes(compressed))
         samples = _unfilter(raw, height, stride, bytes_per_pixel)
-    except (zlib.error, ValueError):
+    except zlib.error, ValueError:
         return None
 
     scale = 255 // ((1 << depth) - 1) if depth < 8 else 1

@@ -105,7 +105,7 @@ async def websocket_handler(request):
                     p_out.write(msg.data.encode())
             elif msg.type == aiohttp.WSMsgType.ERROR:
                 raise ws.exception()
-    except (asyncio.CancelledError, OSError):  # Process died?
+    except asyncio.CancelledError, OSError:  # Process died?
         pass
     finally:
         loop.remove_reader(p_out)
