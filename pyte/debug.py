@@ -101,7 +101,6 @@ class DebugScreen:
     def __getattribute__(self, attr: str) -> Callable[..., None]:
         if attr not in Stream.events:
             return super().__getattribute__(attr)  # type: ignore[no-any-return]
-        elif not self.only or attr in self.only:
+        if not self.only or attr in self.only:
             return self.only_wrapper(attr)
-        else:
-            return lambda *args, **kwargs: None
+        return lambda *args, **kwargs: None
