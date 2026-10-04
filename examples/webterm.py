@@ -26,6 +26,7 @@ Client-side ``webterm.js`` supports
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import pty
@@ -126,10 +127,8 @@ async def on_shutdown(app):
     is_shutting_down = True
     for task in app["websockets"]:
         task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await task
-        except asyncio.CancelledError:
-            pass
 
 
 if __name__ == "__main__":
