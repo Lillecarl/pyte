@@ -11,10 +11,12 @@ goes to `resize_func` and the embedder decides. With no embedder the
 ask goes nowhere.
 """
 
+from __future__ import annotations
+
 from pyte.images import ASSUMED_CELL_HEIGHT, ASSUMED_CELL_WIDTH
 from pyte.screen import Screen
-from pyte.streams import Stream
 from pyte.sequences import Csi, csi
+from pyte.streams import Stream
 
 
 def _screen(lines=24, columns=80):
@@ -112,9 +114,7 @@ def test_the_room_in_cells_is_the_size_of_the_pane():
 
 
 def test_the_room_in_pixels_is_the_size_of_the_pane():
-    assert _answers(csi(Csi.XTWINOPS, 15)) == [
-        "\x1b[5;%i;%it" % (25 * ASSUMED_CELL_HEIGHT, 80 * ASSUMED_CELL_WIDTH)
-    ]
+    assert _answers(csi(Csi.XTWINOPS, 15)) == ["\x1b[5;%i;%it" % (25 * ASSUMED_CELL_HEIGHT, 80 * ASSUMED_CELL_WIDTH)]
 
 
 def test_the_room_and_the_text_area_agree():

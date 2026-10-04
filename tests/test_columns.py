@@ -7,12 +7,13 @@ margin. All four carry a rectangle: every row of the region moves, and
 the cells outside the margins stay where they are.
 """
 
-from pyte.screen import Screen
-from pyte.streams import Stream
+from __future__ import annotations
+
 from pyte import escape
-from pyte.sequences import Csi, Escape, csi, esc
 from pyte.modes import PrivateMode
-from pyte.sequences import set_mode
+from pyte.screen import Screen
+from pyte.sequences import Csi, Escape, csi, esc, set_mode
+from pyte.streams import Stream
 
 
 def _screen(lines=5, columns=10):
@@ -24,8 +25,7 @@ def _screen(lines=5, columns=10):
 def _line(screen, row):
     buffer = screen.data_buffer[row + screen.line_offset]
     return "".join(
-        (buffer[column].char or " ") if column in buffer else " "
-        for column in range(screen.columns)
+        (buffer[column].char or " ") if column in buffer else " " for column in range(screen.columns)
     ).rstrip()
 
 
@@ -71,10 +71,7 @@ def test_an_insert_of_columns_stops_at_the_right_margin():
     screen, stream = _screen()
     _grid(stream)
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 2, 5)
-        + csi(escape.CUP, 1, 3)
-        + csi(Csi.DECIC)
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 2, 5) + csi(escape.CUP, 1, 3) + csi(Csi.DECIC)
     )
     assert _lines(screen) == ["ab cd", "fg hi", "kl mn", "pq rs", "uv wx"]
 
@@ -83,10 +80,7 @@ def test_an_insert_of_columns_outside_the_margins_does_nothing():
     screen, stream = _screen()
     _grid(stream)
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 2, 5)
-        + csi(escape.CUP, 1, 1)
-        + csi(Csi.DECIC, 10)
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 2, 5) + csi(escape.CUP, 1, 1) + csi(Csi.DECIC, 10)
     )
     assert _lines(screen) == GRID
 
@@ -109,10 +103,7 @@ def test_a_delete_of_columns_stops_at_the_right_margin():
     screen, stream = _screen()
     _grid(stream)
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 2, 5)
-        + csi(escape.CUP, 1, 3)
-        + csi(Csi.DECDC)
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 2, 5) + csi(escape.CUP, 1, 3) + csi(Csi.DECDC)
     )
     assert _lines(screen) == ["abde", "fgij", "klno", "pqst", "uvxy"]
 
@@ -121,10 +112,7 @@ def test_a_delete_of_columns_outside_the_margins_does_nothing():
     screen, stream = _screen()
     _grid(stream)
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 2, 5)
-        + csi(escape.CUP, 1, 1)
-        + csi(Csi.DECDC, 10)
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 2, 5) + csi(escape.CUP, 1, 1) + csi(Csi.DECDC, 10)
     )
     assert _lines(screen) == GRID
 
@@ -176,9 +164,7 @@ def test_a_back_index_at_the_left_margin_moves_the_region():
 def test_a_forward_index_at_the_last_column_moves_the_screen():
     "Without margins the last column is the right margin."
     screen, stream = _screen()
-    stream.feed(
-        csi(escape.CUP, 1, 10) + "x" + csi(escape.CUP, 1, 10) + esc(Escape.DECFI)
-    )
+    stream.feed(csi(escape.CUP, 1, 10) + "x" + csi(escape.CUP, 1, 10) + esc(Escape.DECFI))
     assert _line(screen, 0) == "        x"
 
 
@@ -192,10 +178,7 @@ def test_a_forward_index_right_of_the_margin_moves_the_cursor():
     "DEC STD 070 lets the cursor move while it stands outside."
     screen, stream = _screen()
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 3, 5)
-        + csi(escape.CUP, 1, 6)
-        + esc(Escape.DECFI)
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 3, 5) + csi(escape.CUP, 1, 6) + esc(Escape.DECFI)
     )
     assert screen.pt_cursor_position.x == 6
 
@@ -203,9 +186,6 @@ def test_a_forward_index_right_of_the_margin_moves_the_cursor():
 def test_a_back_index_left_of_the_margin_moves_the_cursor():
     screen, stream = _screen()
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 3, 5)
-        + csi(escape.CUP, 1, 2)
-        + esc(Escape.DECBI)
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 3, 5) + csi(escape.CUP, 1, 2) + esc(Escape.DECBI)
     )
     assert screen.pt_cursor_position.x == 0

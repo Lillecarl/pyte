@@ -9,14 +9,14 @@ The check starts an Xvfb for this. Without one the tests skip, and the
 build says so, because a judge that cannot run proves nothing.
 """
 
-import pytest
+from __future__ import annotations
 
-from pyte.colors import parse_color
+import pytest
 from xlib_oracle import xlib_color, xlib_is_available
 
-pytestmark = pytest.mark.skipif(
-    not xlib_is_available(), reason="PYTE_LIBX11 names no display"
-)
+from pyte.colors import parse_color
+
+pytestmark = pytest.mark.skipif(not xlib_is_available(), reason="PYTE_LIBX11 names no display")
 
 
 #: The forms that `XParseColor` reads itself, before Xcms sees

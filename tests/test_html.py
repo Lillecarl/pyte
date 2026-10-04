@@ -10,8 +10,9 @@ text and the style of each piece, which is what a person looking at the
 page would see. Lillecarl/pymux#452.
 """
 
+from __future__ import annotations
+
 from html.parser import HTMLParser
-from typing import List, Tuple
 
 import pytest
 
@@ -19,10 +20,10 @@ from pyte.cells import PLAIN, Rendition, appearance_of
 from pyte.colors import PALETTE, Color, SgrColor
 from pyte.html import (
     CSS,
-    Drawn,
     SAFE_SCHEMES,
     SCREEN_CLASS,
     THEMED,
+    Drawn,
     color_value,
     href_of,
     html_of_page,
@@ -51,15 +52,13 @@ class _Read(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         #: (text, drawn, href) for each piece, in order.
-        self.pieces: List[Tuple[str, Drawn, str]] = []
-        self._styles: List[Drawn] = []
-        self._hrefs: List[str] = []
+        self.pieces: list[tuple[str, Drawn, str]] = []
+        self._styles: list[Drawn] = []
+        self._hrefs: list[str] = []
 
     def handle_starttag(self, tag, attrs):
         held = dict(attrs)
-        self._styles.append(
-            Drawn(held.get("class") or "", held.get("style") or "")
-        )
+        self._styles.append(Drawn(held.get("class") or "", held.get("style") or ""))
         self._hrefs.append(held.get("href") or "")
 
     def handle_endtag(self, tag):
@@ -142,7 +141,7 @@ def test_the_colour_of_the_terminal_is_the_property_of_its_slot():
 # One appearance.
 
 
-def _style(**fields) -> "Drawn":
+def _style(**fields) -> Drawn:
     return style_of(appearance_of[Rendition(**fields), "", ""], False)
 
 
@@ -225,17 +224,13 @@ def test_a_hidden_cell_keeps_its_background():
 
 
 def test_the_colour_of_an_underline_stays_in_the_attribute():
-    drawn = _style(
-        underline=True, underline_color=SgrColor(rgb=Color(0xFF, 0x00, 0x00))
-    )
+    drawn = _style(underline=True, underline_color=SgrColor(rgb=Color(0xFF, 0x00, 0x00)))
     assert "text-decoration-color:#ff0000" in drawn.style
 
 
 def test_an_underline_colour_nobody_draws_is_left_out():
     "It would travel with every cell for a line that is not there."
-    assert "text-decoration-color" not in _style(
-        underline_color=SgrColor(rgb=Color(0xFF, 0x00, 0x00))
-    ).style
+    assert "text-decoration-color" not in _style(underline_color=SgrColor(rgb=Color(0xFF, 0x00, 0x00))).style
 
 
 def test_a_themed_colour_is_a_class():
@@ -311,10 +306,7 @@ def test_every_class_a_cell_can_take_has_a_rule():
         {"baseline": "superscript"},
         {"baseline": "subscript"},
     ]
-    ways += [
-        {"underline": True, "underline_style": shape}
-        for shape in ("double", "curly", "dotted", "dashed")
-    ]
+    ways += [{"underline": True, "underline_style": shape} for shape in ("double", "curly", "dotted", "dashed")]
     ways += [{"color": SgrColor(index=index)} for index in range(THEMED)]
     ways += [{"bgcolor": SgrColor(index=index)} for index in range(THEMED)]
 
@@ -432,7 +424,7 @@ def test_reading_a_page_makes_no_rows():
 # What a program writes into the document.
 
 
-@pytest.mark.parametrize("dangerous", ["<script>", "&", "\"", "'", "</span>"])
+@pytest.mark.parametrize("dangerous", ["<script>", "&", '"', "'", "</span>"])
 def test_what_a_program_writes_cannot_become_markup(dangerous):
     "Every character of a cell came from a program, so all of it is escaped."
     screen = _screen(2, 40, dangerous)
@@ -506,10 +498,7 @@ def _runs(text: str, columns: int = 20, reverse_video: bool = False):
     "The runs of the first row, as (text, style) pairs."
     screen = _screen(3, columns, text)
     row = screen.page.data_buffer[0]
-    return [
-        (run, style_of(appearance, reverse_video))
-        for appearance, run in runs_of_row(row, columns, reverse_video)
-    ]
+    return [(run, style_of(appearance, reverse_video)) for appearance, run in runs_of_row(row, columns, reverse_video)]
 
 
 def test_cells_that_draw_alike_are_one_run():
@@ -554,9 +543,7 @@ def test_the_markup_is_built_from_the_runs():
 
 
 def test_a_scheme_that_is_allowed_comes_back_escaped():
-    assert href_of("https://example.com/?a=1&b=2") == (
-        "https://example.com/?a=1&amp;b=2"
-    )
+    assert href_of("https://example.com/?a=1&b=2") == ("https://example.com/?a=1&amp;b=2")
 
 
 @pytest.mark.parametrize(

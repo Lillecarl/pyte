@@ -30,18 +30,20 @@ import warnings
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
-from . import control as ctrl, escape as esc
+from . import control as ctrl
+from . import escape as esc
 from .sequences import Csi, Escape
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Mapping
     from typing import Any
+
     from .screen import Screen as Screen
 
     ParserGenerator = Generator[bool | None, str, None]
 
 
-def fit_parameters(handler: "Callable[..., None]") -> "Callable[..., None]":
+def fit_parameters(handler: Callable[..., None]) -> Callable[..., None]:
     """
     A handler that gets the parameters it can take, with its defaults.
 
@@ -71,7 +73,7 @@ def fit_parameters(handler: "Callable[..., None]") -> "Callable[..., None]":
     except (TypeError, ValueError):
         return handler
 
-    defaults: "list[Any]" = []
+    defaults: list[Any] = []
     for parameter in signature.parameters.values():
         if parameter.kind is parameter.VAR_POSITIONAL:
             return handler  # It takes as many as arrive.
@@ -79,25 +81,19 @@ def fit_parameters(handler: "Callable[..., None]") -> "Callable[..., None]":
             parameter.POSITIONAL_ONLY,
             parameter.POSITIONAL_OR_KEYWORD,
         ):
-            defaults.append(
-                None if parameter.default is parameter.empty else parameter.default
-            )
+            defaults.append(None if parameter.default is parameter.empty else parameter.default)
 
     count = len(defaults)
 
     takes_private = "private" in signature.parameters or any(
-        parameter.kind is parameter.VAR_KEYWORD
-        for parameter in signature.parameters.values()
+        parameter.kind is parameter.VAR_KEYWORD for parameter in signature.parameters.values()
     )
 
-    def call(*params: "Any", **kwargs: "Any") -> None:
+    def call(*params: Any, **kwargs: Any) -> None:
         if not takes_private:
             kwargs.pop("private", None)
         handler(
-            *(
-                defaults[index] if value is None else value
-                for index, value in enumerate(params[:count])
-            ),
+            *(defaults[index] if value is None else value for index, value in enumerate(params[:count])),
             **kwargs,
         )
 
@@ -412,9 +408,7 @@ class Stream:
         OSC_C1 = ctrl.OSC_C1
         NUL_OR_DEL = ctrl.NUL + ctrl.DEL
         CAN_OR_SUB = ctrl.CAN + ctrl.SUB
-        ALLOWED_IN_CSI = "".join(
-            [ctrl.BEL, ctrl.BS, ctrl.HT, ctrl.LF, ctrl.VT, ctrl.FF, ctrl.CR]
-        )
+        ALLOWED_IN_CSI = "".join([ctrl.BEL, ctrl.BS, ctrl.HT, ctrl.LF, ctrl.VT, ctrl.FF, ctrl.CR])
         OSC_TERMINATORS = {ctrl.ST_C0, ctrl.ST_C1, ctrl.BEL}
         # Intermediate bytes of a CSI sequence. ECMA-48 gives them the
         # whole range 0x20 to 0x2f. They name the sequence together with
@@ -442,10 +436,7 @@ class Stream:
         # need the count trimmed and the defaults filled in.
         csi_dispatch = defaultdict(
             lambda: debug,
-            {
-                event: fit_parameters(handler)
-                for event, handler in create_dispatcher(self.csi).items()
-            },
+            {event: fit_parameters(handler) for event, handler in create_dispatcher(self.csi).items()},
         )
 
         # String sequences (APC/DCS) dispatch to optional screen

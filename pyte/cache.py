@@ -3,16 +3,18 @@ A cache for the small immutable objects that a screen makes by the
 thousand.
 """
 
+from __future__ import annotations
+
 from collections import deque
-from typing import Callable, Deque, Dict, Hashable, Tuple, TypeVar
+from typing import Callable, Hashable, TypeVar
 
 __all__ = ("FastDictCache",)
 
-_K = TypeVar("_K", bound=Tuple[Hashable, ...])
+_K = TypeVar("_K", bound=tuple[Hashable, ...])
 _V = TypeVar("_V")
 
 
-class FastDictCache(Dict[_K, _V]):
+class FastDictCache(dict[_K, _V]):
     """
     A dictionary that makes what it does not hold, and keeps `size`.
 
@@ -31,7 +33,7 @@ class FastDictCache(Dict[_K, _V]):
     def __init__(self, get_value: Callable[..., _V], size: int = 1000000) -> None:
         assert size > 0
 
-        self._keys: Deque[_K] = deque()
+        self._keys: deque[_K] = deque()
         self.get_value = get_value
         self.size = size
 

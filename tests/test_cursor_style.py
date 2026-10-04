@@ -11,11 +11,12 @@ The pane keeps this, and what draws the pane puts it on the terminal of
 the user.
 """
 
-from pyte.screen import Screen
-from pyte.streams import Stream
+from __future__ import annotations
+
 from pyte.modes import PrivateMode
-from pyte.sequences import Csi, csi, reset_mode, set_mode
-from pyte.sequences import decrqss
+from pyte.screen import Screen
+from pyte.sequences import Csi, csi, decrqss, reset_mode, set_mode
+from pyte.streams import Stream
 
 
 def make_screen():

@@ -13,16 +13,16 @@ tests for them live beside the ones for the sequences, because the two
 are only useful together.
 """
 
+from __future__ import annotations
+
 import pytest
 
-from pyte.colors import DEFAULT_COLORS, PALETTE, Color, parse_color
-from pyte.osc import FIRST_SPECIAL_COLOR, SPECIAL_COLOR_NAMES
-from pyte.screen import Screen
-from pyte.streams import Stream
 from pyte import escape
-from pyte.sequences import esc
-from pyte.osc import Osc
-from pyte.sequences import osc
+from pyte.colors import DEFAULT_COLORS, PALETTE, Color, parse_color
+from pyte.osc import FIRST_SPECIAL_COLOR, SPECIAL_COLOR_NAMES, Osc
+from pyte.screen import Screen
+from pyte.sequences import esc, osc
+from pyte.streams import Stream
 
 
 @pytest.fixture
@@ -189,9 +189,7 @@ def test_two_queries_come_back_as_two_answers(pane):
     # one sequence leaves it reading the second answer as part of the
     # first, and every answer after that lands one place out of step.
     _screen, stream, responses = pane
-    stream.feed(
-        osc(Osc.PALETTE_COLOR, "0", "rgb:f0f0/f0f0/f0f0", "1", "rgb:f0f0/0000/0000")
-    )
+    stream.feed(osc(Osc.PALETTE_COLOR, "0", "rgb:f0f0/f0f0/f0f0", "1", "rgb:f0f0/0000/0000"))
     stream.feed(osc(Osc.PALETTE_COLOR, "0", "?", "1", "?"))
     assert responses == [
         "\x1b]4;0;rgb:f0f0/f0f0/f0f0\x1b\\",
@@ -344,9 +342,7 @@ def test_the_kitty_query_reads_the_colour_that_was_set(pane):
     stream.feed(osc("10", "#aabbcc"))
     stream.feed(osc(Osc.PALETTE_COLOR, "1", "#ddeeff"))
     stream.feed(osc(Osc.KITTY_COLORS, "foreground=?", "1=?"))
-    assert responses == [
-        "\x1b]21;foreground=rgb:aaaa/bbbb/cccc;1=rgb:dddd/eeee/ffff\x1b\\"
-    ]
+    assert responses == ["\x1b]21;foreground=rgb:aaaa/bbbb/cccc;1=rgb:dddd/eeee/ffff\x1b\\"]
 
 
 # ----------------------------------------------------------------------

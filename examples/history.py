@@ -8,10 +8,11 @@ A tiny example to show how pagination works.
 :license: LGPL, see LICENSE for more details.
 """
 
+from __future__ import annotations
+
 import os
 import random
 import string
-import sys
 
 import pyte
 from pyte.modes import AnsiMode
@@ -37,11 +38,7 @@ if __name__ == "__main__":
     stream = pyte.Stream(screen)
 
     pages = 3
-    stream.feed(
-        os.linesep.join(
-            random_string(screen.columns) for _ in range(screen.lines * pages)
-        )
-    )
+    stream.feed(os.linesep.join(random_string(screen.columns) for _ in range(screen.lines * pages)))
     screen.prev_page()
 
     print_screen(screen, "Hit ENTER to move up!")

@@ -22,9 +22,10 @@ in, so what comes out stands on its own.
 Lillecarl/pymux#129.
 """
 
+from __future__ import annotations
+
 import sys
 from enum import IntEnum
-from typing import Dict
 
 from .colors import PALETTE
 
@@ -101,7 +102,7 @@ TERMINAL_ALIAS = "pyte-256color"
 #: Nothing goes in here that a pane does not really do. A capability
 #: that is claimed and not served is worse than one that is missing:
 #: the program stops asking and draws what it cannot draw.
-CAPABILITIES: Dict[str, object] = {
+CAPABILITIES: dict[str, object] = {
     # The name of the entry.
     "TN": TERMINAL_NAME,
     "name": TERMINAL_NAME,

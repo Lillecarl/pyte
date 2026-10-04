@@ -15,15 +15,15 @@ then split the two apart, because a program that wanted to rub out a
 wrapped line did not want the cursor leaving the line it typed.
 """
 
+from __future__ import annotations
+
 import pytest
 
-from pyte.screen import Screen
-from pyte.streams import Stream
 from pyte import escape
 from pyte.modes import PrivateMode
-from pyte.sequences import csi, set_mode
-from pyte.sequences import esc
-from pyte.sequences import Csi, reset_mode
+from pyte.screen import Screen
+from pyte.sequences import Csi, csi, esc, reset_mode, set_mode
+from pyte.streams import Stream
 
 #: A screen small enough to read, and wide enough to wrap on purpose.
 LINES, COLUMNS = 6, 10
@@ -61,9 +61,7 @@ def test_a_backspace_in_the_first_column_stays_there(pane):
 def test_a_backspace_needs_autowrap_to_go_back(pane):
     # A terminal that does not wrap forward has nothing to unwrap.
     screen, stream = pane
-    stream.feed(
-        reset_mode(PrivateMode.AUTOWRAP) + ANYWHERE + csi(escape.CUP, 3, 1) + BACKSPACE
-    )
+    stream.feed(reset_mode(PrivateMode.AUTOWRAP) + ANYWHERE + csi(escape.CUP, 3, 1) + BACKSPACE)
     assert at(screen) == (0, 2)
 
 
@@ -87,24 +85,13 @@ def test_the_wider_mode_stays_inside_the_scrolling_region(pane):
     # The region is rows 2 to 4, so the first row of it goes back to
     # the last row of it and not to the last row of the screen.
     screen, stream = pane
-    stream.feed(
-        AUTOWRAP
-        + ANYWHERE
-        + csi(escape.DECSTBM, 2, 4)
-        + csi(escape.CUP, 2, 1)
-        + BACKSPACE
-    )
+    stream.feed(AUTOWRAP + ANYWHERE + csi(escape.DECSTBM, 2, 4) + csi(escape.CUP, 2, 1) + BACKSPACE)
     assert at(screen) == (COLUMNS - 1, 3)
 
 
 def test_the_wider_mode_lands_on_the_right_margin(pane):
     screen, stream = pane
-    stream.feed(
-        AUTOWRAP
-        + ANYWHERE
-        + set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 3, 6)
-    )
+    stream.feed(AUTOWRAP + ANYWHERE + set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 3, 6))
     stream.feed(csi(escape.CUP, 3, 3) + BACKSPACE)
     assert at(screen) == (5, 1)
 

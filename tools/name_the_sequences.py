@@ -51,16 +51,16 @@ import re
 import sys
 from collections import Counter
 from pathlib import Path
-from typing import Iterator, List, NamedTuple, Tuple
+from typing import Iterator, NamedTuple
 
 REPOSITORY = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPOSITORY / "pyte"))
 
-from pyte import escape  # noqa: E402
-from pyte.control import CSI  # noqa: E402
-from pyte.modes import AnsiMode, PrivateMode  # noqa: E402
-from pyte.osc import Osc  # noqa: E402
-from pyte.sequences import MARKERS, Csi, Escape, Sharp  # noqa: E402
+from pyte import escape
+from pyte.control import CSI
+from pyte.modes import AnsiMode, PrivateMode
+from pyte.osc import Osc
+from pyte.sequences import Csi, Escape, Sharp
 
 #: The suites that judge a writer. Their literals are the answer, so
 #: writing them through a builder would ask the writer to mark its own
@@ -222,7 +222,7 @@ class Rewrite(NamedTuple):
     """
 
     text: str
-    pieces: List[str]
+    pieces: list[str]
 
     @property
     def expression(self) -> str:
@@ -251,7 +251,7 @@ def an_expression_for(text: str) -> Rewrite | Skipped:
     checked. So the first ESC that starts something no rule names
     gives up on the whole string, and its reason is the one counted.
     """
-    pieces: List[str] = []
+    pieces: list[str] = []
     plain = ""
     at = 0
 
@@ -295,7 +295,7 @@ def _as_written(text: str) -> str:
     return written
 
 
-def _a_sequence_at(text: str, at: int) -> "Tuple[str, int] | str":
+def _a_sequence_at(text: str, at: int) -> tuple[str, int] | str:
     """
     The sequence that starts at `at`: its expression and its length.
 
@@ -312,7 +312,7 @@ def _a_sequence_at(text: str, at: int) -> "Tuple[str, int] | str":
     return _an_escape_at(text, at)
 
 
-def _a_string_sequence_at(text: str, at: int, call: str) -> "Tuple[str, int] | str":
+def _a_string_sequence_at(text: str, at: int, call: str) -> tuple[str, int] | str:
     """
     The OSC, DCS or APC that starts at `at`, and how long it is.
 
@@ -381,7 +381,7 @@ def _an_osc(payload: str, ending: str) -> str:
     return "osc(%s%s)" % (written, ending)
 
 
-def _a_csi_at(text: str, at: int) -> "Tuple[str, int] | str":
+def _a_csi_at(text: str, at: int) -> tuple[str, int] | str:
     "The CSI sequence that starts at `at`, and how long it is."
     match = A_CSI_SEQUENCE.match(text, at)
     if match is None:
@@ -422,7 +422,7 @@ def _a_csi_at(text: str, at: int) -> "Tuple[str, int] | str":
     return "csi(%s)" % ", ".join(arguments), length
 
 
-def _an_escape_at(text: str, at: int) -> "Tuple[str, int] | str":
+def _an_escape_at(text: str, at: int) -> tuple[str, int] | str:
     """
     The escape sequence that starts at `at`, and how long it is.
 
@@ -437,9 +437,7 @@ def _an_escape_at(text: str, at: int) -> "Tuple[str, int] | str":
     "ESC #" as "ESC" and leaves a "#" behind is the kind that fails
     quietly.
     """
-    for intermediate, call, names in sorted(
-        _ESC_FAMILIES, key=lambda one: -len(one[0])
-    ):
+    for intermediate, call, names in sorted(_ESC_FAMILIES, key=lambda one: -len(one[0])):
         head = "\x1b" + intermediate
         if not text.startswith(head, at):
             continue
@@ -453,7 +451,7 @@ def _an_escape_at(text: str, at: int) -> "Tuple[str, int] | str":
     return "not CSI"
 
 
-def _values_of(params: str) -> List[int | None]:
+def _values_of(params: str) -> list[int | None]:
     """
     The parameters, with `None` for one that was left out.
 
@@ -466,7 +464,7 @@ def _values_of(params: str) -> List[int | None]:
     return [int(one) if one else None for one in params.split(";")]
 
 
-def _a_mode_call(final: str, private: str, values: List[int | None]) -> str | None:
+def _a_mode_call(final: str, private: str, values: list[int | None]) -> str | None:
     "SM or RM, when `modes.py` names every mode in it."
     if final not in (escape.SM, escape.RM):
         return None
@@ -507,8 +505,8 @@ def _written(value: int | None) -> str:
 class Change(NamedTuple):
     "Where a string sits in a file, and what replaces it."
 
-    start: Tuple[int, int]
-    end: Tuple[int, int]
+    start: tuple[int, int]
+    end: tuple[int, int]
     rewrite: Rewrite
 
 
@@ -609,9 +607,7 @@ def _strings_of(tree: ast.AST) -> Iterator[ast.Constant]:
         if isinstance(node, ast.JoinedStr):
             for part in ast.walk(node):
                 inside_a_format.add(id(part))
-        if isinstance(
-            node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
-        ):
+        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
             first = node.body[0] if node.body else None
             if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant):
                 docstrings.add(id(first.value))
@@ -628,11 +624,11 @@ def _strings_of(tree: ast.AST) -> Iterator[ast.Constant]:
         yield node
 
 
-def changes_in(source: str) -> Tuple[List[Change], List[Skipped]]:
+def changes_in(source: str) -> tuple[list[Change], list[Skipped]]:
     "What this tool would do to one module, and what it would not."
     tree = ast.parse(source)
-    changes: List[Change] = []
-    skipped: List[Skipped] = []
+    changes: list[Change] = []
+    skipped: list[Skipped] = []
 
     for node in _strings_of(tree):
         if "\x1b" not in node.value:
@@ -691,7 +687,7 @@ _IMPORTS = {
 ROOM_ON_A_LINE = 88
 
 
-def applied(source: str, changes: List[Change]) -> str:
+def applied(source: str, changes: list[Change]) -> str:
     """
     The module with every change spliced in.
 
@@ -701,11 +697,7 @@ def applied(source: str, changes: List[Change]) -> str:
     had.
     """
     lines = source.splitlines(keepends=True)
-    was_long = {
-        number
-        for number, line in enumerate(lines, 1)
-        if len(line.rstrip("\n")) > ROOM_ON_A_LINE
-    }
+    was_long = {number for number, line in enumerate(lines, 1) if len(line.rstrip("\n")) > ROOM_ON_A_LINE}
 
     on_this_line: dict = {}
     for change in changes:
@@ -766,7 +758,7 @@ def _brackets_around(line: str, start: int, end: int) -> bool:
     return (before, after) in ((b"(", b")"), (b"[", b"]"))
 
 
-def _wrapped(pieces: List[str], indent: str, brackets: bool = False) -> str:
+def _wrapped(pieces: list[str], indent: str, brackets: bool = False) -> str:
     """
     The pieces over several lines.
 
@@ -802,7 +794,7 @@ def _spliced(line: str, start: int, end: int, expression: str) -> str:
     return (raw[:start] + expression.encode("utf-8") + raw[end:]).decode("utf-8")
 
 
-def with_the_imports(source: str, changes: List[Change]) -> str:
+def with_the_imports(source: str, changes: list[Change]) -> str:
     """
     The module, with an import for every name the changes reach for.
 
@@ -817,10 +809,7 @@ def with_the_imports(source: str, changes: List[Change]) -> str:
     used = {
         name: module
         for name, module in _IMPORTS.items()
-        if any(
-            re.search(r"\b%s\b" % re.escape(name), change.rewrite.expression)
-            for change in changes
-        )
+        if any(re.search(r"\b%s\b" % re.escape(name), change.rewrite.expression) for change in changes)
     }
 
     modules: dict = {}
@@ -845,9 +834,7 @@ def with_the_imports(source: str, changes: List[Change]) -> str:
 
     lines = source.splitlines(keepends=True)
     return "".join(
-        lines[: _after_the_imports(tree)]
-        + [line + "\n" for line in sorted(wanted)]
-        + lines[_after_the_imports(tree) :]
+        lines[: _after_the_imports(tree)] + [line + "\n" for line in sorted(wanted)] + lines[_after_the_imports(tree) :]
     )
 
 
@@ -868,7 +855,7 @@ def _after_the_imports(tree: ast.Module) -> int:
     return after
 
 
-def _proven(changes: List[Change], where: Path) -> None:
+def _proven(changes: list[Change], where: Path) -> None:
     """
     Every new expression writes exactly the string it replaces.
 
@@ -900,7 +887,7 @@ def _proven(changes: List[Change], where: Path) -> None:
         "PrivateMode": PrivateMode,
     }
     for change in changes:
-        written = eval(change.rewrite.expression, dict(scope))  # noqa: S307
+        written = eval(change.rewrite.expression, dict(scope))
         if written != change.rewrite.text:
             raise SystemExit(
                 "%s: %s writes %r and not %r"
@@ -913,7 +900,7 @@ def _proven(changes: List[Change], where: Path) -> None:
             )
 
 
-def files_under(paths: List[str]) -> Iterator[Path]:
+def files_under(paths: list[str]) -> Iterator[Path]:
     for one in paths:
         path = Path(one)
         if path.is_dir():
@@ -930,7 +917,7 @@ def _named_by(path: Path) -> str:
         return path.as_posix()
 
 
-def main(argv: List[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("paths", nargs="+", help="files or directories")
     parser.add_argument(
@@ -956,7 +943,7 @@ def main(argv: List[str] | None = None) -> int:
     # A run that stopped halfway would leave the tree half rewritten,
     # and the thing that stops it is exactly the case where nobody
     # should trust what it already did.
-    planned: List[Tuple[Path, str, str]] = []
+    planned: list[tuple[Path, str, str]] = []
 
     for path in files_under(arguments.paths):
         if _named_by(path) in KEEPS_ITS_LITERALS:
@@ -999,10 +986,7 @@ def main(argv: List[str] | None = None) -> int:
             path.write_text(new)
 
     touched = len(planned)
-    print(
-        "\n%s %d sequences in %d files."
-        % ("Wrote" if arguments.apply else "Would write", rewritten, touched)
-    )
+    print("\n%s %d sequences in %d files." % ("Wrote" if arguments.apply else "Would write", rewritten, touched))
     if left:
         print("Left alone:")
         for reason, count in left.most_common():

@@ -14,11 +14,12 @@ Not implemented: the pixel aspect ratio of the raster attributes (the
 share the introducer.
 """
 
+from __future__ import annotations
+
 import colorsys
 import re
 import sys
 from array import array
-from typing import List, Tuple
 
 __all__ = [
     "DEFAULT_PALETTE",
@@ -59,7 +60,7 @@ def _percent(value: int) -> int:
     return min(255, max(0, round(value * 255 / 100)))
 
 
-DEFAULT_PALETTE: List[Tuple[int, int, int]] = [
+DEFAULT_PALETTE: list[tuple[int, int, int]] = [
     (_percent(r), _percent(g), _percent(b)) for r, g, b in _VT340_PALETTE_PERCENT
 ]
 
@@ -73,7 +74,7 @@ MAX_HEIGHT = 16384
 MAX_PIXELS = 4 * 1024 * 1024
 
 
-def _hls_to_rgb(hue: int, lightness: int, saturation: int) -> Tuple[int, int, int]:
+def _hls_to_rgb(hue: int, lightness: int, saturation: int) -> tuple[int, int, int]:
     """
     A DEC HLS colour as RGB bytes.
 
@@ -110,7 +111,7 @@ class _Canvas:
     """
 
     def __init__(self) -> None:
-        self._rows: List[array] = []
+        self._rows: list[array] = []
         self.width = 0
         self.height = 0
 
@@ -147,10 +148,10 @@ class _Canvas:
 
     def to_rgba(
         self,
-        palette: List[Tuple[int, int, int]],
+        palette: list[tuple[int, int, int]],
         width: int,
         height: int,
-        background: Tuple[int, int, int] | None,
+        background: tuple[int, int, int] | None,
     ) -> bytes:
         """
         The RGBA bytes of the canvas, in a `width` x `height` box.
@@ -171,13 +172,11 @@ class _Canvas:
             count = min(len(row), width)
             if count:
                 base = y * width
-                out[base : base + count] = array(
-                    "I", [lookup[value] for value in row[:count]]
-                )
+                out[base : base + count] = array("I", [lookup[value] for value in row[:count]])
         return out.tobytes()
 
 
-def decode_sixel(payload: str) -> Tuple[int, int, bytes] | None:
+def decode_sixel(payload: str) -> tuple[int, int, bytes] | None:
     """
     Decode the payload of a sixel DCS sequence.
 
@@ -197,9 +196,7 @@ def decode_sixel(payload: str) -> Tuple[int, int, bytes] | None:
     transparent = len(params) >= 2 and params[1] == 1
 
     body = payload[header.end() :]
-    palette = list(DEFAULT_PALETTE) + [(0, 0, 0)] * (
-        MAX_REGISTERS - len(DEFAULT_PALETTE)
-    )
+    palette = list(DEFAULT_PALETTE) + [(0, 0, 0)] * (MAX_REGISTERS - len(DEFAULT_PALETTE))
 
     canvas = _Canvas()
     register = 0
@@ -226,9 +223,7 @@ def decode_sixel(payload: str) -> Tuple[int, int, bytes] | None:
                 index += 1
                 if _DATA_LOW <= ord(data) <= _DATA_HIGH:
                     # A missing or zero count means one, like xterm.
-                    x += canvas.write(
-                        band, x, count or 1, ord(data) - _DATA_LOW, register
-                    )
+                    x += canvas.write(band, x, count or 1, ord(data) - _DATA_LOW, register)
 
         elif char == "#":
             index += 1
@@ -288,7 +283,7 @@ def decode_sixel(payload: str) -> Tuple[int, int, bytes] | None:
     return (width, height, canvas.to_rgba(palette, width, height, background))
 
 
-def _define_color(values: List[int]) -> Tuple[int, int, int]:
+def _define_color(values: list[int]) -> tuple[int, int, int]:
     "A colour from the four parameters of a `#` definition."
     system, first, second, third = values
     if system == 1:
@@ -298,7 +293,7 @@ def _define_color(values: List[int]) -> Tuple[int, int, int]:
     return (_percent(first), _percent(second), _percent(third))
 
 
-def _read_int(text: str, index: int) -> Tuple[int, int]:
+def _read_int(text: str, index: int) -> tuple[int, int]:
     "Read digits at `index`. Returns the value and the new index."
     start = index
     while index < len(text) and text[index].isdigit():

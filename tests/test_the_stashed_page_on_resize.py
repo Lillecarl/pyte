@@ -15,8 +15,11 @@ whichever is active, and kitty's `rewrap()` hands `main_linebuf` and
 `alt_linebuf` to their own resizers together.
 """
 
-import pyte
+from __future__ import annotations
+
 from a_screen import a_screen
+
+import pyte
 from pyte.modes import PrivateMode
 from pyte.sequences import reset_mode, set_mode
 
@@ -41,10 +44,7 @@ def widths(screen):
 def rows(screen):
     "Every row of the page, as strings."
     buffer = screen.page.data_buffer
-    return [
-        "".join(cell.char or " " for cell in buffer[row].values()).rstrip()
-        for row in sorted(buffer)
-    ]
+    return ["".join(cell.char or " " for cell in buffer[row].values()).rstrip() for row in sorted(buffer)]
 
 
 # ----------------------------------------------------------------------

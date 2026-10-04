@@ -15,15 +15,16 @@ DECSLRM and names the columns of the scrolling region. `left_right`
 covers that side; this file covers the other one.
 """
 
+from __future__ import annotations
+
 import pytest
 
-from pyte.screen import Screen
-from pyte.streams import Stream
-from pyte.colors import SgrColor
 from pyte import escape
+from pyte.colors import SgrColor
 from pyte.modes import PrivateMode
-from pyte.sequences import Csi, csi, reset_mode, set_mode
-from pyte.sequences import esc
+from pyte.screen import Screen
+from pyte.sequences import Csi, csi, esc, reset_mode, set_mode
+from pyte.streams import Stream
 
 #: The three ways to save, and to bring back what was saved.
 PAIRS = [
@@ -69,12 +70,7 @@ def test_a_restore_brings_the_mark_of_decsca_back(save, restore):
 def test_one_pair_saves_and_another_pair_restores():
     "A terminal holds one savepoint, not three."
     screen, stream = _screen()
-    stream.feed(
-        csi(escape.CUP, 4, 7)
-        + esc(escape.DECSC)
-        + csi(escape.CUP, 1, 1)
-        + csi(Csi.KITTY_KEYBOARD)
-    )
+    stream.feed(csi(escape.CUP, 4, 7) + esc(escape.DECSC) + csi(escape.CUP, 1, 1) + csi(Csi.KITTY_KEYBOARD))
     assert _position(screen) == (6, 3)
 
 
@@ -97,11 +93,7 @@ def test_the_columns_of_a_region_win_while_the_mode_is_set():
     it. The mode decides, and nothing else can.
     """
     screen, stream = _screen()
-    stream.feed(
-        csi(escape.CUP, 3, 5)
-        + set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 2, 9)
-    )
+    stream.feed(csi(escape.CUP, 3, 5) + set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 2, 9))
     assert screen.horizontal_margins == (1, 8)
     # DECSLRM homes the cursor, and saved nothing on the way.
     assert _position(screen) == (0, 0)
@@ -113,12 +105,7 @@ def test_a_plain_csi_u_is_not_the_keyboard_protocol():
     and "CSI ? u". A plain "CSI u" carries no marker, so it is SCORC.
     """
     screen, stream = _screen()
-    stream.feed(
-        csi(escape.CUP, 2, 3)
-        + csi(Csi.DECSLRM)
-        + csi(escape.CUP, 5, 5)
-        + csi(Csi.KITTY_KEYBOARD)
-    )
+    stream.feed(csi(escape.CUP, 2, 3) + csi(Csi.DECSLRM) + csi(escape.CUP, 5, 5) + csi(Csi.KITTY_KEYBOARD))
     assert _position(screen) == (2, 1)
     assert screen.kitty_keyboard_flags == 0
 
@@ -132,9 +119,7 @@ def test_a_restore_takes_origin_mode_off_again(save, restore):
     setting it back leaves a mode on that the program turned off.
     """
     screen, stream = _screen()
-    stream.feed(
-        save + (csi(escape.DECSTBM, 2, 5) + set_mode(PrivateMode.ORIGIN)) + restore
-    )
+    stream.feed(save + (csi(escape.DECSTBM, 2, 5) + set_mode(PrivateMode.ORIGIN)) + restore)
     stream.feed(csi(escape.CUP, 1, 1) + "X")
     assert screen.data_buffer[0][0].char == "X"
 
@@ -149,12 +134,7 @@ def test_a_restore_leaves_the_wrap_alone(save, restore):
     leaves the wrap off.
     """
     screen, stream = _screen(lines=4, columns=8)
-    stream.feed(
-        set_mode(PrivateMode.AUTOWRAP)
-        + save
-        + reset_mode(PrivateMode.AUTOWRAP)
-        + restore
-    )
+    stream.feed(set_mode(PrivateMode.AUTOWRAP) + save + reset_mode(PrivateMode.AUTOWRAP) + restore)
     stream.feed(csi(escape.CUP, 1, 7) + "abcd")
     assert screen.pt_cursor_position.y == 0
 
@@ -198,9 +178,7 @@ def test_the_mode_that_saves_the_cursor_leaves_it_where_it_stands():
     Lillecarl/pymux#34.
     """
     screen, stream = _screen(lines=4, columns=8)
-    stream.feed(
-        csi(escape.CUP, 2, 3) + set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR)
-    )
+    stream.feed(csi(escape.CUP, 2, 3) + set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR))
     assert (screen.pt_cursor_position.y, screen.pt_cursor_position.x) == (1, 2)
 
     # Moving on the alternate screen does not touch the save.

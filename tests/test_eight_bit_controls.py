@@ -18,15 +18,15 @@ libvterm's `26state_query.test` line 62 asks the same question.
 Lillecarl/pymux#94.
 """
 
+from __future__ import annotations
+
 import pytest
 
-from pyte.screen import Screen
-from pyte.terminfo import TERMINAL_VERSION
-from pyte.streams import Stream
 from pyte import escape
-from pyte.sequences import Csi, csi
-from pyte.sequences import announce, esc
-from pyte.sequences import decrqss, osc
+from pyte.screen import Screen
+from pyte.sequences import Csi, announce, csi, decrqss, esc, osc
+from pyte.streams import Stream
+from pyte.terminfo import TERMINAL_VERSION
 
 #: "ESC SP G", which turns eight bit controls on.
 S8C1T = announce(escape.S8C1T)
@@ -125,13 +125,8 @@ def test_decscl_with_no_second_parameter_changes_nothing():
 
 def test_decrqss_reports_the_form_that_is_on():
     "The report names 1 for seven bit and 2 for eight."
-    assert (
-        answered(csi(Csi.DECSCL, 62, 1) + decrqss(Csi.DECSCL))
-        == b'\x1bP1$r62;1"p\x1b\\'
-    )
-    assert (
-        answered(csi(Csi.DECSCL, 62, 0) + decrqss(Csi.DECSCL)) == b'\x901$r62;2"p\x9c'
-    )
+    assert answered(csi(Csi.DECSCL, 62, 1) + decrqss(Csi.DECSCL)) == b'\x1bP1$r62;1"p\x1b\\'
+    assert answered(csi(Csi.DECSCL, 62, 0) + decrqss(Csi.DECSCL)) == b'\x901$r62;2"p\x9c'
 
 
 # ----------------------------------------------------------------------

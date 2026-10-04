@@ -15,6 +15,8 @@ The levels are xterm's, and so are the examples:
 Lillecarl/pymux#169.
 """
 
+from __future__ import annotations
+
 import pyte
 from pyte.keys import (
     FormatOtherKeys,

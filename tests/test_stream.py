@@ -1,13 +1,16 @@
+from __future__ import annotations
+
 import io
 
 import pytest
+from a_screen import a_screen, display
 
 import pyte
-from pyte.screen import Screen
-
-from a_screen import a_screen, display
-from pyte import charsets as cs, control as ctrl, escape as esc
+from pyte import charsets as cs
+from pyte import control as ctrl
 from pyte import escape
+from pyte import escape as esc
+from pyte.screen import Screen
 from pyte.sequences import announce
 
 

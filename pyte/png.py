@@ -12,9 +12,10 @@ The decoder covers what a PNG writer normally produces: bit depths of
 the five filters. Interlaced images (Adam7) are refused.
 """
 
+from __future__ import annotations
+
 import struct
 import zlib
-from typing import List, Tuple
 
 __all__ = [
     "decode_png",
@@ -94,7 +95,7 @@ def _unfilter(raw: bytes, height: int, stride: int, bytes_per_pixel: int) -> byt
     return out
 
 
-def _samples(line: bytes, width: int, depth: int, channels: int) -> List[int]:
+def _samples(line: bytes, width: int, depth: int, channels: int) -> list[int]:
     """
     The samples of one scanline, scaled to bytes.
 
@@ -121,7 +122,7 @@ def _samples(line: bytes, width: int, depth: int, channels: int) -> List[int]:
     return values
 
 
-def decode_png(data: bytes) -> Tuple[int, int, bytes] | None:
+def decode_png(data: bytes) -> tuple[int, int, bytes] | None:
     """
     Decode a PNG image. Returns (width, height, RGBA bytes), or None
     when the data is not a PNG that this decoder handles.
@@ -131,7 +132,7 @@ def decode_png(data: bytes) -> Tuple[int, int, bytes] | None:
 
     width = height = 0
     depth = colour_type = interlace = 0
-    palette: List[Tuple[int, int, int]] = []
+    palette: list[tuple[int, int, int]] = []
     transparency = b""
     compressed = bytearray()
     seen_header = False
@@ -140,15 +141,10 @@ def decode_png(data: bytes) -> Tuple[int, int, bytes] | None:
         if kind == b"IHDR":
             if len(payload) < 13:
                 return None
-            width, height, depth, colour_type, _method, _filter, interlace = (
-                struct.unpack(">IIBBBBB", payload[:13])
-            )
+            width, height, depth, colour_type, _method, _filter, interlace = struct.unpack(">IIBBBBB", payload[:13])
             seen_header = True
         elif kind == b"PLTE":
-            palette = [
-                (payload[i], payload[i + 1], payload[i + 2])
-                for i in range(0, len(payload) - 2, 3)
-            ]
+            palette = [(payload[i], payload[i + 1], payload[i + 2]) for i in range(0, len(payload) - 2, 3)]
         elif kind == b"tRNS":
             transparency = payload
         elif kind == b"IDAT":
@@ -182,9 +178,7 @@ def decode_png(data: bytes) -> Tuple[int, int, bytes] | None:
 
     out = bytearray(width * height * 4)
     for row in range(height):
-        line = _samples(
-            samples[row * stride : (row + 1) * stride], width, depth, channels
-        )
+        line = _samples(samples[row * stride : (row + 1) * stride], width, depth, channels)
         base = row * width * 4
 
         for column in range(width):
@@ -224,9 +218,7 @@ def decode_png(data: bytes) -> Tuple[int, int, bytes] | None:
 
             elif colour_type == 4:  # Greyscale with alpha.
                 grey = line[index] * scale
-                out[offset : offset + 4] = bytes(
-                    (grey, grey, grey, line[index + 1] * scale)
-                )
+                out[offset : offset + 4] = bytes((grey, grey, grey, line[index + 1] * scale))
 
             else:  # Colour type 6: RGBA.
                 out[offset : offset + 4] = bytes(

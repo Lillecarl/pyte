@@ -12,7 +12,8 @@ names an entry that is not there is worse off than one that says
 `xterm-256color`.
 """
 
-import pathlib
+from __future__ import annotations
+
 import shutil
 import subprocess
 
@@ -28,9 +29,7 @@ from pyte.terminfo import (
 tic = shutil.which("tic")
 infocmp = shutil.which("infocmp")
 
-pytestmark = pytest.mark.skipif(
-    not (tic and infocmp), reason="ncurses is not on the path"
-)
+pytestmark = pytest.mark.skipif(not (tic and infocmp), reason="ncurses is not on the path")
 
 
 @pytest.fixture
@@ -40,9 +39,7 @@ def compiled(tmp_path):
     source.write_text(terminfo_source())
     database = tmp_path / "terminfo"
     database.mkdir()
-    subprocess.run(
-        [tic, "-x", "-o", str(database), str(source)], check=True, capture_output=True
-    )
+    subprocess.run([tic, "-x", "-o", str(database), str(source)], check=True, capture_output=True)
     return database
 
 

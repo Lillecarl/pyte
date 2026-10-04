@@ -12,6 +12,8 @@ is where they come from. What is checked here is that a name reaches a
 table and that the table reaches the screen.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from pyte import charsets as cs
@@ -26,9 +28,7 @@ def _drawn(sequence, columns=20):
     line = screen.page.data_buffer.get(screen.line_offset)
     if line is None:
         return ""
-    return "".join(
-        (line[column].char or " ") for column in range(columns)
-    ).rstrip()
+    return "".join((line[column].char or " ") for column in range(columns)).rstrip()
 
 
 def test_the_british_set_draws_a_pound_sign():
@@ -97,11 +97,7 @@ def test_every_alias_names_the_same_table(alias, name):
 def test_a_national_set_only_moves_what_it_names(name):
     "Everything else is ASCII, which is what makes it a replacement."
     table = cs.MAPS[name]
-    moved = {
-        position
-        for position in range(0x20, 0x7F)
-        if table[position] != chr(position)
-    }
+    moved = {position for position in range(0x20, 0x7F) if table[position] != chr(position)}
     assert moved == set(cs.NATIONAL[name])
 
 

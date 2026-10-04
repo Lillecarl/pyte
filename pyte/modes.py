@@ -15,6 +15,8 @@ screen decides what each one does, and `Screen._MODE_LEVELS` says which
 conformance level admits which. Lillecarl/pymux#129.
 """
 
+from __future__ import annotations
+
 from enum import IntEnum
 
 __all__ = (

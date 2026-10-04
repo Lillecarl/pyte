@@ -23,6 +23,9 @@ Client-side ``webterm.js`` supports
 :license: LGPL, see LICENSE for more details.
 """
 
+from __future__ import annotations
+
+import asyncio
 import json
 import os
 import pty
@@ -32,7 +35,6 @@ import webbrowser
 from pathlib import Path
 
 import aiohttp
-import asyncio
 from aiohttp import web
 
 import pyte
@@ -55,8 +57,7 @@ class Terminal:
         for y in self.screen.dirty:
             line = self.screen.buffer[y]
             data = [
-                (char.data, char.reverse, char.fg, char.bg)
-                for char in (line[x] for x in range(self.screen.columns))
+                (char.data, char.reverse, char.fg, char.bg) for char in (line[x] for x in range(self.screen.columns))
             ]
             lines.append((y, data))
 
@@ -68,9 +69,7 @@ def open_terminal(command="bash", columns=80, lines=24):
     p_pid, master_fd = pty.fork()
     if p_pid == 0:  # Child.
         argv = shlex.split(command)
-        env = dict(
-            TERM="linux", LC_ALL="en_GB.UTF-8", COLUMNS=str(columns), LINES=str(lines)
-        )
+        env = dict(TERM="linux", LC_ALL="en_GB.UTF-8", COLUMNS=str(columns), LINES=str(lines))
         os.execvpe(argv[0], argv, env)
 
     # File-like object for I/O with the child process aka command.

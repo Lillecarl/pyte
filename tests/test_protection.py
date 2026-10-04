@@ -10,13 +10,12 @@ A selective erase reads both marks. xterm does the same, for the
 programs that came before DECSCA.
 """
 
-from pyte.screen import Screen
-from pyte.streams import Stream
-from pyte.sequences import Csi, csi
+from __future__ import annotations
+
 from pyte import escape
-from pyte.sequences import esc
-from pyte.sequences import Escape
-from pyte.sequences import decrqss
+from pyte.screen import Screen
+from pyte.sequences import Csi, Escape, csi, decrqss, esc
+from pyte.streams import Stream
 
 
 def _screen(lines=4, columns=10):
@@ -29,8 +28,7 @@ def _screen(lines=4, columns=10):
 def _line(screen, row=0):
     buffer = screen.data_buffer[row + screen.line_offset]
     return "".join(
-        (buffer[column].char or " ") if column in buffer else " "
-        for column in range(screen.columns)
+        (buffer[column].char or " ") if column in buffer else " " for column in range(screen.columns)
     ).rstrip()
 
 
@@ -40,27 +38,13 @@ def _line(screen, row=0):
 
 def test_an_erase_in_line_leaves_a_marked_cell():
     screen, stream, _answers = _screen()
-    stream.feed(
-        "ab"
-        + esc(Escape.SPA)
-        + "c"
-        + esc(Escape.EPA)
-        + csi(escape.CUP, 1, 1)
-        + csi(escape.EL, 2)
-    )
+    stream.feed("ab" + esc(Escape.SPA) + "c" + esc(Escape.EPA) + csi(escape.CUP, 1, 1) + csi(escape.EL, 2))
     assert _line(screen) == "  c"
 
 
 def test_an_erase_in_display_leaves_a_marked_cell():
     screen, stream, _answers = _screen()
-    stream.feed(
-        "ab"
-        + esc(Escape.SPA)
-        + "c"
-        + esc(Escape.EPA)
-        + csi(escape.CUP, 1, 1)
-        + csi(escape.ED, 0)
-    )
+    stream.feed("ab" + esc(Escape.SPA) + "c" + esc(Escape.EPA) + csi(escape.CUP, 1, 1) + csi(escape.ED, 0))
     assert _line(screen) == "  c"
 
 
@@ -73,67 +57,32 @@ def test_an_erase_of_the_whole_screen_takes_a_marked_cell():
     a marked cell that survived would reach the test after it.
     """
     screen, stream, _answers = _screen()
-    stream.feed(
-        "ab"
-        + esc(Escape.SPA)
-        + "c"
-        + esc(Escape.EPA)
-        + csi(escape.CUP, 1, 1)
-        + csi(escape.ED, 2)
-    )
+    stream.feed("ab" + esc(Escape.SPA) + "c" + esc(Escape.EPA) + csi(escape.CUP, 1, 1) + csi(escape.ED, 2))
     assert _line(screen) == ""
 
 
 def test_a_selective_erase_of_the_whole_screen_leaves_a_marked_cell():
     screen, stream, _answers = _screen()
-    stream.feed(
-        "ab"
-        + esc(Escape.SPA)
-        + "c"
-        + esc(Escape.EPA)
-        + csi(escape.CUP, 1, 1)
-        + csi(escape.ED, 2, private="?")
-    )
+    stream.feed("ab" + esc(Escape.SPA) + "c" + esc(Escape.EPA) + csi(escape.CUP, 1, 1) + csi(escape.ED, 2, private="?"))
     assert _line(screen) == "  c"
 
 
 def test_an_erase_of_characters_leaves_a_marked_cell():
     screen, stream, _answers = _screen()
-    stream.feed(
-        "ab"
-        + esc(Escape.SPA)
-        + "c"
-        + esc(Escape.EPA)
-        + csi(escape.CUP, 1, 1)
-        + csi(escape.ECH, 3)
-    )
+    stream.feed("ab" + esc(Escape.SPA) + "c" + esc(Escape.EPA) + csi(escape.CUP, 1, 1) + csi(escape.ECH, 3))
     assert _line(screen) == "  c"
 
 
 def test_the_mark_ends_where_the_program_ends_it():
     screen, stream, _answers = _screen()
-    stream.feed(
-        esc(Escape.SPA)
-        + "ab"
-        + esc(Escape.EPA)
-        + "cd"
-        + csi(escape.CUP, 1, 1)
-        + csi(escape.EL, 2)
-    )
+    stream.feed(esc(Escape.SPA) + "ab" + esc(Escape.EPA) + "cd" + csi(escape.CUP, 1, 1) + csi(escape.EL, 2))
     assert _line(screen) == "ab"
 
 
 def test_a_selective_erase_reads_the_mark_as_well():
     "xterm reads it, for the programs that came before DECSCA."
     screen, stream, _answers = _screen()
-    stream.feed(
-        "ab"
-        + esc(Escape.SPA)
-        + "c"
-        + esc(Escape.EPA)
-        + csi(escape.CUP, 1, 1)
-        + csi(escape.EL, 2, private="?")
-    )
+    stream.feed("ab" + esc(Escape.SPA) + "c" + esc(Escape.EPA) + csi(escape.CUP, 1, 1) + csi(escape.EL, 2, private="?"))
     assert _line(screen) == "  c"
 
 
@@ -144,12 +93,7 @@ def test_a_selective_erase_reads_the_mark_as_well():
 def test_a_selective_erase_in_line_leaves_a_marked_cell():
     screen, stream, _answers = _screen()
     stream.feed(
-        csi(Csi.DECSCA, 1)
-        + "abc"
-        + csi(Csi.DECSCA, 0)
-        + "d"
-        + csi(escape.CUP, 1, 1)
-        + csi(escape.EL, 2, private="?")
+        csi(Csi.DECSCA, 1) + "abc" + csi(Csi.DECSCA, 0) + "d" + csi(escape.CUP, 1, 1) + csi(escape.EL, 2, private="?")
     )
     assert _line(screen) == "abc"
 
@@ -157,12 +101,7 @@ def test_a_selective_erase_in_line_leaves_a_marked_cell():
 def test_a_selective_erase_in_display_leaves_a_marked_cell():
     screen, stream, _answers = _screen()
     stream.feed(
-        csi(Csi.DECSCA, 1)
-        + "abc"
-        + csi(Csi.DECSCA, 0)
-        + "d"
-        + csi(escape.CUP, 1, 1)
-        + csi(escape.ED, 0, private="?")
+        csi(Csi.DECSCA, 1) + "abc" + csi(Csi.DECSCA, 0) + "d" + csi(escape.CUP, 1, 1) + csi(escape.ED, 0, private="?")
     )
     assert _line(screen) == "abc"
 
@@ -170,49 +109,27 @@ def test_a_selective_erase_in_display_leaves_a_marked_cell():
 def test_a_plain_erase_takes_a_cell_that_decsca_marked():
     "That is the whole difference between EL and DECSEL."
     screen, stream, _answers = _screen()
-    stream.feed(
-        csi(Csi.DECSCA, 1)
-        + "abc"
-        + csi(Csi.DECSCA, 0)
-        + "d"
-        + csi(escape.CUP, 1, 1)
-        + csi(escape.EL, 2)
-    )
+    stream.feed(csi(Csi.DECSCA, 1) + "abc" + csi(Csi.DECSCA, 0) + "d" + csi(escape.CUP, 1, 1) + csi(escape.EL, 2))
     assert _line(screen) == ""
 
 
 def test_the_parameter_two_takes_the_mark_away():
     screen, stream, _answers = _screen()
     stream.feed(
-        csi(Csi.DECSCA, 1)
-        + "ab"
-        + csi(Csi.DECSCA, 2)
-        + "cd"
-        + csi(escape.CUP, 1, 1)
-        + csi(escape.EL, 2, private="?")
+        csi(Csi.DECSCA, 1) + "ab" + csi(Csi.DECSCA, 2) + "cd" + csi(escape.CUP, 1, 1) + csi(escape.EL, 2, private="?")
     )
     assert _line(screen) == "ab"
 
 
 def test_a_selective_erase_to_the_right_leaves_a_marked_cell():
     screen, stream, _answers = _screen()
-    stream.feed(
-        csi(Csi.DECSCA, 1)
-        + "abcde"
-        + csi(escape.CUP, 1, 3)
-        + csi(escape.EL, 0, private="?")
-    )
+    stream.feed(csi(Csi.DECSCA, 1) + "abcde" + csi(escape.CUP, 1, 3) + csi(escape.EL, 0, private="?"))
     assert _line(screen) == "abcde"
 
 
 def test_a_selective_erase_to_the_left_leaves_a_marked_cell():
     screen, stream, _answers = _screen()
-    stream.feed(
-        csi(Csi.DECSCA, 1)
-        + "abcde"
-        + csi(escape.CUP, 1, 3)
-        + csi(escape.EL, 1, private="?")
-    )
+    stream.feed(csi(Csi.DECSCA, 1) + "abcde" + csi(escape.CUP, 1, 3) + csi(escape.EL, 1, private="?"))
     assert _line(screen) == "abcde"
 
 
@@ -262,9 +179,7 @@ def test_a_save_and_a_restore_carry_the_mark():
     The marks belong to the cursor, the way the rendition does.
     """
     screen, stream, _answers = _screen()
-    stream.feed(
-        csi(Csi.DECSCA, 1) + esc(escape.DECSC) + csi(Csi.DECSCA, 0) + esc(escape.DECRC)
-    )
+    stream.feed(csi(Csi.DECSCA, 1) + esc(escape.DECSC) + csi(Csi.DECSCA, 0) + esc(escape.DECRC))
     assert screen.protection == 2
     stream.feed("a" + csi(Csi.DECSERA, 1, 1, 1, 1))
     assert _line(screen) == "a"

@@ -13,12 +13,13 @@ the panel reports the mark, and it is visible from the outside only
 through a resize. Lillecarl/pymux#58.
 """
 
-from pyte.screen import Screen
-from pyte.streams import Stream
+from __future__ import annotations
+
 from pyte import escape
 from pyte.modes import PrivateMode
-from pyte.sequences import Csi, csi, set_mode
-from pyte.sequences import reset_mode
+from pyte.screen import Screen
+from pyte.sequences import Csi, csi, reset_mode, set_mode
+from pyte.streams import Stream
 
 COLUMNS = 8
 
@@ -166,9 +167,7 @@ def test_a_scroll_up_ends_the_wrap_under_the_blank_row():
     the other reason: the row it continued is one the scroll dropped.
     Lillecarl/pymux#188 below says why that is not the same question.
     """
-    screen = _screen(
-        "a" * 32 + csi(escape.DECSTBM, 2, 3) + (csi(escape.CUP, 3, 1) + csi(Csi.SU))
-    )
+    screen = _screen("a" * 32 + csi(escape.DECSTBM, 2, 3) + (csi(escape.CUP, 3, 1) + csi(Csi.SU)))
 
     assert not _continues(screen, 3)
 
@@ -181,9 +180,7 @@ def test_a_region_at_the_top_ends_the_wrap_under_its_blank_row():
     the bottom of it by hand, so it has to take the mark off the row
     below by hand too. Lillecarl/pymux#423.
     """
-    screen = _screen(
-        "a" * 32 + csi(escape.DECSTBM, 1, 3) + csi(escape.CUP, 3, 1) + csi(Csi.SU)
-    )
+    screen = _screen("a" * 32 + csi(escape.DECSTBM, 1, 3) + csi(escape.CUP, 3, 1) + csi(Csi.SU))
 
     # The row the scroll blanked, and the fixed row under it.
     assert not _continues(screen, 2)
@@ -295,10 +292,7 @@ def test_the_alternate_screen_gives_the_mark_back():
     """
     screen = _screen(
         "a" * 12
-        + (
-            set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR)
-            + reset_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR)
-        )
+        + (set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR) + reset_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR))
     )
     assert _continues(screen, 1)
 

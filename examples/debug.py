@@ -11,6 +11,8 @@ debug
 :license: LGPL, see LICENSE for more details.
 """
 
+from __future__ import annotations
+
 import pyte
 
 # A blob of `ADOM` output we need to debug. Hey! I know this is ugly ...

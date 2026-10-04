@@ -5,6 +5,8 @@ A pane has no palette of its own, but a program that asks for one needs
 an answer: without it, it waits forever.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from pyte.colors import DEFAULT_COLORS, PALETTE, Color
@@ -12,13 +14,13 @@ from pyte.osc import (
     COLOR_BASE,
     ColorBase,
     ColorOverrides,
+    Osc,
     a_key_an_answer_may_carry,
     parse_kitty_color_query,
 )
 from pyte.screen import Screen
-from pyte.streams import Stream
-from pyte.osc import Osc
 from pyte.sequences import Terminator, osc
+from pyte.streams import Stream
 
 BLACK = "rgb:0000/0000/0000"
 WHITE = "rgb:ffff/ffff/ffff"
@@ -259,9 +261,7 @@ def test_a_base_kitty_query():
     # protocol says.
     screen, stream, responses = make_screen_on_a_base()
     stream.feed(osc(Osc.KITTY_COLORS, "foreground=?", "3=?"))
-    assert responses == [
-        "\x1b]21;foreground=%s;3=%s\x1b\\" % (_BASE_FG.spec, _BASE_PALETTE[3].spec)
-    ]
+    assert responses == ["\x1b]21;foreground=%s;3=%s\x1b\\" % (_BASE_FG.spec, _BASE_PALETTE[3].spec)]
 
 
 def test_the_cube_of_a_base_is_convention():
@@ -325,9 +325,7 @@ def test_a_terminal_reset_keeps_the_base():
 def test_the_base_can_be_swapped_mid_life():
     screen, stream, responses = make_screen_on_a_base()
     later = Color(0x77, 0x88, 0x99)
-    screen.set_color_base(
-        ColorBase([later] * len(PALETTE), {"foreground": later, "background": later})
-    )
+    screen.set_color_base(ColorBase([later] * len(PALETTE), {"foreground": later, "background": later}))
     stream.feed(osc(Osc.PALETTE_COLOR, "1", "?", end=Terminator.BEL))
     stream.feed(osc("10", "rgb:00/ff/00", end=Terminator.BEL))
     green = "rgb:0000/ffff/0000"
@@ -376,10 +374,6 @@ def test_an_unknown_sequence_is_consumed():
 
 def test_a_hyperlink_does_not_reach_the_screen():
     screen, stream, responses = make_screen()
-    stream.feed(
-        osc(Osc.HYPERLINK, "", "https://example.com")
-        + "link"
-        + osc(Osc.HYPERLINK, "", "")
-    )
+    stream.feed(osc(Osc.HYPERLINK, "", "https://example.com") + "link" + osc(Osc.HYPERLINK, "", ""))
     row = screen.page.data_buffer[0]
     assert "".join(row[i].char for i in range(4)) == "link"

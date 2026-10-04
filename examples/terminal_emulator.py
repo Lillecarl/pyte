@@ -13,6 +13,8 @@ To exit the application, hit Ctrl-C.
 :license: LGPL, see LICENSE for more details.
 """
 
+from __future__ import annotations
+
 import asyncio
 import fcntl
 import os
@@ -21,11 +23,12 @@ import shlex
 import struct
 import termios
 
-import pyte
 from rich.text import Text
 from textual import events
 from textual.app import App
 from textual.widget import Widget
+
+import pyte
 
 
 class PyteDisplay:

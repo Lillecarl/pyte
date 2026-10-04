@@ -12,12 +12,14 @@ claimed and not served is worse than one that is missing, because the
 program stops asking and draws what the terminal cannot draw.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from pyte.screen import Screen
-from pyte.terminfo import CAPABILITIES, TERMINAL_NAME
-from pyte.streams import Stream
 from pyte.sequences import dcs
+from pyte.streams import Stream
+from pyte.terminfo import CAPABILITIES, TERMINAL_NAME
 
 
 def ask(names):

@@ -13,11 +13,13 @@ nobody reads ends at the "#", and the digit after it lands on the screen
 as text.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from pyte.screen import Screen
-from pyte.streams import Stream
 from pyte.sequences import Sharp, sharp
+from pyte.streams import Stream
 
 LINES, COLUMNS = 5, 10
 

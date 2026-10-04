@@ -6,11 +6,12 @@ blank space under the prompt, the lines that the program covered come
 back from the scroll buffer.
 """
 
-from pyte.screen import Screen
-from pyte.streams import Stream
+from __future__ import annotations
+
 from pyte import escape
-from pyte.sequences import Csi, csi
-from pyte.sequences import apc
+from pyte.screen import Screen
+from pyte.sequences import Csi, apc, csi
+from pyte.streams import Stream
 
 LINES = 5
 

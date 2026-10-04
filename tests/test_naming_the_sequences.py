@@ -12,6 +12,8 @@ expected value of an assertion turns a test into one that passes
 whatever the code does, and nothing downstream would say so.
 """
 
+from __future__ import annotations
+
 import ast
 import sys
 from pathlib import Path
@@ -20,7 +22,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 
-from name_the_sequences import (  # noqa: E402
+from name_the_sequences import (
     Rewrite,
     Skipped,
     an_expression_for,
@@ -71,12 +73,8 @@ def test_a_private_marker_is_named():
 
 def test_a_mode_is_a_mode_before_it_is_a_sequence():
     "The rules run from the most specific to the least."
-    assert rewritten("\x1b[?1049h") == (
-        "set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR)"
-    )
-    assert rewritten("\x1b[?1049l") == (
-        "reset_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR)"
-    )
+    assert rewritten("\x1b[?1049h") == ("set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR)")
+    assert rewritten("\x1b[?1049l") == ("reset_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR)")
     assert rewritten("\x1b[4h") == "set_mode(AnsiMode.INSERT_REPLACE)"
 
 
@@ -117,9 +115,7 @@ def test_the_intermediate_byte_picks_the_family():
 
 
 def test_an_operating_system_command():
-    assert rewritten("\x1b]4;3;#aabbcc\x1b\\") == (
-        'osc(Osc.PALETTE_COLOR, "3", "#aabbcc")'
-    )
+    assert rewritten("\x1b]4;3;#aabbcc\x1b\\") == ('osc(Osc.PALETTE_COLOR, "3", "#aabbcc")')
     assert rewritten("\x1b]104\x1b\\") == "osc(Osc.RESET_PALETTE_COLOR)"
     assert rewritten("\x1b]8;;\x1b\\") == 'osc(Osc.HYPERLINK, "", "")'
 
@@ -186,9 +182,7 @@ def test_a_string_with_two_sequences_becomes_two_calls():
 
 
 def test_the_text_between_two_sequences_stays_text():
-    assert rewritten("\x1b[42mhi\x1b[K") == (
-        'csi(escape.SGR, 42) + "hi" + csi(escape.EL)'
-    )
+    assert rewritten("\x1b[42mhi\x1b[K") == ('csi(escape.SGR, 42) + "hi" + csi(escape.EL)')
 
 
 def test_the_text_around_a_sequence_stays_text():
@@ -369,9 +363,7 @@ def test_two_rewrites_on_one_line_are_not_wrapped():
     other, and that is a judgement about the whole line rather than
     about one string in it.
     """
-    source = (
-        'def t():\n    feed("\\x1b[5;7r\\x1b[?69h\\x1b[5;7s", "\\x1b[5;7r\\x1b[?69h")\n'
-    )
+    source = 'def t():\n    feed("\\x1b[5;7r\\x1b[?69h\\x1b[5;7s", "\\x1b[5;7r\\x1b[?69h")\n'
     written = applied(source, changes_in(source)[0])
 
     assert "\n" not in written.splitlines()[1]

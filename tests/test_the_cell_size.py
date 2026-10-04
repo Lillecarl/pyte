@@ -15,6 +15,8 @@ Until somebody says otherwise it is `ASSUMED_CELL_WIDTH` by
 answer those queries. Lillecarl/pymux#369.
 """
 
+from __future__ import annotations
+
 from pyte.images import ASSUMED_CELL_HEIGHT, ASSUMED_CELL_WIDTH
 from pyte.screen import Screen
 from pyte.sequences import Csi, csi

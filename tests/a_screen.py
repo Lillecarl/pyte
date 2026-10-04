@@ -7,6 +7,8 @@ a look at the result. They used upstream's `Screen`, which had a
 replace it.
 """
 
+from __future__ import annotations
+
 from pyte.screen import Screen
 
 __all__ = ("a_screen", "display")

@@ -17,8 +17,10 @@ file.** How a renderer writes a colour is that renderer's, and
 Nothing here reads or writes a sequence.
 """
 
+from __future__ import annotations
+
 from string import hexdigits
-from typing import Dict, List, NamedTuple
+from typing import NamedTuple
 
 from .xcms import SPACES, intensity_to_value, screen_rgb
 
@@ -80,7 +82,7 @@ class Color(NamedTuple):
 
 # The colours that a pane reports. pymux renders a dark background, so
 # these are the honest answer for what a program will draw on.
-DEFAULT_COLORS: Dict[str, Color] = {
+DEFAULT_COLORS: dict[str, Color] = {
     "foreground": Color(0xFF, 0xFF, 0xFF),
     "background": Color(0x00, 0x00, 0x00),
     "cursor": Color(0xFF, 0xFF, 0xFF),
@@ -121,7 +123,7 @@ _GREY_FIRST = 8
 _GREY_STEP = 10
 
 
-def _build_palette() -> List[Color]:
+def _build_palette() -> list[Color]:
     palette = list(_ANSI)
     for red in _CUBE:
         for green in _CUBE:
@@ -177,7 +179,7 @@ def _parse_hash(spec: str) -> Color | None:
     return _parse_parts(parts, scale=False)
 
 
-def _parse_parts(parts: List[str], scale: bool) -> Color | None:
+def _parse_parts(parts: list[str], scale: bool) -> Color | None:
     "Three components of a spec, or None when one of them is not hex."
     if len(parts) != _COMPONENTS:
         return None
@@ -295,7 +297,7 @@ class SgrColor(NamedTuple):
     rgb: Color | None = None
 
 
-def sgr_color_parameters(parameters: List[int]) -> int:
+def sgr_color_parameters(parameters: list[int]) -> int:
     """
     How many parameters a colour of "38", "48" or "58" takes.
 
@@ -311,7 +313,7 @@ def sgr_color_parameters(parameters: List[int]) -> int:
     return len(parameters)
 
 
-def sgr_color(parameters: List[int]) -> SgrColor | None:
+def sgr_color(parameters: list[int]) -> SgrColor | None:
     """
     The colour that "38", "48" or "58" names, or None for nonsense.
 
@@ -369,7 +371,7 @@ _DEFAULT_FOREGROUND = 39
 _DEFAULT_BACKGROUND = 49
 
 
-def _coded_colors(first: int, bright: int, default: int) -> Dict[int, SgrColor]:
+def _coded_colors(first: int, bright: int, default: int) -> dict[int, SgrColor]:
     "The single SGR codes of one side, and the colour each one names."
     table = {default: DEFAULT_COLOR}
     for number in range(_HALF):
@@ -381,12 +383,8 @@ def _coded_colors(first: int, bright: int, default: int) -> Dict[int, SgrColor]:
 #: The colour that each of the single SGR codes names. "SGR 31" is the
 #: first colour of the palette and "SGR 101" is the ninth, as a
 #: background.
-COLOR_OF_A_FOREGROUND = _coded_colors(
-    _FIRST_FOREGROUND, _FIRST_BRIGHT_FOREGROUND, _DEFAULT_FOREGROUND
-)
-COLOR_OF_A_BACKGROUND = _coded_colors(
-    _FIRST_BACKGROUND, _FIRST_BRIGHT_BACKGROUND, _DEFAULT_BACKGROUND
-)
+COLOR_OF_A_FOREGROUND = _coded_colors(_FIRST_FOREGROUND, _FIRST_BRIGHT_FOREGROUND, _DEFAULT_FOREGROUND)
+COLOR_OF_A_BACKGROUND = _coded_colors(_FIRST_BACKGROUND, _FIRST_BRIGHT_BACKGROUND, _DEFAULT_BACKGROUND)
 
 
 def sgr_code_of(index: int, background: bool = False) -> int | None:

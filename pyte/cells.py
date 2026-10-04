@@ -13,9 +13,11 @@ into a `Rendition` and `page.py` says what holds the cells.
 Lillecarl/pymux#129.
 """
 
+from __future__ import annotations
+
 from enum import IntFlag
 from functools import lru_cache
-from typing import NamedTuple, Tuple
+from typing import NamedTuple
 
 from wcwidth import wcwidth  # type: ignore[import-untyped]
 
@@ -110,7 +112,7 @@ class Cell:
     `WrittenCell` existed to undo one entry of that table.
     """
 
-    __slots__ = ("char", "appearance", "width")
+    __slots__ = ("appearance", "char", "width")
 
     #: Whether a program put the character here, or an erase left it.
     #:
@@ -121,7 +123,7 @@ class Cell:
     #: output at 400x150. Lillecarl/pymux#434.
     written = False
 
-    def __init__(self, char: str, appearance: "Appearance") -> None:
+    def __init__(self, char: str, appearance: Appearance) -> None:
         self.char = char
         self.appearance = appearance
 
@@ -208,9 +210,7 @@ class ProtectedCell(WrittenCell):
 
     __slots__ = ("protection",)
 
-    def __init__(
-        self, char: str, appearance: "Appearance", protection: int = 0
-    ) -> None:
+    def __init__(self, char: str, appearance: Appearance, protection: int = 0) -> None:
         super().__init__(char, appearance)
         self.protection = protection
 
@@ -221,15 +221,11 @@ def protection_of(cell: Cell) -> int:
 
 
 # Cache for Cell objects.
-_CHAR_CACHE: FastDictCache[Tuple[str, "Appearance"], Cell] = FastDictCache(
-    WrittenCell, size=1000 * 1000
-)
+_CHAR_CACHE: FastDictCache[tuple[str, Appearance], Cell] = FastDictCache(WrittenCell, size=1000 * 1000)
 
 #: The same for the cells that carry a mark. Nearly no program marks
 #: one, so this one stays small.
-_PROTECTED_CHAR_CACHE: FastDictCache[Tuple[str, "Appearance", int], Cell] = (
-    FastDictCache(ProtectedCell, size=10 * 1000)
-)
+_PROTECTED_CHAR_CACHE: FastDictCache[tuple[str, Appearance, int], Cell] = FastDictCache(ProtectedCell, size=10 * 1000)
 
 
 class Rendition(NamedTuple):
@@ -295,11 +291,9 @@ class Appearance:
     a screen makes one of these per SGR sequence rather than per cell.
     """
 
-    __slots__ = ("rendition", "hyperlink", "hyperlink_id", "_hash")
+    __slots__ = ("_hash", "hyperlink", "hyperlink_id", "rendition")
 
-    def __init__(
-        self, rendition: Rendition, hyperlink: str = "", hyperlink_id: str = ""
-    ) -> None:
+    def __init__(self, rendition: Rendition, hyperlink: str = "", hyperlink_id: str = "") -> None:
         self.rendition = rendition
         #: The target of the link that is open ("OSC 8"), and the id
         #: that joins its pieces. Both are empty outside a link.
@@ -340,9 +334,7 @@ class Appearance:
 #: dropping one is every cell that still points at it comparing unequal
 #: to the next. Both front ends size their own style cache off this
 #: one, so it is the number that decides all three.
-appearance_of: FastDictCache[Tuple[Rendition, str, str], Appearance] = FastDictCache(
-    Appearance, size=10 * 1000
-)
+appearance_of: FastDictCache[tuple[Rendition, str, str], Appearance] = FastDictCache(Appearance, size=10 * 1000)
 
 #: How a screen draws before any program has asked for anything, and
 #: what an untouched cell carries.

@@ -12,12 +12,14 @@ is why the whole class of these tests failed while only some of them
 were missing.
 """
 
+from __future__ import annotations
+
 import pytest
 
-from pyte.screen import Screen
-from pyte.streams import Stream
 from pyte import escape
+from pyte.screen import Screen
 from pyte.sequences import csi
+from pyte.streams import Stream
 
 
 def _screen(lines=8, columns=20):

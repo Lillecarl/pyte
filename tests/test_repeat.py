@@ -6,14 +6,15 @@ a box or a rule is made of. The repeat draws the way the typing would
 have, so it wraps at the right margin and scrolls at the bottom one.
 """
 
+from __future__ import annotations
+
 import pytest
 
-from pyte.screen import Screen
-from pyte.streams import Stream
 from pyte import escape
-from pyte.sequences import Csi, csi
 from pyte.modes import PrivateMode
-from pyte.sequences import set_mode
+from pyte.screen import Screen
+from pyte.sequences import Csi, csi, set_mode
+from pyte.streams import Stream
 
 LINES, COLUMNS = 5, 10
 
@@ -66,9 +67,7 @@ def test_a_repeat_takes_the_last_character_of_a_run(pane):
 
 def test_a_repeat_wraps_at_the_right_margin(pane):
     screen, stream = pane
-    stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 2, 4)
-    )  # A region from column 2 to 4.
+    stream.feed(set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 2, 4))  # A region from column 2 to 4.
     stream.feed(csi(escape.CUP, 1, 2) + "a" + csi(Csi.REP, 3))
     assert row(screen, 0) == " aaa" + " " * (COLUMNS - 4)
     assert row(screen, 1) == " a" + " " * (COLUMNS - 2)

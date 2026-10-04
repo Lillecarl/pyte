@@ -8,6 +8,8 @@ installed is worse than naming xterm**, so nothing is claimed until the
 compiled entry is found.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from pyte.environment import (

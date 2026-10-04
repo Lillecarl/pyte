@@ -7,9 +7,11 @@ and says nothing. `xterm_tables.py` says why xterm's `charsets.h` is
 the list and why there is no other. Lillecarl/pymux#111.
 """
 
-import pytest
+from __future__ import annotations
 
+import pytest
 import xterm_tables
+
 from pyte import charsets as cs
 
 pytestmark = pytest.mark.skipif(

@@ -7,13 +7,14 @@ OSC 1337 name services of the embedder too. Those sequences therefore
 leave the pane through `osc_func`, and the embedder reads them.
 """
 
+from __future__ import annotations
+
 import pytest
 
-from pyte.osc import FORWARDED_OSC
+from pyte.osc import FORWARDED_OSC, Osc
 from pyte.screen import Screen
-from pyte.streams import Stream
-from pyte.osc import Osc
 from pyte.sequences import osc
+from pyte.streams import Stream
 
 
 def make_screen():

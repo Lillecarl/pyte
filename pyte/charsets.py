@@ -22,6 +22,8 @@ and not a choice, so this table follows the five.
 :license: LGPL, see LICENSE for more details.
 """
 
+from __future__ import annotations
+
 #: Latin1.
 LAT1_MAP = "".join(map(chr, range(256)))
 
@@ -1084,8 +1086,6 @@ def _latin1_with(replacements: dict) -> str:
 
 MAPS = {"B": LAT1_MAP, "0": VT100_MAP, "U": IBMPC_MAP, "V": VAX42_MAP}
 
-MAPS.update(
-    {name: _latin1_with(replacements) for name, replacements in NATIONAL.items()}
-)
+MAPS.update({name: _latin1_with(replacements) for name, replacements in NATIONAL.items()})
 MAPS.update({alias: MAPS[name] for alias, name in NATIONAL_ALIASES.items()})
 MAPS[">"] = _latin1_with(TECHNICAL)

@@ -18,10 +18,12 @@ the top row and puts the cursor at `4,2`, which is what these tests
 assert. Lillecarl/pymux#57.
 """
 
+from __future__ import annotations
+
 from pyte.cells import WrittenCell
 from pyte.screen import Screen
-from pyte.streams import Stream
 from pyte.sequences import Csi, csi
+from pyte.streams import Stream
 
 # The prompt of libvterm's "Shell wrapped prompt behaviour" case. On ten
 # columns it takes seven rows, so two of them scroll off a five row
@@ -48,7 +50,7 @@ def _row(screen, row: int) -> str:
     a reflow that drops it is Lillecarl/pymux#56 again.
     """
     line = screen.page.data_buffer[screen.line_offset + row]
-    text = [line[x] for x in range(0, max(line) + 1)]
+    text = [line[x] for x in range(max(line) + 1)]
     while text and not isinstance(text[-1], WrittenCell):
         text.pop()
     return "".join(cell.char for cell in text)

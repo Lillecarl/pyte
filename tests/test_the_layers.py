@@ -19,6 +19,8 @@ Everything that parses or holds is held to the rules. The disassembler
 is not: it is a program, it writes to a file, and `TOOLS` names it.
 """
 
+from __future__ import annotations
+
 import ast
 from pathlib import Path
 
@@ -165,9 +167,7 @@ def test_every_module_has_a_layer():
     else can hold it to a rule.
     """
     unplaced = sorted(name for name in MODULES if name not in PURE | TOOLS)
-    assert unplaced == [], (
-        "these modules are in no layer: add each one to PURE or TOOLS in this file"
-    )
+    assert unplaced == [], "these modules are in no layer: add each one to PURE or TOOLS in this file"
 
 
 @pytest.mark.parametrize("name", sorted(PURE))

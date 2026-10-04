@@ -20,8 +20,10 @@ feeds a parser, and the replies a test makes a terminal give. Getting
 one of those wrong is a passing test that asserts the wrong thing.
 """
 
+from __future__ import annotations
+
 from enum import StrEnum
-from typing import Iterable, Sequence, Union
+from typing import Iterable, Sequence
 
 from .control import BEL as _BEL
 from .control import CSI as _CSI
@@ -324,7 +326,7 @@ def announce(final: str) -> str:
 #: how a program asks for the default of that position rather than for
 #: zero. A sequence of them is a parameter with subparameters, which
 #: the colons join.
-Parameter = Union[int, None, Sequence[Union[int, None]]]
+Parameter = int | None | Sequence[int | None]
 
 #: The markers that go between the "[" and the parameters. The marker
 #: is the whole difference between some sequences that share a final
@@ -372,14 +374,12 @@ def _joined(params: Iterable[Parameter]) -> str:
     return ";".join(
         # An `IntEnum` is an `int`, so only a real sequence of
         # subparameters reaches the colons.
-        _one(value)
-        if isinstance(value, (int, type(None)))
-        else ":".join(_one(part) for part in value)
+        _one(value) if isinstance(value, (int, type(None))) else ":".join(_one(part) for part in value)
         for value in params
     )
 
 
-def _one(value: Union[int, None]) -> str:
+def _one(value: int | None) -> str:
     "One parameter. Nothing at all is how an empty one is written."
     return "" if value is None else str(int(value))
 
@@ -390,7 +390,7 @@ def _one(value: Union[int, None]) -> str:
 #: exists as "CSI ? 1049 h". `modes.py` names the modes a pane acts on;
 #: for any other number, write `csi(escape.SM, 2026, private="?")` and
 #: say the marker out loud.
-Mode = Union[AnsiMode, PrivateMode]
+Mode = AnsiMode | PrivateMode
 
 
 def set_mode(*modes: Mode) -> str:
@@ -426,9 +426,7 @@ def _marker_of(modes: Sequence[Mode]) -> str:
 
     private = [isinstance(mode, PrivateMode) for mode in modes]
     if any(private) and not all(private):
-        raise ValueError(
-            "a private mode and an ANSI mode cannot go in one sequence: %r" % (modes,)
-        )
+        raise ValueError("a private mode and an ANSI mode cannot go in one sequence: %r" % (modes,))
     return "?" if any(private) else ""
 
 

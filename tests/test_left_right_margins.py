@@ -6,14 +6,13 @@ mode 69 (DECLRMM) says whether it may. The margins are the edges of the
 line for everything that draws or moves the cursor along it.
 """
 
-from pyte.screen import Screen
-from pyte.streams import Stream
-from pyte.modes import PrivateMode
-from pyte.sequences import Csi, csi, set_mode
+from __future__ import annotations
+
 from pyte import escape
-from pyte.modes import AnsiMode
-from pyte.sequences import esc, reset_mode
-from pyte.sequences import decrqss
+from pyte.modes import AnsiMode, PrivateMode
+from pyte.screen import Screen
+from pyte.sequences import Csi, csi, decrqss, esc, reset_mode, set_mode
+from pyte.streams import Stream
 
 
 def _screen(lines=5, columns=10):
@@ -26,10 +25,7 @@ def _screen(lines=5, columns=10):
 def _line(screen, row=0):
     "The text of one row of the screen, with a space for an empty cell."
     buffer = screen.data_buffer[row + screen.line_offset]
-    return "".join(
-        (buffer[column].char or " ") if column in buffer else " "
-        for column in range(screen.columns)
-    )
+    return "".join((buffer[column].char or " ") if column in buffer else " " for column in range(screen.columns))
 
 
 def _column(screen):
@@ -56,9 +52,7 @@ def test_the_margins_need_the_mode():
 def test_resetting_the_mode_takes_the_margins_away():
     screen, stream, _answers = _screen()
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 3, 7)
-        + reset_mode(PrivateMode.LEFT_RIGHT_MARGIN)
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 3, 7) + reset_mode(PrivateMode.LEFT_RIGHT_MARGIN)
     )
     assert screen.horizontal_margins is None
 
@@ -77,11 +71,7 @@ def test_a_region_of_one_column_is_refused():
 
 def test_the_margins_home_the_cursor():
     screen, stream, _answers = _screen()
-    stream.feed(
-        csi(escape.CUP, 3, 5)
-        + set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 3, 7)
-    )
+    stream.feed(csi(escape.CUP, 3, 5) + set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 3, 7))
     assert (screen.pt_cursor_position.x, screen.pt_cursor_position.y) == (0, 0)
 
 
@@ -127,11 +117,7 @@ def test_a_line_wraps_at_the_right_margin():
 
 def test_a_line_without_wrap_stops_at_the_right_margin():
     screen, stream, _answers = _screen()
-    stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 2, 4)
-        + reset_mode(PrivateMode.AUTOWRAP)
-    )
+    stream.feed(set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 2, 4) + reset_mode(PrivateMode.AUTOWRAP))
     stream.feed(csi(escape.CUP, 1, 2) + "abcdef")
     assert _line(screen, 0) == " abf      "
     assert _column(screen) == 3
@@ -152,55 +138,34 @@ def test_a_line_right_of_the_margin_runs_to_the_edge():
 
 def test_a_carriage_return_reaches_the_left_margin():
     screen, stream, _answers = _screen()
-    stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 3, 7)
-        + csi(escape.CUP, 1, 6)
-        + "\r"
-    )
+    stream.feed(set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 3, 7) + csi(escape.CUP, 1, 6) + "\r")
     assert _column(screen) == 2
 
 
 def test_a_carriage_return_left_of_the_margin_reaches_the_first_column():
     screen, stream, _answers = _screen()
-    stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 3, 7)
-        + csi(escape.CUP, 1, 2)
-        + "\r"
-    )
+    stream.feed(set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 3, 7) + csi(escape.CUP, 1, 2) + "\r")
     assert _column(screen) == 0
 
 
 def test_a_move_back_stops_at_the_left_margin():
     screen, stream, _answers = _screen()
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 3, 7)
-        + csi(escape.CUP, 1, 5)
-        + csi(escape.CUB, 99)
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 3, 7) + csi(escape.CUP, 1, 5) + csi(escape.CUB, 99)
     )
     assert _column(screen) == 2
 
 
 def test_a_backspace_stops_at_the_left_margin():
     screen, stream, _answers = _screen()
-    stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 3, 7)
-        + csi(escape.CUP, 1, 3)
-        + "\x08"
-    )
+    stream.feed(set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 3, 7) + csi(escape.CUP, 1, 3) + "\x08")
     assert _column(screen) == 2
 
 
 def test_a_move_back_left_of_the_margin_reaches_the_first_column():
     screen, stream, _answers = _screen()
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 3, 7)
-        + csi(escape.CUP, 1, 2)
-        + csi(escape.CUB, 99)
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 3, 7) + csi(escape.CUP, 1, 2) + csi(escape.CUB, 99)
     )
     assert _column(screen) == 0
 
@@ -208,10 +173,7 @@ def test_a_move_back_left_of_the_margin_reaches_the_first_column():
 def test_a_move_forward_stops_at_the_right_margin():
     screen, stream, _answers = _screen()
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 3, 7)
-        + csi(escape.CUP, 1, 4)
-        + csi(escape.CUF, 99)
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 3, 7) + csi(escape.CUP, 1, 4) + csi(escape.CUF, 99)
     )
     assert _column(screen) == 6
 
@@ -219,22 +181,14 @@ def test_a_move_forward_stops_at_the_right_margin():
 def test_a_move_forward_right_of_the_margin_reaches_the_last_column():
     screen, stream, _answers = _screen()
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 3, 7)
-        + csi(escape.CUP, 1, 9)
-        + csi(escape.CUF, 99)
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 3, 7) + csi(escape.CUP, 1, 9) + csi(escape.CUF, 99)
     )
     assert _column(screen) == 9
 
 
 def test_a_tab_stops_at_the_right_margin():
     screen, stream, _answers = _screen(columns=40)
-    stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 10, 20)
-        + csi(escape.CUP, 1, 1)
-        + "\t\t\t"
-    )
+    stream.feed(set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 10, 20) + csi(escape.CUP, 1, 1) + "\t\t\t")
     assert _column(screen) == 19
 
 
@@ -242,10 +196,7 @@ def test_a_tab_left_of_the_region_stops_at_the_right_margin():
     "The DEC terminals stop a tab at the margin, wherever it starts."
     screen, stream, _answers = _screen(columns=40)
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 10, 20)
-        + csi(escape.CUP, 1, 1)
-        + csi(Csi.CHT, 9)
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 10, 20) + csi(escape.CUP, 1, 1) + csi(Csi.CHT, 9)
     )
     assert _column(screen) == 19
 
@@ -329,10 +280,7 @@ def test_a_scroll_up_carries_the_columns_of_the_region():
     screen, stream, _answers = _screen()
     _grid(stream)
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 2, 4)
-        + csi(escape.CUP, 2, 3)
-        + csi(Csi.SU, 2)
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 2, 4) + csi(escape.CUP, 2, 3) + csi(Csi.SU, 2)
     )
     assert _lines(screen) == ["almne", "fqrsj", "kvwxo", "p   t", "u   y"]
 
@@ -341,10 +289,7 @@ def test_a_scroll_down_carries_the_columns_of_the_region():
     screen, stream, _answers = _screen()
     _grid(stream)
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 2, 4)
-        + csi(escape.CUP, 2, 3)
-        + csi(Csi.SD, 2)
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 2, 4) + csi(escape.CUP, 2, 3) + csi(Csi.SD, 2)
     )
     assert _lines(screen) == ["a   e", "f   j", "kbcdo", "pghit", "ulmny"]
 
@@ -419,10 +364,7 @@ def test_a_delete_of_lines_carries_the_columns_of_the_region():
     screen, stream, _answers = _screen()
     _grid(stream)
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 2, 4)
-        + csi(escape.CUP, 2, 3)
-        + csi(escape.DL)
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 2, 4) + csi(escape.CUP, 2, 3) + csi(escape.DL)
     )
     assert _lines(screen) == ["abcde", "flmnj", "kqrso", "pvwxt", "u   y"]
 
@@ -431,10 +373,7 @@ def test_a_delete_of_lines_outside_the_columns_does_nothing():
     screen, stream, _answers = _screen()
     _grid(stream)
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 2, 4)
-        + csi(escape.CUP, 2, 1)
-        + csi(escape.DL)
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 2, 4) + csi(escape.CUP, 2, 1) + csi(escape.DL)
     )
     assert _lines(screen) == GRID
 
@@ -443,10 +382,7 @@ def test_an_insert_of_lines_carries_the_columns_of_the_region():
     screen, stream, _answers = _screen()
     _grid(stream)
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 2, 4)
-        + csi(escape.CUP, 2, 3)
-        + csi(escape.IL)
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 2, 4) + csi(escape.CUP, 2, 3) + csi(escape.IL)
     )
     assert _lines(screen) == ["abcde", "f   j", "kghio", "plmnt", "uqrsy"]
 
@@ -455,10 +391,7 @@ def test_an_insert_of_lines_outside_the_columns_does_nothing():
     screen, stream, _answers = _screen()
     _grid(stream)
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 2, 4)
-        + csi(escape.CUP, 2, 1)
-        + csi(escape.IL)
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 2, 4) + csi(escape.CUP, 2, 1) + csi(escape.IL)
     )
     assert _lines(screen) == GRID
 
@@ -471,10 +404,7 @@ def test_an_insert_of_characters_stops_at_the_right_margin():
     screen, stream, _answers = _screen()
     stream.feed("abcdefg")
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 2, 5)
-        + csi(escape.CUP, 1, 3)
-        + csi(escape.ICH)
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 2, 5) + csi(escape.CUP, 1, 3) + csi(escape.ICH)
     )
     assert _line(screen, 0) == "ab cdfg   "
 
@@ -483,10 +413,7 @@ def test_an_insert_of_characters_outside_the_margins_does_nothing():
     screen, stream, _answers = _screen()
     stream.feed("abcdefg")
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 2, 5)
-        + csi(escape.CUP, 1, 1)
-        + csi(escape.ICH, 10)
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 2, 5) + csi(escape.CUP, 1, 1) + csi(escape.ICH, 10)
     )
     assert _line(screen, 0) == "abcdefg   "
 
@@ -495,10 +422,7 @@ def test_a_delete_of_characters_stops_at_the_right_margin():
     screen, stream, _answers = _screen()
     stream.feed("abcde")
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 2, 4)
-        + csi(escape.CUP, 1, 3)
-        + csi(escape.DCH)
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 2, 4) + csi(escape.CUP, 1, 3) + csi(escape.DCH)
     )
     assert _line(screen, 0) == "abd e     "
 
@@ -507,10 +431,7 @@ def test_a_delete_of_characters_reaches_the_right_margin():
     screen, stream, _answers = _screen()
     stream.feed("abcde")
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 2, 4)
-        + csi(escape.CUP, 1, 3)
-        + csi(escape.DCH, 99)
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 2, 4) + csi(escape.CUP, 1, 3) + csi(escape.DCH, 99)
     )
     assert _line(screen, 0) == "ab  e     "
 
@@ -519,10 +440,7 @@ def test_a_delete_of_characters_outside_the_margins_does_nothing():
     screen, stream, _answers = _screen()
     stream.feed("abcde")
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 2, 4)
-        + csi(escape.CUP, 1, 1)
-        + csi(escape.DCH, 99)
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 2, 4) + csi(escape.CUP, 1, 1) + csi(escape.DCH, 99)
     )
     assert _line(screen, 0) == "abcde     "
 

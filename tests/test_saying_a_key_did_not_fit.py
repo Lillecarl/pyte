@@ -11,6 +11,8 @@ a `report` now, and the caller decides whether to say anything.
 Lillecarl/pymux#238.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from pyte.keys import (

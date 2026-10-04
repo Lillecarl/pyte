@@ -11,14 +11,15 @@ say how the terminal reports one back.
 where the gap was found.
 """
 
+from __future__ import annotations
+
 import pytest
 
+from pyte import escape
 from pyte.parameters import TitleMode
 from pyte.screen import Screen
+from pyte.sequences import Csi, csi, esc
 from pyte.streams import Stream
-from pyte.sequences import Csi, csi
-from pyte import escape
-from pyte.sequences import esc
 
 #: "CSI > Ps t": set a title mode. "CSI > Ps T": take it away.
 SET = "\x1b[>%st"

@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+import os
+
 # pyte documentation build configuration file, created by
 # sphinx-quickstart on Fri Apr  8 12:49:51 2011.
 #
@@ -8,8 +12,7 @@
 #
 # All configuration values have a default; values that are commented out
 # serve to show the default.
-
-import sys, os
+import sys
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -94,8 +97,8 @@ linkcode_base_url = "https://github.com/selectel/pyte/tree/"
 
 
 def resolve_tag():
-    from urllib.request import urlopen
     from urllib.error import HTTPError
+    from urllib.request import urlopen
 
     try:
         urlopen(linkcode_base_url + release)
@@ -119,6 +122,7 @@ def linkcode_resolve(domain, info):
 
         import inspect
         import os
+
         import pyte
 
         fn = inspect.getsourcefile(obj)

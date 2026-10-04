@@ -21,15 +21,16 @@ the old behaviour, kept here and nowhere else.
 keeps every line of the whole buffer, history included.
 """
 
-from hypothesis import HealthCheck, given, settings
-from hypothesis import strategies as st
+from __future__ import annotations
 
 from a_screen import a_screen
-from pyte.screen import Screen
-from pyte.streams import Stream
-
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 from test_row_versions import a_chunk
+
+from pyte.screen import Screen
 from pyte.sequences import Sharp, sharp
+from pyte.streams import Stream
 
 
 class EagerScreen(Screen):
@@ -63,10 +64,7 @@ def what_a_person_sees(screen):
             continue
         rows.append(
             (
-                tuple(
-                    (row[column].char, row[column].appearance)
-                    for column in range(max(row, default=-1) + 1)
-                ),
+                tuple((row[column].char, row[column].appearance) for column in range(max(row, default=-1) + 1)),
                 row.wrapped,
             )
         )
@@ -179,9 +177,7 @@ def test_the_history_keeps_the_width_it_was_written_at():
     is not touched by a column change.
     """
     screen = a_screen(columns=10, lines=6)
-    Stream(screen).feed(
-        "".join("row %d is long enough to wrap\r\n" % number for number in range(40))
-    )
+    Stream(screen).feed("".join("row %d is long enough to wrap\r\n" % number for number in range(40)))
 
     before = screen.page.data_buffer[0]
     screen.resize(6, 20)

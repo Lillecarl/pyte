@@ -18,6 +18,8 @@ right if something says so against the original.
 `nix/checks.nix` sets it from `xterm.src`.
 """
 
+from __future__ import annotations
+
 import os
 import re
 from pathlib import Path
@@ -46,9 +48,7 @@ MACROS = {
 }
 
 _DEFINE = re.compile(r"#define (map_\w+)\(")
-_ENTRY = re.compile(
-    r"(MAP|UNI|XXX)\(0x([0-9A-Fa-f]{2}),\s*([^)]+)\)(?:\s*/\*\s*(.*?)\*/)?"
-)
+_ENTRY = re.compile(r"(MAP|UNI|XXX)\(0x([0-9A-Fa-f]{2}),\s*([^)]+)\)(?:\s*/\*\s*(.*?)\*/)?")
 _CODEPOINT = re.compile(r"U\+([0-9A-Fa-f]{4})")
 
 

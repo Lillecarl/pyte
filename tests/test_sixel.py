@@ -3,12 +3,13 @@ Tests for the sixel decoder and for the sixel images that a pane
 stores.
 """
 
+from __future__ import annotations
+
+from pyte import escape
 from pyte.screen import Screen
+from pyte.sequences import apc, csi, decrqss
 from pyte.sixel import DEFAULT_PALETTE, decode_sixel
 from pyte.streams import Stream
-from pyte import escape
-from pyte.sequences import csi
-from pyte.sequences import apc, decrqss
 
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)

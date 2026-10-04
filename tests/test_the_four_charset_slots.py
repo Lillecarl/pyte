@@ -13,6 +13,8 @@ character, which is cheaper than shifting there and back.
 Lillecarl/pymux#373.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from pyte import charsets as cs
@@ -36,21 +38,15 @@ def _drawn(sequence, columns=20):
     line = screen.page.data_buffer.get(screen.line_offset)
     if line is None:
         return ""
-    return "".join(
-        (line[column].char or " ") for column in range(columns)
-    ).rstrip()
+    return "".join((line[column].char or " ") for column in range(columns)).rstrip()
 
 
-@pytest.mark.parametrize(
-    "designator, slot", sorted(Screen.SLOTS.items(), key=lambda pair: pair[1])
-)
+@pytest.mark.parametrize("designator, slot", sorted(Screen.SLOTS.items(), key=lambda pair: pair[1]))
 def test_each_designator_names_its_own_slot(designator, slot):
     screen, stream = _screen()
     stream.feed("\x1b%s0" % (designator,))
     assert screen.g_charsets[slot] is cs.MAPS["0"]
-    assert [
-        other for index, other in enumerate(screen.g_charsets) if index != slot
-    ] == [cs.LAT1_MAP] * 3
+    assert [other for index, other in enumerate(screen.g_charsets) if index != slot] == [cs.LAT1_MAP] * 3
 
 
 def test_a_slot_alone_draws_nothing_different():
@@ -67,21 +63,15 @@ def test_a_locking_shift_brings_g3_in():
 
 
 def test_shift_in_takes_the_letters_back_to_g0():
-    assert _drawn("\x1b*0\x1bn%s\x0f%s" % (CORNER_IS, CORNER_IS)) == (
-        CORNER + CORNER_IS
-    )
+    assert _drawn("\x1b*0\x1bn%s\x0f%s" % (CORNER_IS, CORNER_IS)) == (CORNER + CORNER_IS)
 
 
 def test_a_single_shift_lends_g2_for_one_character():
-    assert _drawn("\x1b*0\x1bN%s%s" % (CORNER_IS, CORNER_IS)) == (
-        CORNER + CORNER_IS
-    )
+    assert _drawn("\x1b*0\x1bN%s%s" % (CORNER_IS, CORNER_IS)) == (CORNER + CORNER_IS)
 
 
 def test_a_single_shift_lends_g3_for_one_character():
-    assert _drawn("\x1b+0\x1bO%s%s" % (CORNER_IS, CORNER_IS)) == (
-        CORNER + CORNER_IS
-    )
+    assert _drawn("\x1b+0\x1bO%s%s" % (CORNER_IS, CORNER_IS)) == (CORNER + CORNER_IS)
 
 
 def test_a_single_shift_leaves_the_locking_shift_where_it_was():

@@ -10,6 +10,8 @@ a running terminal app.
 :license: LGPL, see LICENSE for more details.
 """
 
+from __future__ import annotations
+
 import os
 import pty
 import select
@@ -17,7 +19,6 @@ import signal
 import sys
 
 import pyte
-
 
 if __name__ == "__main__":
     if len(sys.argv) <= 1:
@@ -28,9 +29,7 @@ if __name__ == "__main__":
 
     p_pid, master_fd = pty.fork()
     if p_pid == 0:  # Child.
-        os.execvpe(
-            sys.argv[1], sys.argv[1:], env=dict(TERM="linux", COLUMNS="80", LINES="24")
-        )
+        os.execvpe(sys.argv[1], sys.argv[1:], env=dict(TERM="linux", COLUMNS="80", LINES="24"))
 
     while True:
         try:

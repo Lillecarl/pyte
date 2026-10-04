@@ -5,10 +5,12 @@ pyte has neither. A program that scrolls with "CSI S" instead of a
 linefeed saw nothing happen before.
 """
 
-from pyte.screen import Screen
-from pyte.streams import Stream
+from __future__ import annotations
+
 from pyte import escape
+from pyte.screen import Screen
 from pyte.sequences import Csi, csi
+from pyte.streams import Stream
 
 
 def _screen(lines=4, columns=8):
@@ -21,8 +23,7 @@ def _rows(screen):
     buffer = screen.page.data_buffer
     offset = screen.line_offset
     return [
-        "".join(buffer[y][x].char for x in range(screen.columns)).rstrip()
-        for y in range(offset, offset + screen.lines)
+        "".join(buffer[y][x].char for x in range(screen.columns)).rstrip() for y in range(offset, offset + screen.lines)
     ]
 
 

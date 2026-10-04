@@ -11,6 +11,8 @@ by :class:`~pyte.streams.Stream` and subclasses.
 :license: LGPL, see LICENSE for more details.
 """
 
+from __future__ import annotations
+
 #: *Reset*.
 RIS = "c"
 

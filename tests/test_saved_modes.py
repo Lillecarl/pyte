@@ -6,14 +6,15 @@ found it saves it first. The two commands share their final byte with
 DECSLRM and DECSTBM, and the private marker says which is meant.
 """
 
+from __future__ import annotations
+
 import pytest
 
-from pyte.modes import flag_of
-from pyte.screen import Screen
-from pyte.streams import Stream
 from pyte import escape
-from pyte.modes import PrivateMode
+from pyte.modes import PrivateMode, flag_of
+from pyte.screen import Screen
 from pyte.sequences import Csi, csi, reset_mode, set_mode
+from pyte.streams import Stream
 
 
 @pytest.fixture

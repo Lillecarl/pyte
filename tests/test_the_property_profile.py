@@ -12,6 +12,8 @@ order two lines run in, and nothing else here would say when that
 order changed.
 """
 
+from __future__ import annotations
+
 from hypothesis import settings
 
 #: What a run without `--hypothesis-profile` gets.

@@ -1,7 +1,8 @@
 """Tests for the kitty keyboard protocol flag stack in Screen."""
 
-import pyte
+from __future__ import annotations
 
+import pyte
 from pyte import keys
 from pyte.screen import Screen
 from pyte.streams import Stream

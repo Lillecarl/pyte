@@ -8,8 +8,9 @@ A minimal working example for :mod:`pyte`.
 :license: LGPL, see LICENSE for more details.
 """
 
-import pyte
+from __future__ import annotations
 
+import pyte
 
 if __name__ == "__main__":
     screen = pyte.Screen(80, 24)

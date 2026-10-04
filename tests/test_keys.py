@@ -6,6 +6,8 @@ feeding the pane) into the encoding that the pane expects, given its
 kitty keyboard protocol flags.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from pyte.keys import (
@@ -101,10 +103,7 @@ def test_report_all_keys_encodes_everything():
     # and kitty leaves out a parameter that holds its default. Only the
     # SS3 form of application mode goes away.
     assert translate_key_data("\x1b[D", flags=REPORT_ALL) == "\x1b[D"
-    assert (
-        translate_key_data("\x1b[D", flags=REPORT_ALL, application_mode=True)
-        == "\x1b[D"
-    )
+    assert translate_key_data("\x1b[D", flags=REPORT_ALL, application_mode=True) == "\x1b[D"
     assert translate_key_data("\x01", flags=REPORT_ALL) == "\x1b[97;5u"
 
 
@@ -175,9 +174,7 @@ RELEASE = "\x1b[98;5:3u"
 
 def test_a_release_reaches_a_pane_that_asked_for_the_event_types():
     assert translate_key_data(RELEASE, flags=EVENT_TYPES) == "\x1b[98;5:3u"
-    assert (
-        translate_key_data(RELEASE, flags=EVENT_TYPES | DISAMBIGUATE) == "\x1b[98;5:3u"
-    )
+    assert translate_key_data(RELEASE, flags=EVENT_TYPES | DISAMBIGUATE) == "\x1b[98;5:3u"
 
 
 def test_a_release_stops_at_a_pane_that_did_not_ask():
@@ -213,9 +210,7 @@ def test_a_repeat_without_the_flag_is_a_press():
 def test_the_other_codes_of_a_key_reach_a_pane_that_asked():
     "The shifted key and the key of the base layout."
     assert translate_key_data("\x1b[97:65;2u", flags=ALTERNATE_KEYS) == "\x1b[97:65;2u"
-    assert (
-        translate_key_data("\x1b[97::99;2u", flags=ALTERNATE_KEYS) == "\x1b[97::99;2u"
-    )
+    assert translate_key_data("\x1b[97::99;2u", flags=ALTERNATE_KEYS) == "\x1b[97::99;2u"
     # Without the flag they go away, and the key itself stays.
     assert translate_key_data("\x1b[97:65;2u", flags=REPORT_ALL) == "\x1b[97;2u"
 
@@ -225,15 +220,11 @@ def test_the_text_of_a_key_reaches_a_pane_that_asked():
     The text of a printable key needs no modern terminal: the character
     that a legacy terminal sends is the text of that key event.
     """
-    assert translate_key_data("A", flags=REPORT_ALL | ASSOCIATED_TEXT) == (
-        "\x1b[97;2;65u"
-    )
+    assert translate_key_data("A", flags=REPORT_ALL | ASSOCIATED_TEXT) == ("\x1b[97;2;65u")
     assert translate_key_data("a", flags=ASSOCIATED_TEXT) == "\x1b[97;;97u"
     # A key that writes no text carries none.
     assert translate_key_data("\r", flags=REPORT_ALL | ASSOCIATED_TEXT) == ("\x1b[13u")
-    assert translate_key_data("\x01", flags=REPORT_ALL | ASSOCIATED_TEXT) == (
-        "\x1b[97;5u"
-    )
+    assert translate_key_data("\x01", flags=REPORT_ALL | ASSOCIATED_TEXT) == ("\x1b[97;5u")
 
 
 # ----------------------------------------------------------------------
@@ -263,18 +254,13 @@ def test_enter_gets_no_made_up_release_either():
     """
     assert translate_key_data("\r", flags=EVENT_TYPES) == "\r"
     assert translate_key_data("\t", flags=EVENT_TYPES) == "\t"
-    assert translate_key_data("\r", flags=EVENT_TYPES | REPORT_ALL) == (
-        "\x1b[13u\x1b[13;1:3u"
-    )
+    assert translate_key_data("\r", flags=EVENT_TYPES | REPORT_ALL) == ("\x1b[13u\x1b[13;1:3u")
 
 
 def test_a_keyboard_that_sends_its_own_release_is_left_alone():
     "Two releases for one key would be worse than none."
     assert translate_key_data("a", flags=EVENT_TYPES, source_flags=0b11111) == "a"
-    assert (
-        translate_key_data("\x1b[97;1:3u", flags=EVENT_TYPES, source_flags=0b11111)
-        == "\x1b[97;1:3u"
-    )
+    assert translate_key_data("\x1b[97;1:3u", flags=EVENT_TYPES, source_flags=0b11111) == "\x1b[97;1:3u"
 
 
 def test_nothing_is_made_up_without_the_switch():
@@ -296,12 +282,8 @@ def test_the_shifted_key_of_a_letter_is_the_letter():
     is the key itself on every Latin layout, and kitty leaves it out
     there too.
     """
-    assert translate_key_data("A", flags=ALTERNATE_KEYS | REPORT_ALL) == (
-        "\x1b[97:65;2u"
-    )
-    assert translate_key_data("Ä", flags=ALTERNATE_KEYS | REPORT_ALL) == (
-        "\x1b[228:196;2u"
-    )
+    assert translate_key_data("A", flags=ALTERNATE_KEYS | REPORT_ALL) == ("\x1b[97:65;2u")
+    assert translate_key_data("Ä", flags=ALTERNATE_KEYS | REPORT_ALL) == ("\x1b[228:196;2u")
 
 
 def test_a_key_with_no_shifted_key_of_its_own_reports_none():
@@ -324,10 +306,7 @@ def test_the_ss3_form_belongs_to_a_pane_that_pushed_no_flag():
     assert translate_key_data("\x1bOD", flags=0, application_mode=True) == "\x1bOD"
     assert translate_key_data("\x1bOP", flags=0) == "\x1bOP"
     for flags in (DISAMBIGUATE, EVENT_TYPES, REPORT_ALL):
-        assert (
-            translate_key_data("\x1bOD", flags=flags, application_mode=True)[:3]
-            == "\x1b[D"[:3]
-        )
+        assert translate_key_data("\x1bOD", flags=flags, application_mode=True)[:3] == "\x1b[D"[:3]
         assert translate_key_data("\x1bOP", flags=flags)[:3] == "\x1b[P"
 
 
@@ -384,9 +363,7 @@ def test_a_pane_reads_the_same_key_from_either_keyboard():
     Lillecarl/pymux#166.
     """
     for name, legacy, protocol in WHAT_A_KEYBOARD_SENDS:
-        assert translate_key_data(protocol, flags=0) == translate_key_data(
-            legacy, flags=0
-        ), name
+        assert translate_key_data(protocol, flags=0) == translate_key_data(legacy, flags=0), name
 
 
 def test_a_key_the_legacy_encoding_cannot_write_reaches_no_such_pane():
@@ -487,10 +464,7 @@ def test_the_back_tab_belongs_to_the_legacy_mode_alone():
     """
     for flags in (DISAMBIGUATE, REPORT_ALL):
         assert translate_key_data("\x1b[9;2u", flags=flags) == "\x1b[9;2u"
-    assert (
-        translate_key_data("\x1b[9;2u", flags=EVENT_TYPES, synthesize=False)
-        == "\x1b[9;2u"
-    )
+    assert translate_key_data("\x1b[9;2u", flags=EVENT_TYPES, synthesize=False) == "\x1b[9;2u"
 
 
 def test_a_back_tab_from_a_legacy_keyboard_reaches_the_pane_in_its_form():

@@ -18,7 +18,7 @@ the numbers that name a mode and a half of the pair.
 Lillecarl/pymux#129.
 """
 
-from typing import List, Set, Tuple
+from __future__ import annotations
 
 from .parameters import TitleMode, TitlePart
 
@@ -62,7 +62,7 @@ class Titles:
     #: without end.
     STACK_LIMIT = 10
 
-    __slots__ = ("window", "icon", "stack", "modes")
+    __slots__ = ("icon", "modes", "stack", "window")
 
     def __init__(self) -> None:
         #: What "OSC 2" set, and what "CSI 21 t" reports.
@@ -73,12 +73,12 @@ class Titles:
 
         #: What "CSI 22 t" pushed, oldest first. One stack holds both
         #: titles, as a pair.
-        self.stack: List[Tuple[str, str]] = []
+        self.stack: list[tuple[str, str]] = []
 
         #: The `TitleMode` members that are on.
-        self.modes: Set[int] = set()
+        self.modes: set[int] = set()
 
-    def change_modes(self, params: Tuple[int, ...], on: bool) -> None:
+    def change_modes(self, params: tuple[int, ...], on: bool) -> None:
         """
         SM_Title ("CSI > Ps t") and RM_Title ("CSI > Ps T").
 

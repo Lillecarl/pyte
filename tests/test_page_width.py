@@ -10,12 +10,13 @@ does the same, and asks the embedder for the room rather than taking
 it: a pane sits in a layout and cannot decide its own size.
 """
 
-from pyte.screen import Screen
-from pyte.streams import Stream
-from pyte.modes import PrivateMode
-from pyte.sequences import Csi, csi, reset_mode, set_mode
+from __future__ import annotations
+
 from pyte import escape
-from pyte.sequences import esc
+from pyte.modes import PrivateMode
+from pyte.screen import Screen
+from pyte.sequences import Csi, csi, esc, reset_mode, set_mode
+from pyte.streams import Stream
 
 ALLOW = set_mode(PrivateMode.ALLOW_80_TO_132)
 DENY = reset_mode(PrivateMode.ALLOW_80_TO_132)
@@ -143,10 +144,7 @@ def refusing_screen(allowed):
 def test_decncsm_is_unknown_where_the_embedder_gives_no_room():
     "A mode a pane cannot have is a mode it never heard of."
     screen, stream, answers = refusing_screen(lambda: False)
-    stream.feed(
-        set_mode(PrivateMode.NO_CLEAR_ON_COLUMN_CHANGE)
-        + csi(Csi.DECRQM, 95, private="?")
-    )
+    stream.feed(set_mode(PrivateMode.NO_CLEAR_ON_COLUMN_CHANGE) + csi(Csi.DECRQM, 95, private="?"))
     assert answers == ["\x1b[?95;0$y"]
     assert not screen._keeps_the_page_through_a_width_change()
 
@@ -165,10 +163,7 @@ def test_decncsm_comes_back_when_the_embedder_changes_its_mind():
 
     allowed[0] = True
     answers.clear()
-    stream.feed(
-        set_mode(PrivateMode.NO_CLEAR_ON_COLUMN_CHANGE)
-        + csi(Csi.DECRQM, 95, private="?")
-    )
+    stream.feed(set_mode(PrivateMode.NO_CLEAR_ON_COLUMN_CHANGE) + csi(Csi.DECRQM, 95, private="?"))
     assert answers == ["\x1b[?95;1$y"]
 
 

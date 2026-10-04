@@ -17,6 +17,8 @@ names the rules of `_encode_event` rather than holding a second opinion
 about them.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from pyte.keys import (
@@ -26,7 +28,6 @@ from pyte.keys import (
     KeyEvent,
     Modifier,
     Unhearable,
-    parse_key_data,
     the_modifiers_a_pane_cannot_read,
     translate_key_event,
 )

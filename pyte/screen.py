@@ -17,63 +17,32 @@ different, and is now simply what this package does:
     - CPR, device attributes, and the other reports a program reads.
 """
 
+from __future__ import annotations
+
 from collections import namedtuple
-from enum import IntEnum
 from typing import (
     Callable,
-    Dict,
     Iterable,
-    List,
     Sequence,
-    Set,
-    Tuple,
 )
 
 from . import charsets as cs
-from .images import (
-    ASSUMED_CELL_HEIGHT,
-    ASSUMED_CELL_WIDTH,
-    GraphicsState,
-)
 from . import keys
 from .cells import (
-    BASELINE_PARAMETERS,
-    UNDERLINE_PARAMETERS,
-    UNDERLINE_SHAPES,
     _CHAR_CACHE,
     _PROTECTED_CHAR_CACHE,
+    BASELINE_PARAMETERS,
     PLAIN,
     PLAIN_APPEARANCE,
+    UNDERLINE_PARAMETERS,
+    UNDERLINE_SHAPES,
     Appearance,
     Cell,
     ErasedCell,
     Protection,
-    ProtectedCell,
-    Rendition,
     WrittenCell,
     appearance_of,
-    character_width,
     protection_of,
-)
-from .page import (
-    CursorPosition,
-    HorizontalMargins,
-    LogicalLine,
-    Margins,
-    Page,
-    Row,
-)
-from .modes import AnsiMode, ModeReport, PrivateMode, flag_of
-from .parameters import (
-    DEFAULT_CONFORMANCE_LEVEL,
-    DEFAULT_CURSOR_STYLE,
-    FIRST_PAGE_LENGTH,
-    AttributeExtent,
-    ConformanceLevel,
-    CursorShape,
-    StatusDisplay,
-    StatusLineType,
-    WindowOp,
 )
 from .colors import (
     COLOR_OF_A_BACKGROUND,
@@ -83,6 +52,12 @@ from .colors import (
     sgr_color,
     sgr_color_parameters,
 )
+from .images import (
+    ASSUMED_CELL_HEIGHT,
+    ASSUMED_CELL_WIDTH,
+    GraphicsState,
+)
+from .modes import AnsiMode, ModeReport, PrivateMode, flag_of
 from .osc import (
     COLOR_BASE,
     DYNAMIC_COLOR_CODES,
@@ -97,9 +72,26 @@ from .osc import (
     asks_for_the_clipboard,
     parse_hyperlink,
 )
+from .page import (
+    CursorPosition,
+    HorizontalMargins,
+    Margins,
+    Page,
+    Row,
+)
+from .parameters import (
+    DEFAULT_CONFORMANCE_LEVEL,
+    DEFAULT_CURSOR_STYLE,
+    FIRST_PAGE_LENGTH,
+    AttributeExtent,
+    ConformanceLevel,
+    CursorShape,
+    StatusDisplay,
+    StatusLineType,
+    WindowOp,
+)
 from .placeholders import PlaceholderRun, merge_runs, runs_in_line
 from .sixel import decode_sixel
-from .titles import Titles
 from .terminfo import (
     CAPABILITIES,
     DEVICE_EXTENSIONS,
@@ -107,6 +99,7 @@ from .terminfo import (
     XTERM_PATCH_LEVEL,
     XTERM_TYPE,
 )
+from .titles import Titles
 
 __all__ = ("Screen",)
 
@@ -140,7 +133,7 @@ def _param(params: Sequence[object], index: int, default: int = 0) -> int:
     return default if value is None else value  # type: ignore[return-value]
 
 
-def _four(params: Tuple[int, ...], first: int) -> Tuple[int, int, int, int]:
+def _four(params: tuple[int, ...], first: int) -> tuple[int, int, int, int]:
     """
     Four parameters, counting from `first`, with zero for a missing one.
 
@@ -262,14 +255,14 @@ class Screen:
         # reader has to draw again. `touch` says why the state is shaped
         # this way. Lillecarl/pymux#126.
         self.writes = 0
-        self.written_at: Dict[int, int] = {}
+        self.written_at: dict[int, int] = {}
 
         # The count that a row with no count of its own carries. A
         # reader reads it as the default of `written_at`, so it costs a
         # reader nothing. `touch_everything` says why it exists.
         self.everything_at = 0
 
-        self.savepoints: List[_Savepoint] = []
+        self.savepoints: list[_Savepoint] = []
         self.lines = lines
         self.columns = columns
         self.write_process_input = write_process_input
@@ -287,7 +280,7 @@ class Screen:
 
         # Stack of kitty keyboard protocol flags. ("CSI > flags u" pushes,
         # "CSI < number u" pops. See `report_kitty_keyboard`.)
-        self.kitty_flags_stack: Tuple[int, ...] = ()
+        self.kitty_flags_stack: tuple[int, ...] = ()
 
         # What XTMODKEYS was told, per resource. Only resource 4,
         # modifyOtherKeys, changes what a key sends; the rest are kept
@@ -297,13 +290,13 @@ class Screen:
         # asks for one or the other, and a terminal that had both would
         # have to say which wins; the flag stack does, because every
         # branch of the encoder answers before the extended one.
-        self.key_modifier_options: Dict[int, int] = {}
+        self.key_modifier_options: dict[int, int] = {}
 
         # What XTFMTKEYS was told, per resource. The mirror of the
         # above: that one says how much modifier information a group
         # of keys carries, and this one says which form it goes out
         # in. Only resource 4 changes anything here.
-        self.key_format_options: Dict[int, int] = {}
+        self.key_format_options: dict[int, int] = {}
 
         # What the terminal that feeds this pane its keys can report,
         # in the same flags. The host sets it; zero means a terminal
@@ -385,10 +378,7 @@ class Screen:
         arrows? Only on the alternate screen, with "?1007" set; that is
         the rule of xterm (`scrollbar.c`), Ghostty and Alacritty.
         """
-        return (
-            self.in_alternate_screen
-            and PrivateMode.ALTERNATE_SCROLL.flag in self.mode
-        )
+        return self.in_alternate_screen and PrivateMode.ALTERNATE_SCROLL.flag in self.mode
 
     @property
     def bracketed_paste_enabled(self) -> bool:
@@ -480,8 +470,7 @@ class Screen:
         """
         return bool(
             self.synthesize_key_events
-            and self.deliverable_kitty_keyboard_flags
-            & keys.KeyboardFlag.REPORT_EVENT_TYPES
+            and self.deliverable_kitty_keyboard_flags & keys.KeyboardFlag.REPORT_EVENT_TYPES
             and not self.keyboard_source_flags & keys.KeyboardFlag.REPORT_EVENT_TYPES
         )
 
@@ -528,9 +517,7 @@ class Screen:
         """
         if not self.extended_keys_allowed:
             return keys.ModifyOtherKeys.OFF
-        return self.key_modifier_options.get(
-            keys.KeyModifierResource.OTHER_KEYS, keys.ModifyOtherKeys.OFF
-        )
+        return self.key_modifier_options.get(keys.KeyModifierResource.OTHER_KEYS, keys.ModifyOtherKeys.OFF)
 
     @property
     def format_other_keys(self) -> int:
@@ -542,9 +529,7 @@ class Screen:
         """
         if not self.extended_keys_allowed:
             return keys.FormatOtherKeys.TILDE
-        return self.key_format_options.get(
-            keys.KeyModifierResource.OTHER_KEYS, keys.FormatOtherKeys.TILDE
-        )
+        return self.key_format_options.get(keys.KeyModifierResource.OTHER_KEYS, keys.FormatOtherKeys.TILDE)
 
     def set_key_format_options(self, *params: int) -> None:
         """
@@ -570,9 +555,7 @@ class Screen:
         self.reply_csi(">%i;%if" % (resource, value))
 
     @staticmethod
-    def _remember_a_key_option(
-        options: Dict[int, int], params: Sequence[object]
-    ) -> None:
+    def _remember_a_key_option(options: dict[int, int], params: Sequence[object]) -> None:
         """
         What XTMODKEYS and XTFMTKEYS both do with what they carry.
 
@@ -731,10 +714,7 @@ class Screen:
         # modes yet the first time round. A terminal that does not
         # exist yet is on no page.
         modes = getattr(self, "mode", frozenset())
-        on_the_wide_page = (
-            PrivateMode.ALLOW_80_TO_132.flag in modes
-            and PrivateMode.COLUMNS_132.flag in modes
-        )
+        on_the_wide_page = PrivateMode.ALLOW_80_TO_132.flag in modes and PrivateMode.COLUMNS_132.flag in modes
 
         self._reset_screen()
 
@@ -751,7 +731,7 @@ class Screen:
         #
         # A list of its own, because a save writes into the list that is
         # there rather than making a new one.
-        self.savepoints: List[_Savepoint] = []
+        self.savepoints: list[_Savepoint] = []
 
         # The window title, the icon label, the stack that "CSI 22 t"
         # pushes them onto and the modes that say how they are written.
@@ -795,7 +775,7 @@ class Screen:
         # the sequence carries. XTRESTORE reads them. A mode that was
         # never saved is not here, and a restore of it changes
         # nothing.
-        self.saved_modes: Dict[int, bool] = {}
+        self.saved_modes: dict[int, bool] = {}
 
         # The colours that a program set with "OSC 4", "OSC 5" and
         # "OSC 10". A pane starts with nothing set and answers a query
@@ -917,9 +897,7 @@ class Screen:
 
         # xterm's DECSTR leaves the wheel alone too: alternate scroll is
         # a setting of the person's, not of the program's.
-        kept = self.mode.intersection(
-            [*self._ALTERNATE_SCREEN_MODES, PrivateMode.ALTERNATE_SCROLL.flag]
-        )
+        kept = self.mode.intersection([*self._ALTERNATE_SCREEN_MODES, PrivateMode.ALTERNATE_SCROLL.flag])
         self.mode = {PrivateMode.AUTOWRAP.flag, PrivateMode.SHOW_CURSOR.flag}
         self.mode.update(kept)
         self.page.show_cursor = True
@@ -1272,9 +1250,7 @@ class Screen:
             # be read off `line_offset`, which answers for the page that
             # is showing. Lillecarl/pymux#203.
             stashed, stashed_vars = self._the_page_that_is_not_showing()
-            stashed_bottom = (
-                None if stashed is None else self._bottom_for(stashed_vars["max_y"])
-            )
+            stashed_bottom = None if stashed is None else self._bottom_for(stashed_vars["max_y"])
 
             self.lines = lines
             self.columns = columns
@@ -1376,9 +1352,7 @@ class Screen:
             else:
                 self._clip()
         finally:
-            variables.update(
-                {name: getattr(self, name) for name in self.swap_variables}
-            )
+            variables.update({name: getattr(self, name) for name in self.swap_variables})
             self.page = held_page
             for name, value in held.items():
                 setattr(self, name, value)
@@ -1544,7 +1518,7 @@ class Screen:
         self.cursor_position()
 
     @property
-    def left_right(self) -> Tuple[int, int]:
+    def left_right(self) -> tuple[int, int]:
         """
         The first and the last column of the scrolling region.
 
@@ -1578,7 +1552,7 @@ class Screen:
         return min(column, self.columns - 1)
 
     @property
-    def reported_position(self) -> Tuple[int, int]:
+    def reported_position(self) -> tuple[int, int]:
         """
         The row and the column that a cursor report names, counted
         from one.
@@ -1759,9 +1733,7 @@ class Screen:
             held_row = self.pt_cursor_position.y - self.line_offset
 
             self._original_screen = self.page
-            self._original_screen_vars = {
-                v: getattr(self, v) for v in self.swap_variables
-            }
+            self._original_screen_vars = {v: getattr(self, v) for v in self.swap_variables}
             # The scrolling region belongs to the terminal and not to
             # one of its screens, so it survives the switch. xterm and
             # kitty both keep it.
@@ -1771,8 +1743,7 @@ class Screen:
             # "?1049" clears the screen it takes. The two older modes
             # do not, so they find what the last visit left.
             keeps_the_content = (
-                PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR.flag not in taken_by
-                and self._alternate_screen is not None
+                PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR.flag not in taken_by and self._alternate_screen is not None
             )
             if keeps_the_content:
                 # The buffer is replaced rather than written into, so
@@ -1873,9 +1844,7 @@ class Screen:
         # "?1047" give the screen back as well.
         given_back = self._alternate_screen_modes(modes)
         if self._original_screen and given_back:
-            restores_the_cursor = (
-                PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR.flag in given_back
-            )
+            restores_the_cursor = PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR.flag in given_back
             row = self.pt_cursor_position.y - self.line_offset
             column = self.pt_cursor_position.x
             # The wait travels with the cursor it belongs to.
@@ -1895,9 +1864,7 @@ class Screen:
                 self._alternate_screen_vars = {}
             else:
                 self._alternate_screen = self.page
-                self._alternate_screen_vars = {
-                    name: getattr(self, name) for name in self.swap_variables
-                }
+                self._alternate_screen_vars = {name: getattr(self, name) for name in self.swap_variables}
 
             # The rows of the screen that is being left, and then the
             # rows of the one that comes back. Lillecarl/pymux#126.
@@ -1944,7 +1911,7 @@ class Screen:
     )
 
     @classmethod
-    def _alternate_screen_modes(cls, modes) -> "List[int]":
+    def _alternate_screen_modes(cls, modes) -> list[int]:
         "The modes of this list that name the alternate screen."
         return [mode for mode in cls._ALTERNATE_SCREEN_MODES if mode in modes]
 
@@ -2065,9 +2032,9 @@ class Screen:
         if self.single_shift is None:
             chars = chars.translate(self.g_charsets[self.gl])
         else:
-            chars = chars[0].translate(
-                self.g_charsets[self.single_shift]
-            ) + chars[1:].translate(self.g_charsets[self.gl])
+            chars = chars[0].translate(self.g_charsets[self.single_shift]) + chars[1:].translate(
+                self.g_charsets[self.gl]
+            )
             self.single_shift = None
 
         # The column after the last one a character may take. The loop
@@ -2104,9 +2071,7 @@ class Screen:
             # The column after the margin is where the wait to wrap
             # sits, so a cursor that waits there counts as inside. A
             # cursor that a program put on that column does not.
-            if cursor_position_x <= right_margin or (
-                waiting_to_wrap and cursor_position_x == right_margin + 1
-            ):
+            if cursor_position_x <= right_margin or (waiting_to_wrap and cursor_position_x == right_margin + 1):
                 edge = right_margin + 1
             else:
                 edge = columns
@@ -2120,9 +2085,7 @@ class Screen:
             # is a tab stop back -- a `CSI D` from there lands one
             # column left of it -- and the next character wraps anyway.
             # Lillecarl/pymux#106.
-            if char_width > 0 and (
-                waiting_to_wrap or cursor_position_x + char_width > edge
-            ):
+            if char_width > 0 and (waiting_to_wrap or cursor_position_x + char_width > edge):
                 if PrivateMode.AUTOWRAP.flag in self.mode:
                     # The moves below read the cursor from the screen,
                     # and this loop keeps it in a local. Write it back
@@ -2187,23 +2150,15 @@ class Screen:
                 # A cell that an erase left holds no character, so a
                 # mark has nothing to hang on and goes away. kitty and
                 # WezTerm both drop it there.
-                if (
-                    previous >= 0
-                    and cell is not None
-                    and not isinstance(cell, ErasedCell)
-                ):
+                if previous >= 0 and cell is not None and not isinstance(cell, ErasedCell):
                     # The mark belongs to the cell that is there, so it
                     # keeps the marks of that cell and not the ones
                     # that are set now.
                     marks = protection_of(cell)
                     if marks:
-                        row[previous] = _PROTECTED_CHAR_CACHE[
-                            cell.char + pt_char.char, cell.appearance, marks
-                        ]
+                        row[previous] = _PROTECTED_CHAR_CACHE[cell.char + pt_char.char, cell.appearance, marks]
                     else:
-                        row[previous] = _CHAR_CACHE[
-                            cell.char + pt_char.char, cell.appearance
-                        ]
+                        row[previous] = _CHAR_CACHE[cell.char + pt_char.char, cell.appearance]
             else:  # char_width < 0
                 # (Should not happen.)
                 char_width = 0
@@ -2421,11 +2376,7 @@ class Screen:
         so every line of the transcript leaves through the top of a
         region. Lillecarl/pymux#423.
         """
-        if (
-            top == 0
-            and self.horizontal_margins is None
-            and self._original_screen is None
-        ):
+        if top == 0 and self.horizontal_margins is None and self._original_screen is None:
             self._slide_the_screen_under_the_region(bottom, amount)
         else:
             self._move_rows(top, bottom, amount)
@@ -3319,9 +3270,7 @@ class Screen:
             limit = self.lines - 1
         else:
             limit = bottom
-        cursor_position.y = min(
-            cursor_position.y + (count or 1), limit + self.line_offset
-        )
+        cursor_position.y = min(cursor_position.y + (count or 1), limit + self.line_offset)
 
         self.max_y = max(self.max_y, cursor_position.y)
 
@@ -3448,7 +3397,7 @@ class Screen:
     # `ErasedCell`: a combining mark falls off one and hangs on a space
     # that a program wrote. Lillecarl/pymux#56.
 
-    def erase_appearance(self) -> "Appearance | None":
+    def erase_appearance(self) -> Appearance | None:
         """
         How an erased cell is drawn.
 
@@ -3533,9 +3482,7 @@ class Screen:
         self.repair_wide_char(row, cursor_position.x)
         self.repair_wide_char(row, end)
 
-    def _move_columns(
-        self, top: int, bottom: int, left: int, right: int, amount: int
-    ) -> None:
+    def _move_columns(self, top: int, bottom: int, left: int, right: int, amount: int) -> None:
         """
         Move the cells between `left` and `right` by `amount` columns.
 
@@ -3680,9 +3627,9 @@ class Screen:
         if type_of == 0:
             columns = range(pt_cursor_position.x, self.columns)
         elif type_of == 1:
-            columns = range(0, pt_cursor_position.x + 1)
+            columns = range(pt_cursor_position.x + 1)
         else:
-            columns = range(0, self.columns)
+            columns = range(self.columns)
 
         line = data_buffer[pt_cursor_position.y]
         self.touch(pt_cursor_position.y)
@@ -3775,9 +3722,7 @@ class Screen:
             # A line that holds nothing needs no cell, so the erasing
             # stops at the last line in use. A background has to reach
             # the bottom of the screen, though.
-            last_line = (
-                max(max_line, line_offset + self.lines - 1) if appearance else max_line
-            )
+            last_line = max(max_line, line_offset + self.lines - 1) if appearance else max_line
 
             try:
                 interval = (
@@ -3801,9 +3746,7 @@ class Screen:
             # selective erase reads them whatever its parameter is.
             # xterm draws it that way, and its own conformance suite
             # clears the screen with "CSI 2 J" between tests.
-            reads_the_marks = self._protected_chars and (
-                private is True or type_of != 2
-            )
+            reads_the_marks = self._protected_chars and (private is True or type_of != 2)
 
             # A row that is erased is no longer the tail of a line that
             # wrapped: the text that wrapped onto it is gone. The note
@@ -3863,9 +3806,7 @@ class Screen:
     # Two corners name an area, and DECSACE says whether that is a
     # rectangle or the stream between them.
 
-    def _rectangle(
-        self, top: int, left: int, bottom: int, right: int
-    ) -> Tuple[int, int, int, int] | None:
+    def _rectangle(self, top: int, left: int, bottom: int, right: int) -> tuple[int, int, int, int] | None:
         """
         Read the four corners that a rectangle command names.
 
@@ -3906,7 +3847,7 @@ class Screen:
 
         return top, left, min(bottom, lines - 1), min(right, columns - 1)
 
-    def _corner(self, top: int, left: int) -> Tuple[int, int]:
+    def _corner(self, top: int, left: int) -> tuple[int, int]:
         """
         Read the row and the column of one corner of a rectangle.
 
@@ -3994,9 +3935,7 @@ class Screen:
         """
         self._erase_rectangle(self._rectangle(*_four(params, 0)), True)
 
-    def _erase_rectangle(
-        self, corners: Tuple[int, int, int, int] | None, selective: bool
-    ) -> None:
+    def _erase_rectangle(self, corners: tuple[int, int, int, int] | None, selective: bool) -> None:
         """
         Erase every cell of a rectangle that no mark holds back.
 
@@ -4073,10 +4012,7 @@ class Screen:
         data_buffer = self.data_buffer
         line_offset = self.line_offset
         read = [
-            [
-                data_buffer[top + row + line_offset].get(left + column)
-                for column in range(width)
-            ]
+            [data_buffer[top + row + line_offset].get(left + column) for column in range(width)]
             for row in range(height)
         ]
 
@@ -4167,9 +4103,7 @@ class Screen:
         "Set a horizontal tab stop at cursor position."
         self.tabstops.add(self.pt_cursor_position.x)
 
-    def clear_tab_stop(
-        self, type_of: int | None = None, private: object = False
-    ) -> None:
+    def clear_tab_stop(self, type_of: int | None = None, private: object = False) -> None:
         """Clears a horizontal tab stop in a specific way, depending
         on the ``type_of`` value:
         * ``0`` or nothing -- Clears a horizontal tab stop at cursor
@@ -4210,9 +4144,7 @@ class Screen:
         line_offset = self.line_offset
 
         cursor_position.x = min(max(0, cursor_position.x), self.columns - 1)
-        cursor_position.y = min(
-            max(top + line_offset, cursor_position.y), bottom + line_offset
-        )
+        cursor_position.y = min(max(top + line_offset, cursor_position.y), bottom + line_offset)
 
         # A move of the cursor ends the wait to wrap. Every command
         # that places the cursor comes through here, so this is the one
@@ -4239,10 +4171,10 @@ class Screen:
         a cell that nobody wrote, which is what an erase leaves, and
         anything that tells the two apart then reads a blank screen.
         """
-        for y in range(0, self.lines):
+        for y in range(self.lines):
             line = self.data_buffer[y + self.line_offset]
             self.touch(y + self.line_offset)
-            for x in range(0, self.columns):
+            for x in range(self.columns):
                 line[x] = _CHAR_CACHE["E", PLAIN_APPEARANCE]
         self.margins = None
         self.horizontal_margins = None
@@ -4265,9 +4197,7 @@ class Screen:
     # SGR builds a `Rendition` and "OSC 8" opens a hyperlink. The two
     # arrive apart and a cell holds both, as one interned `Appearance`.
 
-    def select_graphic_rendition(
-        self, *attrs_tuple: int, private: bool = False
-    ) -> None:
+    def select_graphic_rendition(self, *attrs_tuple: int, private: bool = False) -> None:
         """
         SGR ("CSI Ps m"): the style of the cells that come next.
 
@@ -4287,7 +4217,7 @@ class Screen:
         if private:
             return
 
-        replace: Dict[str, object] = {}
+        replace: dict[str, object] = {}
 
         if not attrs_tuple:
             attrs = [0]
@@ -4474,9 +4404,7 @@ class Screen:
     # Not one of these holds state of its own. Each reads the screen and
     # writes bytes back through `reply_csi` and its neighbours.
 
-    def report_device_status(
-        self, data: int = 0, *args, private=False, **kwargs
-    ) -> None:
+    def report_device_status(self, data: int = 0, *args, private=False, **kwargs) -> None:
         """
         Answer a device status report.
 
@@ -4580,7 +4508,7 @@ class Screen:
             # screen is the one the buffer was written into.
             self._reflow(self.line_offset + self.lines - 1)
 
-    def placeholder_runs(self, first_row: int, last_row: int) -> List[PlaceholderRun]:
+    def placeholder_runs(self, first_row: int, last_row: int) -> list[PlaceholderRun]:
         """
         The unicode placeholder runs between two rows of the scroll
         buffer, for an embedder that draws the images.
@@ -4597,7 +4525,7 @@ class Screen:
 
         data_buffer = self.page.data_buffer
         columns = self.columns
-        runs: List[PlaceholderRun] = []
+        runs: list[PlaceholderRun] = []
         for row in range(first_row, last_row + 1):
             line = data_buffer.get(row)
             if line:
@@ -4649,9 +4577,7 @@ class Screen:
     )
 
     #: The same for the modes without a private marker.
-    _known_ansi_modes = frozenset(
-        [AnsiMode.INSERT_REPLACE, AnsiMode.LINE_FEED_NEW_LINE]
-    )
+    _known_ansi_modes = frozenset([AnsiMode.INSERT_REPLACE, AnsiMode.LINE_FEED_NEW_LINE])
 
     #: The modes that a terminal knows about and never implements.
     #: DECRQM answers 4 for these, which reads as "permanently reset".
@@ -4758,8 +4684,7 @@ class Screen:
         if is_private:
             permanent = number in self._permanently_reset_private_modes
             known = (
-                number in self._known_private_modes
-                or number in self._remembered_private_modes
+                number in self._known_private_modes or number in self._remembered_private_modes
             ) and self._embedder_carries(number)
             if number == PrivateMode.CURSOR_BLINK:
                 # DECSCUSR writes this one as well, and the alternate
@@ -4771,10 +4696,7 @@ class Screen:
                 enabled = flag_of(number) in self.mode
         else:
             permanent = number in self._permanently_reset_ansi_modes
-            known = (
-                number in self._known_ansi_modes
-                or number in self._remembered_ansi_modes
-            )
+            known = number in self._known_ansi_modes or number in self._remembered_ansi_modes
             enabled = number in self.mode
 
         if permanent:
@@ -5031,10 +4953,7 @@ class Screen:
             self.reply_csi("8;%i;%it" % (self.lines, self.columns))
         elif what == WindowOp.REPORT_TEXT_AREA_PIXELS:
             # Size of the text area, in pixels.
-            self.reply_csi(
-                "4;%i;%it"
-                % (self.lines * self.cell_height, self.columns * self.cell_width)
-            )
+            self.reply_csi("4;%i;%it" % (self.lines * self.cell_height, self.columns * self.cell_width))
         elif what == WindowOp.REPORT_SCREEN_SIZE_CHARS:
             # How much room there is, in cells.
             #
@@ -5050,12 +4969,9 @@ class Screen:
             self.reply_csi("9;%i;%it" % (self.lines, self.columns))
         elif what == WindowOp.REPORT_SCREEN_SIZE_PIXELS:
             # The same room, counted in pixels.
-            self.reply_csi(
-                "5;%i;%it"
-                % (self.lines * self.cell_height, self.columns * self.cell_width)
-            )
+            self.reply_csi("5;%i;%it" % (self.lines * self.cell_height, self.columns * self.cell_width))
 
-    def _resize_in_cells(self, params: Tuple[int, ...]) -> None:
+    def _resize_in_cells(self, params: tuple[int, ...]) -> None:
         """
         "CSI 8 ; Ph ; Pw t": ask for Ph rows and Pw columns.
 
@@ -5068,7 +4984,7 @@ class Screen:
             self._wanted(params, 2, self.MAX_COLUMNS),
         )
 
-    def _resize_in_pixels(self, params: Tuple[int, ...]) -> None:
+    def _resize_in_pixels(self, params: tuple[int, ...]) -> None:
         """
         "CSI 4 ; Ph ; Pw t": as many cells as fit in Ph by Pw pixels.
 
@@ -5081,20 +4997,12 @@ class Screen:
         lines = self._wanted(params, 1, None)
         columns = self._wanted(params, 2, None)
         self.resize_func(
-            self.MAX_LINES
-            if lines == 0
-            else None
-            if lines is None
-            else max(1, lines // self.cell_height),
-            self.MAX_COLUMNS
-            if columns == 0
-            else None
-            if columns is None
-            else max(1, columns // self.cell_width),
+            self.MAX_LINES if lines == 0 else None if lines is None else max(1, lines // self.cell_height),
+            self.MAX_COLUMNS if columns == 0 else None if columns is None else max(1, columns // self.cell_width),
         )
 
     @staticmethod
-    def _wanted(params: Tuple[int, ...], index: int, whole: int | None) -> int | None:
+    def _wanted(params: tuple[int, ...], index: int, whole: int | None) -> int | None:
         """
         One number of a resize: how many, all of them, or leave it.
 
@@ -5159,12 +5067,8 @@ class Screen:
         # A rectangle that ends before it starts is read the other way
         # round. The suite that drives this reads one cell at a time,
         # so an answer that never comes costs more than a wrong one.
-        top, bottom = sorted(
-            (max(0, min(top, self.lines - 1)), max(0, min(bottom, self.lines - 1)))
-        )
-        left, right = sorted(
-            (max(0, min(left, self.columns - 1)), max(0, min(right, self.columns - 1)))
-        )
+        top, bottom = sorted((max(0, min(top, self.lines - 1)), max(0, min(bottom, self.lines - 1))))
+        left, right = sorted((max(0, min(left, self.columns - 1)), max(0, min(right, self.columns - 1))))
 
         line_offset = self.line_offset
         total = 0
@@ -5251,15 +5155,11 @@ class Screen:
 
         elif private == ">":
             # Push. The flags default to none.
-            self.kitty_flags_stack = keys.pushed(
-                self.kitty_flags_stack, _param(params, 0)
-            )
+            self.kitty_flags_stack = keys.pushed(self.kitty_flags_stack, _param(params, 0))
 
         elif private == "<":
             # Pop. The count defaults to one.
-            self.kitty_flags_stack = keys.popped(
-                self.kitty_flags_stack, _param(params, 0, 1)
-            )
+            self.kitty_flags_stack = keys.popped(self.kitty_flags_stack, _param(params, 0, 1))
 
         elif private == "=":
             # Set. The mode defaults to setting the flags exactly.
@@ -5319,9 +5219,7 @@ class Screen:
         elif code == Osc.RESET_PALETTE_COLOR:
             self.colors.reset_indexed(param, 0, len(self.color_base.palette))
         elif code == Osc.RESET_SPECIAL_COLOR:
-            self.colors.reset_indexed(
-                param, FIRST_SPECIAL_COLOR, len(SPECIAL_COLOR_NAMES)
-            )
+            self.colors.reset_indexed(param, FIRST_SPECIAL_COLOR, len(SPECIAL_COLOR_NAMES))
         elif code in DYNAMIC_COLOR_CODES:
             self._reply_each(self.colors.read_dynamic(code, param))
         elif self._reset_code_of(code) in DYNAMIC_COLOR_CODES:
@@ -5741,9 +5639,7 @@ class Screen:
         for line in all_lines:
             cells = line.cells
             while (
-                len(cells) > 1
-                and not isinstance(cells[-1], WrittenCell)
-                and cells[-1].appearance == PLAIN_APPEARANCE
+                len(cells) > 1 and not isinstance(cells[-1], WrittenCell) and cells[-1].appearance == PLAIN_APPEARANCE
             ):
                 cells.pop()
 
@@ -5831,9 +5727,7 @@ class Screen:
         # and `.get` asks without making one.
         row = data_buffer.get(cursor_position.y)
         cell = None if row is None else row.get(cursor_position.x)
-        if cursor_character is not None and cursor_character != (
-            None if cell is None else cell.char
-        ):
+        if cursor_character is not None and cursor_character != (None if cell is None else cell.char):
             # FIXME:
             raise Exception("Reflow failed: {!r} {!r}".format(cursor_character, cell))
 

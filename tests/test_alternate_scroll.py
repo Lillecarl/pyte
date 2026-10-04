@@ -11,6 +11,8 @@ in `mouse.c`) and WezTerm send the arrows with no mode at all; xterm
 alone starts it off.
 """
 
+from __future__ import annotations
+
 from pyte import escape
 from pyte.modes import PrivateMode
 from pyte.screen import Screen

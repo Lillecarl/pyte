@@ -8,6 +8,8 @@ their own images and apply the forward filter by hand, which checks the
 filter arithmetic on its own.
 """
 
+from __future__ import annotations
+
 import struct
 import zlib
 
@@ -62,11 +64,7 @@ RGB_8X8 = bytes.fromhex(
     "4ba82323340913188ac694708420ac127e0c0c7e6812d130896800ec550964c9"
     "cdf0820000000049454e44ae426082"
 )
-RGB_8X8_PIXELS = [
-    ((x * 31) % 256, (y * 37) % 256, (x * y * 13) % 256)
-    for y in range(8)
-    for x in range(8)
-]
+RGB_8X8_PIXELS = [((x * 31) % 256, (y * 37) % 256, (x * y * 13) % 256) for y in range(8) for x in range(8)]
 
 BILEVEL_8X1 = bytes.fromhex(
     "89504e470d0a1a0a0000000d4948445200000008000000010100000000cb7bd2"

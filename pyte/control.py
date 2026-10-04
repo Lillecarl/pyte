@@ -12,6 +12,8 @@ This module defines simple control sequences, recognized by
 :license: LGPL, see LICENSE for more details.
 """
 
+from __future__ import annotations
+
 #: *Space*: Not surprisingly -- ``" "``.
 SP = " "
 

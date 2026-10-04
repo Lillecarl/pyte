@@ -11,6 +11,8 @@ that a resize keeps every line is `test_reflow_keeps_the_content.py`,
 and it judges the same function through the screen.
 """
 
+from __future__ import annotations
+
 from pyte.cells import PLAIN_APPEARANCE, WrittenCell
 from pyte.page import Page, TextLine
 

@@ -18,10 +18,12 @@ the history pymux shows is taller than the screen a program drew.
 Lillecarl/pymux#132.
 """
 
-from pyte.screen import Screen
-from pyte.streams import Stream
+from __future__ import annotations
+
 from pyte.modes import PrivateMode
+from pyte.screen import Screen
 from pyte.sequences import reset_mode, set_mode
+from pyte.streams import Stream
 
 LINES = 5
 COLUMNS = 10

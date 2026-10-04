@@ -22,6 +22,8 @@ the thing, then writes one character. Where that character lands is the
 whole answer: the row below means the wait came through.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from pyte import escape
@@ -127,9 +129,7 @@ def test_a_restore_with_nothing_saved_leaves_no_wait():
 # Giving the alternate screen back. Lillecarl/pymux#35.
 
 
-@pytest.mark.parametrize(
-    "mode", [PrivateMode.ALTERNATE_SCREEN, PrivateMode.ALTERNATE_SCREEN_AGAIN]
-)
+@pytest.mark.parametrize("mode", [PrivateMode.ALTERNATE_SCREEN, PrivateMode.ALTERNATE_SCREEN_AGAIN])
 def test_the_older_modes_give_the_screen_back_with_the_wait(mode):
     """
     "?47" and "?1047" save no cursor, so the cursor stays where the
@@ -155,8 +155,6 @@ def test_the_cursor_mode_gives_the_screen_back_with_the_wait():
     """
     screen, stream = _waiting()
     stream.feed(set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR))
-    stream.feed(
-        "z" + reset_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR) + "b"
-    )
+    stream.feed("z" + reset_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR) + "b")
 
     assert _where(screen, "b") == (1, 0)

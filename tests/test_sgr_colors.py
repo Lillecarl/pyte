@@ -15,6 +15,8 @@ path through a screen. This file judges the arithmetic alone, so a
 failure says which half is wrong.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from pyte.colors import Color, sgr_color, sgr_color_parameters

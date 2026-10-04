@@ -19,14 +19,16 @@ move whole ranges of rows are the ones that could put a row under the
 floor, and that file already names them.
 """
 
+from __future__ import annotations
+
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
-
-from pyte.screen import Screen
-from pyte.streams import Stream
 from test_row_versions import a_chunk
+
 from pyte.modes import PrivateMode
+from pyte.screen import Screen
 from pyte.sequences import Csi, csi, reset_mode, set_mode
+from pyte.streams import Stream
 
 #: How deep the history goes in this file. It is tiny so that a prune
 #: happens over and over in a short run, where two thousand rows would
@@ -111,9 +113,7 @@ def test_the_notes_about_a_row_go_when_the_row_does():
     screen = a_short_history()
     stream = Stream(screen)
     # Every line wraps, so a mark is written on nearly every row.
-    stream.feed(
-        "".join("row %d " % number + "x" * COLUMNS + "\r\n" for number in range(300))
-    )
+    stream.feed("".join("row %d " % number + "x" * COLUMNS + "\r\n" for number in range(300)))
     screen._remove_old_lines_from_history()
 
     rows = screen.page.data_buffer.values()

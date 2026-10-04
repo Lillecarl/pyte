@@ -15,7 +15,8 @@ Example run::
 :license: LGPL, see LICENSE for more details.
 """
 
-import io
+from __future__ import annotations
+
 import os.path
 import sys
 from functools import partial

@@ -5,20 +5,21 @@ They are two questions, not one, and they take differently shaped
 answers. A program tells them apart by the prefix of the reply.
 """
 
+from __future__ import annotations
+
 import pytest
 
+from pyte import escape
 from pyte.parameters import ConformanceLevel
 from pyte.screen import Screen
+from pyte.sequences import Escape, csi, esc
+from pyte.streams import Stream
 from pyte.terminfo import (
     DEVICE_EXTENSIONS,
     XTERM_PATCH_LEVEL,
     XTERM_TYPE,
     DeviceExtension,
 )
-from pyte.streams import Stream
-from pyte import escape
-from pyte.sequences import csi
-from pyte.sequences import Escape, esc
 
 
 @pytest.fixture
@@ -45,9 +46,7 @@ def test_da_answers_the_level_and_the_extensions(pane, sequence):
     ]
 
 
-@pytest.mark.parametrize(
-    "sequence", [csi(escape.DA, private=">"), csi(escape.DA, 0, private=">")]
-)
+@pytest.mark.parametrize("sequence", [csi(escape.DA, private=">"), csi(escape.DA, 0, private=">")])
 def test_da2_answers_the_type_and_the_firmware(pane, sequence):
     _screen, stream, responses = pane
     stream.feed(sequence)

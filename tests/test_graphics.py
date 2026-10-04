@@ -2,16 +2,16 @@
 Tests for the kitty graphics protocol state in Screen.
 """
 
+from __future__ import annotations
+
 import base64
 import zlib
 
-from pyte.screen import Screen
-from pyte.streams import Stream
 from pyte import escape
 from pyte.modes import PrivateMode
-from pyte.sequences import csi, reset_mode, set_mode
-from pyte.sequences import esc
-from pyte.sequences import apc
+from pyte.screen import Screen
+from pyte.sequences import apc, csi, esc, reset_mode, set_mode
+from pyte.streams import Stream
 
 
 def make_screen():
@@ -283,15 +283,11 @@ def test_unsupported_actions_error():
 def place(screen, stream, image_id, rows=1, columns=1):
     "Transmit a 1x1 image and place it at the cursor."
     data = base64.b64encode(rgb_image(1, 1)).decode()
-    stream.feed(
-        apc("a=T,f=24,s=1,v=1,c=%i,r=%i,C=1,i=%i" % (columns, rows, image_id), data)
-    )
+    stream.feed(apc("a=T,f=24,s=1,v=1,c=%i,r=%i,C=1,i=%i" % (columns, rows, image_id), data))
 
 
 def placement_rows(screen):
-    return sorted(
-        (placement.image_id, placement.y) for placement in screen.graphics.placements
-    )
+    return sorted((placement.image_id, placement.y) for placement in screen.graphics.placements)
 
 
 def placement_screen_rows(screen):
@@ -303,10 +299,7 @@ def placement_screen_rows(screen):
     about where a person sees the image. Lillecarl/pymux#423.
     """
     offset = screen.line_offset
-    return sorted(
-        (placement.image_id, placement.y - offset)
-        for placement in screen.graphics.placements
-    )
+    return sorted((placement.image_id, placement.y - offset) for placement in screen.graphics.placements)
 
 
 def test_plain_scrolling_keeps_placement_rows():
@@ -531,9 +524,7 @@ def test_a_chunked_transmission_that_is_short_stores_nothing():
     encoded = base64.b64encode(data).decode()
     stream.feed(apc("a=T,f=24,s=20,v=40,i=22,m=1", encoded[: len(encoded) // 2]))
     stream.feed(apc("m=0"))
-    assert responses == [
-        "\x1b_Gi=22;EINVAL:data size does not match width and height\x1b\\"
-    ]
+    assert responses == ["\x1b_Gi=22;EINVAL:data size does not match width and height\x1b\\"]
     assert 22 not in screen.graphics.images_by_id
     assert screen.graphics.placements == []
 

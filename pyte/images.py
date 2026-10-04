@@ -14,10 +14,11 @@ scrolling placements along with the text, the file- and shared-memory
 transmission media, and z-index handling beyond storing the value.
 """
 
+from __future__ import annotations
+
 import base64
 import zlib
 from enum import IntEnum
-from typing import Dict, List, Optional, Tuple
 
 __all__ = [
     "ASSUMED_CELL_HEIGHT",
@@ -89,11 +90,9 @@ class GraphicsError(Exception):
 class GraphicsImage:
     "A transmitted image."
 
-    __slots__ = ("format", "width", "height", "data", "number")
+    __slots__ = ("data", "format", "height", "number", "width")
 
-    def __init__(
-        self, format: int, width: int, height: int, data: bytes, number: int = 0
-    ) -> None:
+    def __init__(self, format: int, width: int, height: int, data: bytes, number: int = 0) -> None:
         self.format = format  # A `PixelFormat`.
         self.width = width  # in pixels
         self.height = height  # in pixels
@@ -105,15 +104,15 @@ class GraphicsPlacement:
     "A placement of an image on the screen. Coordinates are cells."
 
     __slots__ = (
+        "asked_for_the_box",
+        "columns",
         "image_id",
         "placement_id",
+        "rows",
+        "virtual",
         "x",
         "y",
-        "columns",
-        "rows",
         "z",
-        "virtual",
-        "asked_for_the_box",
     )
 
     def __init__(
@@ -151,7 +150,7 @@ class GraphicsPlacement:
         self.asked_for_the_box = asked_for_the_box
 
 
-def parse_control_data(data: str) -> Tuple[Dict[str, str], str]:
+def parse_control_data(data: str) -> tuple[dict[str, str], str]:
     """
     Split a graphics command into its control data keys and the base64
     payload. ("a=T,f=24;<payload>".)
@@ -161,7 +160,7 @@ def parse_control_data(data: str) -> Tuple[Dict[str, str], str]:
     else:
         control, payload = data, ""
 
-    keys: Dict[str, str] = {}
+    keys: dict[str, str] = {}
     for part in control.split(","):
         if not part:
             continue
@@ -173,7 +172,7 @@ def parse_control_data(data: str) -> Tuple[Dict[str, str], str]:
     return keys, payload
 
 
-def _png_size(data: bytes) -> Tuple[int, int]:
+def _png_size(data: bytes) -> tuple[int, int]:
     "Read the width and height from the PNG IHDR chunk."
     if data[:8] != PNG_SIGNATURE or data[12:16] != b"IHDR" or len(data) < 24:
         raise GraphicsError("EINVAL", "invalid PNG data")
@@ -192,17 +191,17 @@ class GraphicsState:
     """
 
     def __init__(self) -> None:
-        self.images_by_id: Dict[int, GraphicsImage] = {}
+        self.images_by_id: dict[int, GraphicsImage] = {}
         # The newest image for every image number ("I" key).
-        self.newest_by_number: Dict[int, GraphicsImage] = {}
-        self.placements: List[GraphicsPlacement] = []
+        self.newest_by_number: dict[int, GraphicsImage] = {}
+        self.placements: list[GraphicsPlacement] = []
         self.next_image_id = 1
         # An in-flight chunked transmission: (keys, payload-so-far).
-        self._pending: Tuple[Dict[str, str], str] | None = None
+        self._pending: tuple[dict[str, str], str] | None = None
 
     # ------------------------------------------------------------------
 
-    def handle(self, data: str, screen) -> Tuple[str, bool] | None:
+    def handle(self, data: str, screen) -> tuple[str, bool] | None:
         """
         Handle a graphics command (the payload of the APC sequence,
         without the leading "G"). Returns the response body (including
@@ -255,7 +254,7 @@ class GraphicsState:
         return (response, is_ok)
 
     @staticmethod
-    def _prefix(keys: Dict[str, str]) -> str:
+    def _prefix(keys: dict[str, str]) -> str:
         parts = []
         if keys.get("i"):
             parts.append("i=%s" % keys["i"])
@@ -266,7 +265,7 @@ class GraphicsState:
         return ",".join(parts) + ";" if parts else ""
 
     @staticmethod
-    def _int(keys: Dict[str, str], key: str, default: int = 0) -> int:
+    def _int(keys: dict[str, str], key: str, default: int = 0) -> int:
         value = keys.get(key)
         if not value:
             return default
@@ -275,9 +274,7 @@ class GraphicsState:
     # ------------------------------------------------------------------
     # Transmission.
 
-    def _assemble(
-        self, keys: Dict[str, str], payload: str
-    ) -> Tuple[Dict[str, str], str] | None:
+    def _assemble(self, keys: dict[str, str], payload: str) -> tuple[dict[str, str], str] | None:
         """
         Join the chunks of a chunked transmission ("m=1" on every
         message but the last). Returns the keys and the whole payload
@@ -313,9 +310,7 @@ class GraphicsState:
 
         return (keys, payload)
 
-    def _transmit(
-        self, keys: Dict[str, str], payload: str, store: bool
-    ) -> Tuple[str, bool, int | None] | None:
+    def _transmit(self, keys: dict[str, str], payload: str, store: bool) -> tuple[str, bool, int | None] | None:
         """
         Handle the 't' and 'q' actions. Returns the response, whether
         it is a success, and the id of the stored image (None for the
@@ -326,9 +321,7 @@ class GraphicsState:
 
         medium = keys.get("t", "d")
         if medium != "d":
-            raise GraphicsError(
-                "EINVAL", "unsupported transmission medium: %r" % medium
-            )
+            raise GraphicsError("EINVAL", "unsupported transmission medium: %r" % medium)
 
         image_id: int | None = None
         try:
@@ -350,18 +343,14 @@ class GraphicsState:
                     except Exception:
                         raise GraphicsError("EINVAL", "invalid compressed data")
                 elif compression:
-                    raise GraphicsError(
-                        "EINVAL", "unknown compression: %r" % compression
-                    )
+                    raise GraphicsError("EINVAL", "unknown compression: %r" % compression)
                 width = self._int(keys, "s")
                 height = self._int(keys, "v")
                 if width <= 0 or height <= 0:
                     raise GraphicsError("EINVAL", "width and height required")
                 expected = width * height * (3 if fmt == PixelFormat.RGB else 4)
                 if len(data) != expected:
-                    raise GraphicsError(
-                        "EINVAL", "data size does not match width and height"
-                    )
+                    raise GraphicsError("EINVAL", "data size does not match width and height")
             else:
                 raise GraphicsError("EINVAL", "unknown format: %i" % fmt)
 
@@ -415,12 +404,10 @@ class GraphicsState:
         return (self._prefix(keys) + "OK", True, image_id)
 
     @staticmethod
-    def _pending_response_possible(keys: Dict[str, str]) -> bool:
+    def _pending_response_possible(keys: dict[str, str]) -> bool:
         return bool(keys.get("i") or keys.get("I"))
 
-    def _transmit_and_display(
-        self, keys: Dict[str, str], payload: str, screen
-    ) -> Tuple[str, bool] | None:
+    def _transmit_and_display(self, keys: dict[str, str], payload: str, screen) -> tuple[str, bool] | None:
         "Handle the 'T' action: transmit, then place at the cursor."
         result = self._transmit(keys, payload, store=True)
         if result is None:
@@ -434,7 +421,7 @@ class GraphicsState:
     # ------------------------------------------------------------------
     # Placement.
 
-    def _lookup_image(self, keys: Dict[str, str]) -> Tuple[int, GraphicsImage]:
+    def _lookup_image(self, keys: dict[str, str]) -> tuple[int, GraphicsImage]:
         if "i" in keys and "I" in keys:
             raise GraphicsError("EINVAL", "both image id and image number given")
         if "i" in keys:
@@ -456,15 +443,13 @@ class GraphicsState:
         return image_id, image
 
     @staticmethod
-    def _put_prefix(keys: Dict[str, str], image_id: int) -> str:
+    def _put_prefix(keys: dict[str, str], image_id: int) -> str:
         parts = ["i=%i" % image_id]
         if keys.get("p"):
             parts.append("p=%s" % keys["p"])
         return ",".join(parts) + ";"
 
-    def _put(
-        self, keys: Dict[str, str], screen, image_id: int | None = None
-    ) -> Tuple[str, bool]:
+    def _put(self, keys: dict[str, str], screen, image_id: int | None = None) -> tuple[str, bool]:
         if image_id is None:
             image_id, _image = self._lookup_image(keys)
         else:
@@ -494,16 +479,11 @@ class GraphicsState:
         # image with the same id.
         if placement_id:
             for existing in list(self.placements):
-                if (
-                    existing.image_id == image_id
-                    and existing.placement_id == placement_id
-                ):
+                if existing.image_id == image_id and existing.placement_id == placement_id:
                     self._clear_placement_cells(screen, existing)
                     self.placements.remove(existing)
 
-        placement = GraphicsPlacement(
-            image_id, placement_id, x, y, columns, rows, z, virtual, asked_for_the_box
-        )
+        placement = GraphicsPlacement(image_id, placement_id, x, y, columns, rows, z, virtual, asked_for_the_box)
         self.placements.append(placement)
 
         if not virtual and z >= 0:
@@ -526,7 +506,7 @@ class GraphicsState:
     # ------------------------------------------------------------------
     # Deletion.
 
-    def _delete(self, keys: Dict[str, str], screen) -> Tuple[str, bool] | None:
+    def _delete(self, keys: dict[str, str], screen) -> tuple[str, bool] | None:
         specifier = keys.get("d", "a")
         lower = specifier.lower()
         free_data = specifier.isupper()
@@ -543,42 +523,30 @@ class GraphicsState:
             targets = [
                 pl
                 for pl in self.placements
-                if pl.image_id == image_id
-                and (not placement_id or pl.placement_id == placement_id)
+                if pl.image_id == image_id and (not placement_id or pl.placement_id == placement_id)
             ]
         elif lower == "n":
             number = self._int(keys, "I")
             image = self.newest_by_number.get(number)
-            targets = [
-                pl
-                for pl in self.placements
-                if image is not None and pl.image_id in self._ids_of(image)
-            ]
+            targets = [pl for pl in self.placements if image is not None and pl.image_id in self._ids_of(image)]
         elif lower == "c":
             cursor = screen.pt_cursor_position
             targets = [
                 pl
                 for pl in self.placements
-                if pl.x <= cursor.x < pl.x + pl.columns
-                and pl.y <= cursor.y < pl.y + pl.rows
+                if pl.x <= cursor.x < pl.x + pl.columns and pl.y <= cursor.y < pl.y + pl.rows
             ]
         elif lower in ("p", "q"):
             x = self._int(keys, "x") - 1
             y = self._int(keys, "y") - 1
-            targets = [
-                pl
-                for pl in self.placements
-                if pl.x <= x < pl.x + pl.columns and pl.y <= y < pl.y + pl.rows
-            ]
+            targets = [pl for pl in self.placements if pl.x <= x < pl.x + pl.columns and pl.y <= y < pl.y + pl.rows]
             if lower == "q":
                 z = self._int(keys, "z")
                 targets = [pl for pl in targets if pl.z == z]
         elif lower == "r":
             low = self._int(keys, "x")
             high = self._int(keys, "y")
-            image_ids = [
-                image_id for image_id in self.images_by_id if low <= image_id <= high
-            ]
+            image_ids = [image_id for image_id in self.images_by_id if low <= image_id <= high]
             targets = [pl for pl in self.placements if pl.image_id in image_ids]
         else:
             return None  # Unknown specifier: ignore.
@@ -594,10 +562,8 @@ class GraphicsState:
 
         return None  # Deletes are not acknowledged.
 
-    def _ids_of(self, image: GraphicsImage) -> List[int]:
-        return [
-            image_id for image_id, known in self.images_by_id.items() if known is image
-        ]
+    def _ids_of(self, image: GraphicsImage) -> list[int]:
+        return [image_id for image_id, known in self.images_by_id.items() if known is image]
 
     def _new_image_id(self) -> int:
         "An id that no image uses. (For images that the terminal names.)"
@@ -708,9 +674,7 @@ class GraphicsState:
         """
         return any(placement.virtual for placement in self.placements)
 
-    def virtual_placement(
-        self, image_id: int, placement_id: int = 0
-    ) -> Optional["GraphicsPlacement"]:
+    def virtual_placement(self, image_id: int, placement_id: int = 0) -> GraphicsPlacement | None:
         """
         The virtual placement that a unicode placeholder points at.
 
@@ -735,7 +699,7 @@ class GraphicsState:
         that the scroll would tear or move out of the region are
         removed, the same way kitty drops an image that scrolls out.
         """
-        kept: List[GraphicsPlacement] = []
+        kept: list[GraphicsPlacement] = []
         for placement in self.placements:
             top = placement.y
             bottom = placement.y + placement.rows - 1
@@ -747,26 +711,17 @@ class GraphicsState:
                 continue  # Crosses the edge of the region: torn.
 
             placement.y -= count
-            if (
-                placement.y >= first_row
-                and placement.y + placement.rows - 1 <= last_row
-            ):
+            if placement.y >= first_row and placement.y + placement.rows - 1 <= last_row:
                 kept.append(placement)
         self.placements = kept
 
     def prune_above(self, row: int) -> None:
         "Remove placements that end above `row`. (History was trimmed.)"
-        self.placements = [
-            placement
-            for placement in self.placements
-            if placement.y + placement.rows > row
-        ]
+        self.placements = [placement for placement in self.placements if placement.y + placement.rows > row]
 
     def prune_below(self, row: int) -> None:
         "Remove placements that start below `row`. (Lines were dropped.)"
-        self.placements = [
-            placement for placement in self.placements if placement.y <= row
-        ]
+        self.placements = [placement for placement in self.placements if placement.y <= row]
 
     def clear(self) -> None:
         "Forget all images and placements. (Full terminal reset.)"

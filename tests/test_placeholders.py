@@ -7,16 +7,16 @@ the row and the column in combining characters. The terminal reads the
 screen back to find out what to draw.
 """
 
+from __future__ import annotations
+
 import base64
 
-import pytest
-
+from pyte import escape
 from pyte.colors import Color, SgrColor
 from pyte.placeholders import DIACRITICS, PLACEHOLDER, foreground_id
 from pyte.screen import Screen
-from pyte.streams import Stream
-from pyte import escape
 from pyte.sequences import csi
+from pyte.streams import Stream
 
 
 def make_screen(lines=24, columns=80):
@@ -52,9 +52,7 @@ def rgb_image(width, height):
 def transmit_virtual(stream, image_id, width, height):
     "A virtual placement: it covers no cells of its own."
     data = base64.b64encode(rgb_image(width, height)).decode()
-    stream.feed(
-        "\x1b_Ga=T,U=1,f=24,s=%i,v=%i,i=%i;%s\x1b\\" % (width, height, image_id, data)
-    )
+    stream.feed("\x1b_Ga=T,U=1,f=24,s=%i,v=%i,i=%i;%s\x1b\\" % (width, height, image_id, data))
 
 
 # ----------------------------------------------------------------------

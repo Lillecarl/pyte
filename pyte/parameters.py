@@ -17,6 +17,8 @@ their own, `terminfo.py` holds the answers a program reads back, and
 Lillecarl/pymux#129.
 """
 
+from __future__ import annotations
+
 from enum import IntEnum
 
 __all__ = (

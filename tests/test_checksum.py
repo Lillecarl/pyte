@@ -7,14 +7,15 @@ is "DCS Pid ! ~ xxxx ST", and the value is the negated sum of the
 characters.
 """
 
+from __future__ import annotations
+
 import re
 
-from pyte.screen import Screen
-from pyte.streams import Stream
-from pyte.sequences import Csi, csi
 from pyte import escape
 from pyte.modes import PrivateMode
-from pyte.sequences import set_mode
+from pyte.screen import Screen
+from pyte.sequences import Csi, csi, set_mode
+from pyte.streams import Stream
 
 
 def make_screen(lines=24, columns=80):
@@ -68,9 +69,7 @@ def test_the_rectangle_is_clamped_to_the_screen():
     stream.feed("ab")
     # Past the last line and the last column. The whole screen holds
     # "ab" and fourteen spaces.
-    identifier, total = checksum(
-        stream, responses, csi(Csi.DECRQCRA, 1, 0, 1, 1, 99, 99)
-    )
+    identifier, total = checksum(stream, responses, csi(Csi.DECRQCRA, 1, 0, 1, 1, 99, 99))
     assert total == ord("a") + ord("b") + 14 * ord(" ")
 
 
@@ -126,11 +125,7 @@ def test_the_rectangle_counts_from_the_screen_without_origin_mode():
     "With the mode off, the same margins do not move the corners."
     screen, stream, responses = make_screen()
     stream.feed(csi(escape.CUP, 5, 5) + "X")
-    stream.feed(
-        csi(escape.DECSTBM, 5, 7)
-        + set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 5, 7)
-    )
+    stream.feed(csi(escape.DECSTBM, 5, 7) + set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 5, 7))
     assert checksum(stream, responses, csi(Csi.DECRQCRA, 7, 0, 1, 1, 1, 1)) == (
         7,
         ord(" "),

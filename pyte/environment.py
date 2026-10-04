@@ -28,6 +28,8 @@ the answer depends on whether it is there. Nothing that parses or holds
 a cell imports it, and `tests/test_the_layers.py` says so.
 """
 
+from __future__ import annotations
+
 import os
 from typing import MutableMapping
 
@@ -148,9 +150,7 @@ def terminal_name(directory: str = DEFAULT_DATABASE) -> str:
     return TERMINAL_NAME if database(directory) else FALLBACK_NAME
 
 
-def prepare(
-    environment: MutableMapping[str, str], directory: str = DEFAULT_DATABASE
-) -> None:
+def prepare(environment: MutableMapping[str, str], directory: str = DEFAULT_DATABASE) -> None:
     """
     Say, in place, that this program runs on this screen.
 

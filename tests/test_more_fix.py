@@ -10,12 +10,13 @@ The mode is off unless a program asks for it, so the ordinary tab is
 unchanged.
 """
 
-from pyte.screen import Screen
-from pyte.streams import Stream
-from pyte.modes import PrivateMode
-from pyte.sequences import reset_mode, set_mode
+from __future__ import annotations
+
 from pyte import escape
-from pyte.sequences import csi
+from pyte.modes import PrivateMode
+from pyte.screen import Screen
+from pyte.sequences import csi, reset_mode, set_mode
+from pyte.streams import Stream
 
 MORE_FIX = set_mode(PrivateMode.MORE_FIX)
 

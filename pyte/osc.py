@@ -23,8 +23,10 @@ returns the payload to answer with, and the screen sends it.
 Lillecarl/pymux#129.
 """
 
+from __future__ import annotations
+
 from enum import StrEnum
-from typing import Dict, List, Mapping, NamedTuple, Sequence, Tuple
+from typing import Mapping, NamedTuple, Sequence
 
 from .colors import DEFAULT_COLORS, PALETTE, Color, parse_color
 
@@ -128,7 +130,7 @@ def asks_for_the_clipboard(payload: str) -> bool:
 #: xterm numbers ten of these. The five that are here are the five
 #: that a pane holds; the rest name a pointer or a Tektronix window,
 #: which a pane does not have.
-DYNAMIC_COLOR_CODES: Dict[str, str] = {
+DYNAMIC_COLOR_CODES: dict[str, str] = {
     "10": "foreground",
     "11": "background",
     "12": "cursor",
@@ -139,9 +141,7 @@ DYNAMIC_COLOR_CODES: Dict[str, str] = {
 #: The same colours, by the names kitty's protocol asks them by: the
 #: "OSC 21" payload names a colour, and this is where its name turns
 #: into the code the pane holds it under.
-CODES_OF_DYNAMIC_COLOR_NAMES = {
-    name: code for code, name in DYNAMIC_COLOR_CODES.items()
-}
+CODES_OF_DYNAMIC_COLOR_NAMES = {name: code for code, name in DYNAMIC_COLOR_CODES.items()}
 
 #: The colours that a rendition asks for by name, in the order that
 #: xterm numbers them. "OSC 5 ; 0" is the first.
@@ -158,7 +158,7 @@ FIRST_SPECIAL_COLOR = len(PALETTE)
 DYNAMIC_COLOR_RESET_OFFSET = 100
 
 
-def parse_kitty_color_query(param: str) -> List[Tuple[str, str | None]] | None:
+def parse_kitty_color_query(param: str) -> list[tuple[str, str | None]] | None:
     """
     Split the payload of an "OSC 21" sequence into its keys.
 
@@ -226,12 +226,7 @@ def _hyperlink_id(params: str) -> str:
             continue
         if not value or len(value) > MAX_HYPERLINK_ID_LENGTH:
             return ""
-        if any(
-            character < " "
-            or character == "\x7f"
-            or character in _UNSAFE_IN_HYPERLINK_ID
-            for character in value
-        ):
+        if any(character < " " or character == "\x7f" or character in _UNSAFE_IN_HYPERLINK_ID for character in value):
             return ""
         return value
     return ""
@@ -392,7 +387,7 @@ class PointerShapes:
     __slots__ = ("stack",)
 
     def __init__(self) -> None:
-        self.stack: List[str] = []
+        self.stack: list[str] = []
 
     @property
     def shape(self) -> str:
@@ -529,7 +524,7 @@ class ColorOverrides:
     what a program set.
     """
 
-    __slots__ = ("base", "by_index", "by_code")
+    __slots__ = ("base", "by_code", "by_index")
 
     def __init__(self, base: ColorBase = COLOR_BASE) -> None:
         if len(base.palette) != len(PALETTE):
@@ -537,20 +532,17 @@ class ColorOverrides:
             # wire, and the special colours follow it at a number that
             # assumes so. A shorter table would answer a cube query
             # with the colour of the text.
-            raise ValueError(
-                "the palette of a ColorBase holds %i colours, not %i"
-                % (len(PALETTE), len(base.palette))
-            )
+            raise ValueError("the palette of a ColorBase holds %i colours, not %i" % (len(PALETTE), len(base.palette)))
         #: The colours that a program's sets sit on top of.
         self.base = base
 
         #: What "OSC 4" and "OSC 5" set, by the index into the palette
         #: and the special colours after it.
-        self.by_index: Dict[int, Color] = {}
+        self.by_index: dict[int, Color] = {}
 
         #: What "OSC 10" and the codes after it set, by the code that
         #: set it.
-        self.by_code: Dict[str, Color] = {}
+        self.by_code: dict[str, Color] = {}
 
     def color_of(self, index: int) -> Color | None:
         """
@@ -591,7 +583,7 @@ class ColorOverrides:
         # to the defaults: a pane answers, whatever its embedder said.
         return self.base.defaults.get(name) or DEFAULT_COLORS[name]
 
-    def read_indexed(self, code: str, param: str, offset: int) -> List[str]:
+    def read_indexed(self, code: str, param: str, offset: int) -> list[str]:
         """
         Read "OSC 4" or "OSC 5": the palette and the special colours.
 
@@ -638,7 +630,7 @@ class ColorOverrides:
             if number.isdigit():
                 self.by_index.pop(int(number) + offset, None)
 
-    def read_dynamic(self, code: str, param: str) -> List[str]:
+    def read_dynamic(self, code: str, param: str) -> list[str]:
         """
         Read "OSC 10" and the codes after it: the colours that a
         terminal names rather than numbers.

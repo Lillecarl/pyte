@@ -26,9 +26,11 @@ The source is libX11, `src/xcms/LRGB.c`. The tables are
 `_XcmsIntensityCmp` and `_XcmsIntensityInterpolation`.
 """
 
+from __future__ import annotations
+
 import math
 import sys
-from typing import List, NamedTuple, Tuple
+from typing import NamedTuple
 
 __all__ = [
     "BITS_PER_RGB",
@@ -48,18 +50,16 @@ _SPEC_BITS = 16
 #: The bits of a value that survive at a given `BITS_PER_RGB`. Xcms
 #: drops the rest, because a display cannot show them. This is `MASK`
 #: of `src/xcms/LRGB.c`, written as the sum it really is.
-_MASK = [
-    ((1 << bits) - 1) << (_SPEC_BITS - bits) & 0xFFFF for bits in range(_SPEC_BITS + 1)
-]
+_MASK = [((1 << bits) - 1) << (_SPEC_BITS - bits) & 0xFFFF for bits in range(_SPEC_BITS + 1)]
 
 #: One entry of a channel table: the value that a display takes, and
 #: the light that it gives for it.
-Entry = Tuple[int, float]
+Entry = tuple[int, float]
 
 #: What the red channel of the built-in display gives. The first two
 #: entries both give nothing: a display that is told to emit a little
 #: emits none at all.
-_RED: List[Entry] = [
+_RED: list[Entry] = [
     (0x0000, 0.000000),
     (0x0909, 0.000000),
     (0x0A0A, 0.000936),
@@ -115,7 +115,7 @@ _RED: List[Entry] = [
 ]
 
 #: What the green channel gives.
-_GREEN: List[Entry] = [
+_GREEN: list[Entry] = [
     (0x0000, 0.000000),
     (0x1313, 0.000000),
     (0x1414, 0.000832),
@@ -169,7 +169,7 @@ _GREEN: List[Entry] = [
 ]
 
 #: What the blue channel gives.
-_BLUE: List[Entry] = [
+_BLUE: list[Entry] = [
     (0x0000, 0.000000),
     (0x0E0E, 0.000000),
     (0x0F0F, 0.001341),
@@ -588,7 +588,7 @@ def _radians(degrees: float) -> float:
     return degrees * math.pi / 180.0
 
 
-def _matvec(matrix, vector) -> Tuple[float, float, float]:
+def _matvec(matrix, vector) -> tuple[float, float, float]:
     """
     One 3x3 matrix times one vector. `_XcmsMatVec`.
 
@@ -648,9 +648,7 @@ _WHITE = (
 _WHITE_UVY = _xyz_to_uvy(_WHITE)
 
 #: Where TekHVC starts counting hue, given that white. `ThetaOffset`.
-_THETA_OFFSET = _degrees(
-    _arc_tangent((_BEST_RED[1] - _WHITE_UVY[1]) / (_BEST_RED[0] - _WHITE_UVY[0]))
-)
+_THETA_OFFSET = _degrees(_arc_tangent((_BEST_RED[1] - _WHITE_UVY[1]) / (_BEST_RED[0] - _WHITE_UVY[0])))
 
 
 def _lightness_to_y(lightness: float) -> float:
@@ -861,7 +859,7 @@ def _rgb_to_hvc(rgb) -> Hvc:
     return _xyz_to_hvc(_matvec(_RGB_TO_XYZ, rgb))
 
 
-def _hvc_to_rgb(color: Hvc) -> Tuple[float, float, float]:
+def _hvc_to_rgb(color: Hvc) -> tuple[float, float, float]:
     """
     A TekHVC colour as the light each channel gives.
 
@@ -872,7 +870,7 @@ def _hvc_to_rgb(color: Hvc) -> Tuple[float, float, float]:
     return _matvec(_XYZ_TO_RGB, _hvc(*color))
 
 
-def _most_chroma_of_hue(hue: float) -> Tuple[Hvc, Tuple[float, float, float]]:
+def _most_chroma_of_hue(hue: float) -> tuple[Hvc, tuple[float, float, float]]:
     """
     `_XcmsTekHVCQueryMaxVCRGB`: the most chroma a hue can carry, with
     the value that goes with it, and the channel lights that show it.
@@ -930,9 +928,7 @@ def _most_chroma(hue: float, value: float) -> Hvc:
 
         # How far from the saturated colour towards white to stand.
         share = (wanted - corner.value) / distance * shrink
-        reached = _rgb_to_hvc(
-            tuple(light * (1.0 - share) + share for light in saturated)
-        )
+        reached = _rgb_to_hvc(tuple(light * (1.0 - share) + share for light in saturated))
 
         if abs(reached.value - value) <= _SEARCH_SLOP:
             return _valid(reached._replace(hue=hue))
@@ -952,7 +948,7 @@ def _most_chroma(hue: float, value: float) -> Hvc:
     return closer()
 
 
-def _clip_chroma(xyz) -> Tuple[float, float, float]:
+def _clip_chroma(xyz) -> tuple[float, float, float]:
     """
     `XcmsTekHVCClipC`: the nearest showable colour of the same hue and
     value.
@@ -964,7 +960,7 @@ def _clip_chroma(xyz) -> Tuple[float, float, float]:
     return _hvc(*_most_chroma(color.hue, color.value))
 
 
-def screen_rgb(xyz) -> Tuple[int, int, int] | None:
+def screen_rgb(xyz) -> tuple[int, int, int] | None:
     """
     The eight bit colour that shows a CIEXYZ colour on the screen that
     Xcms assumes.

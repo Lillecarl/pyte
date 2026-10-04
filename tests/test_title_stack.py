@@ -6,12 +6,12 @@ The window title and the icon label, and the stack that holds them.
 title of its own. A pane has both, so it answers all four.
 """
 
-from pyte.screen import Screen
-from pyte.streams import Stream
-from pyte.sequences import Csi, csi
+from __future__ import annotations
+
 from pyte import escape
-from pyte.sequences import esc
-from pyte.sequences import osc
+from pyte.screen import Screen
+from pyte.sequences import Csi, csi, esc, osc
+from pyte.streams import Stream
 
 
 def _screen(lines=5, columns=10):

@@ -1,9 +1,11 @@
 """Tests for APC, DCS, SOS and PM string sequences."""
 
-import pyte
-from pyte.screen import Screen
+from __future__ import annotations
 
 from a_screen import a_screen, display
+
+import pyte
+from pyte.screen import Screen
 
 
 def display_for(data, columns=20, lines=5):

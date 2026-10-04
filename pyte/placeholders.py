@@ -21,7 +21,9 @@ combining characters of class 230, in the order that gives them their
 numbers.
 """
 
-from typing import Dict, List, NamedTuple
+from __future__ import annotations
+
+from typing import NamedTuple
 
 __all__ = [
     "PLACEHOLDER",
@@ -339,9 +341,7 @@ DIACRITICS = (
 #: The number that a combining character stands for, counting from one.
 #: Zero means "this is not one of them", which is also how a missing
 #: number reads.
-_NUMBER_BY_DIACRITIC: Dict[str, int] = {
-    chr(code): index + 1 for index, code in enumerate(DIACRITICS)
-}
+_NUMBER_BY_DIACRITIC: dict[str, int] = {chr(code): index + 1 for index, code in enumerate(DIACRITICS)}
 
 
 class PlaceholderRun(NamedTuple):
@@ -389,7 +389,7 @@ def _number(text: str, index: int) -> int:
     return _NUMBER_BY_DIACRITIC.get(text[index], 0)
 
 
-def runs_in_line(line, columns: int, row: int) -> List[PlaceholderRun]:
+def runs_in_line(line, columns: int, row: int) -> list[PlaceholderRun]:
     """
     The placeholder runs of one line of the screen.
 
@@ -398,7 +398,7 @@ def runs_in_line(line, columns: int, row: int) -> List[PlaceholderRun]:
     row or column takes them from the cell to the left, which is how a
     program writes a wide image without a diacritic per cell.
     """
-    runs: List[PlaceholderRun] = []
+    runs: list[PlaceholderRun] = []
 
     length = 0
     previous_id = previous_placement = 0
@@ -464,7 +464,7 @@ def runs_in_line(line, columns: int, row: int) -> List[PlaceholderRun]:
     return runs
 
 
-def merge_runs(runs: List[PlaceholderRun]) -> List[PlaceholderRun]:
+def merge_runs(runs: list[PlaceholderRun]) -> list[PlaceholderRun]:
     """
     Join the runs that sit on top of each other into rectangles.
 
@@ -476,9 +476,9 @@ def merge_runs(runs: List[PlaceholderRun]) -> List[PlaceholderRun]:
     The runs come in the order that `runs_in_line` yields them: by row,
     and by column inside a row.
     """
-    merged: List[PlaceholderRun] = []
+    merged: list[PlaceholderRun] = []
     # The rectangle that each column can still grow, by its start.
-    open_by_column: Dict[int, int] = {}
+    open_by_column: dict[int, int] = {}
 
     for run in runs:
         index = open_by_column.get(run.column)

@@ -22,8 +22,11 @@ Command-line tool for "disassembling" escape and CSI sequences::
 :license: LGPL, see LICENSE for more details.
 """
 
+from __future__ import annotations
+
 if __name__ == "__main__":
     import sys
+
     import pyte
 
     if len(sys.argv) == 1:

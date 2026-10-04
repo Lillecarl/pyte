@@ -42,6 +42,8 @@ decides how to draw one: `ptterm` does it with prompt_toolkit and
 :license: LGPL, see LICENSE for more details.
 """
 
+from __future__ import annotations
+
 __version__ = "0.8.3.dev"
 
 __all__ = ("Screen", "Stream", "ByteStream", "DebugScreen", "GroundTimer")
@@ -49,7 +51,6 @@ __all__ = ("Screen", "Stream", "ByteStream", "DebugScreen", "GroundTimer")
 from .debug import DebugScreen
 from .screen import Screen
 from .streams import ByteStream, GroundTimer, Stream
-
 
 if __debug__:
     import io

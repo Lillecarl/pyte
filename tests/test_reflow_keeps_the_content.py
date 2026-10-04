@@ -39,18 +39,18 @@ and no read makes a cell, so the lines after the first resize are the
 lines before it. Lillecarl/pymux#143.
 """
 
-from hypothesis import HealthCheck, assume, example, given, settings
-from hypothesis import strategies as st
+from __future__ import annotations
 
 from a_screen import a_screen
+from hypothesis import HealthCheck, assume, example, given, settings
+from hypothesis import strategies as st
+from test_row_versions import a_chunk
+
+from pyte import escape
 from pyte.cells import PLAIN_APPEARANCE, WrittenCell
 from pyte.modes import PrivateMode
+from pyte.sequences import Csi, csi, esc, set_mode
 from pyte.streams import Stream
-
-from test_row_versions import a_chunk
-from pyte import escape
-from pyte.sequences import esc
-from pyte.sequences import Csi, csi, set_mode
 
 
 def _trimmed(cells):
@@ -69,11 +69,7 @@ def _trimmed(cells):
     the cell the cursor stands on, which is the same thing again.
     """
     end = len(cells)
-    while (
-        end > 0
-        and not isinstance(cells[end - 1], WrittenCell)
-        and cells[end - 1].appearance == PLAIN_APPEARANCE
-    ):
+    while end > 0 and not isinstance(cells[end - 1], WrittenCell) and cells[end - 1].appearance == PLAIN_APPEARANCE:
         end -= 1
     return cells[:end]
 
@@ -125,9 +121,7 @@ def logical_lines(screen):
     # judge.
     lines = [line for line in lines if line]
 
-    return tuple(
-        tuple((cell.char, cell.appearance) for cell in cells) for cells in lines
-    )
+    return tuple(tuple((cell.char, cell.appearance) for cell in cells) for cells in lines)
 
 
 #: The widths to resize through. Narrower than the screen so a line
@@ -183,9 +177,7 @@ def test_a_column_change_keeps_every_line(chunks, widths):
 #: looks for the top of the buffer at the last row of the screen, and
 #: a smaller height moves that row down past rows the buffer holds.
 #: Lillecarl/pymux#145.
-SIZES = st.lists(
-    st.tuples(st.integers(1, 12), st.integers(4, 24)), min_size=1, max_size=4
-)
+SIZES = st.lists(st.tuples(st.integers(1, 12), st.integers(4, 24)), min_size=1, max_size=4)
 
 
 @given(st.lists(a_chunk(), min_size=1, max_size=40), SIZES)
@@ -255,16 +247,12 @@ def test_the_alternate_screen_loses_what_no_longer_fits():
     """
     screen = a_screen(columns=10, lines=6)
     Stream(screen).feed(
-        set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR)
-        + "wider text that wraps around the end of a short row"
+        set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR) + "wider text that wraps around the end of a short row"
     )
     assert screen.in_alternate_screen
 
     assert logical_lines(screen) == (
-        tuple(
-            (char, PLAIN_APPEARANCE)
-            for char in "wider text that wraps around the end of a short row"
-        ),
+        tuple((char, PLAIN_APPEARANCE) for char in "wider text that wraps around the end of a short row"),
     )
 
     screen.resize(1, 4)

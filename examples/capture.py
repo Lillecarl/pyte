@@ -9,12 +9,13 @@ An example showing how to capure output from a running terminal app.
 :license: LGPL, see LICENSE for more details.
 """
 
+from __future__ import annotations
+
 import os
 import pty
-import signal
 import select
+import signal
 import sys
-
 
 if __name__ == "__main__":
     try:

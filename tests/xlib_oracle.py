@@ -17,9 +17,10 @@ channel the low byte of each is zero, so `>> 8` gives what a pane
 holds.
 """
 
+from __future__ import annotations
+
 import ctypes
 import os
-from typing import Tuple
 
 __all__ = ["xlib_is_available", "xlib_color"]
 
@@ -57,11 +58,9 @@ class _Xlib:
         screen = self.library.XDefaultScreen(self.display)
         self.colormap = self.library.XDefaultColormap(self.display, screen)
 
-    def parse(self, spec: str) -> Tuple[int, int, int] | None:
+    def parse(self, spec: str) -> tuple[int, int, int] | None:
         color = _XColor()
-        answered = self.library.XParseColor(
-            self.display, self.colormap, spec.encode(), ctypes.byref(color)
-        )
+        answered = self.library.XParseColor(self.display, self.colormap, spec.encode(), ctypes.byref(color))
         if not answered:
             return None
         return color.red, color.green, color.blue
@@ -86,7 +85,7 @@ def xlib_is_available() -> bool:
     return _xlib() is not None
 
 
-def xlib_color(spec: str) -> Tuple[int, int, int] | None:
+def xlib_color(spec: str) -> tuple[int, int, int] | None:
     """
     What `XParseColor` gives for `spec`, as three eight bit
     components, or `None` for a spec it refuses.

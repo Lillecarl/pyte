@@ -15,6 +15,8 @@ The table is xterm's, out of `kypd_num` and `kypd_apl` in its
 pair says what one key sends in each mode.
 """
 
+from __future__ import annotations
+
 import pyte
 from pyte.keys import FunctionalKey
 from pyte.modes import PrivateMode

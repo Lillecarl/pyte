@@ -12,8 +12,10 @@ in txterm — and copy mode, which walks the whole buffer.
 Lillecarl/pymux#129.
 """
 
+from __future__ import annotations
+
 from collections import defaultdict, namedtuple
-from typing import DefaultDict, Dict, List, NamedTuple, Tuple
+from typing import NamedTuple
 
 from .cells import UNWRITTEN, Cell
 
@@ -58,7 +60,7 @@ class CursorPosition:
         return f"pymux.CursorPosition(x={self.x!r}, y={self.y!r})"
 
 
-class Row(Dict[int, Cell]):
+class Row(dict[int, Cell]):
     """
     One row of the buffer: its cells, and what is true of the row
     itself rather than of any cell in it.
@@ -122,7 +124,7 @@ class LogicalLine:
     __slots__ = ("cells",)
 
     def __init__(self) -> None:
-        self.cells: List[Cell] = []
+        self.cells: list[Cell] = []
 
     def __repr__(self) -> str:
         return "LogicalLine(%r)" % "".join(cell.char for cell in self.cells)
@@ -172,7 +174,7 @@ class Page:
         #: cell. A reflow lays every line out by writing to the row it
         #: lands on, so the rows have to arrive; `wrapped` and the
         #: readers that must not write use `.get`.
-        self.data_buffer: DefaultDict[int, Row] = defaultdict(Row)
+        self.data_buffer: defaultdict[int, Row] = defaultdict(Row)
 
         #: Does the cursor show? DECTCEM ("?25") sets it, and it belongs
         #: to the screen in front, so the alternate screen has its own.
@@ -200,7 +202,7 @@ class Page:
         Nothing here writes, and a row the buffer does not hold gives
         no characters.
         """
-        characters: List[str] = []
+        characters: list[str] = []
         data_buffer = self.data_buffer
 
         for number in range(first, last + 1):
@@ -210,7 +212,7 @@ class Page:
 
         return "".join(characters)
 
-    def text_lines(self, first: int, last: int) -> "List[TextLine]":
+    def text_lines(self, first: int, last: int) -> list[TextLine]:
         """
         The lines the range holds, as text and as the rows each one
         is laid out on.
@@ -298,8 +300,8 @@ class Page:
         return min(offset, len(line.text))
 
     def unwrap(
-        self, first: int, last: int, cursor: "Tuple[int, int] | None" = None
-    ) -> "Tuple[List[LogicalLine], Tuple[int, int] | None]":
+        self, first: int, last: int, cursor: tuple[int, int] | None = None
+    ) -> tuple[list[LogicalLine], tuple[int, int] | None]:
         """
         The rows from `first` to `last` as the lines a program wrote.
 
@@ -331,9 +333,9 @@ class Page:
         The answer holds one line for every line the range starts, and
         nothing after them.
         """
-        lines: List[LogicalLine] = []
-        line: "LogicalLine | None" = None
-        cells: List[Cell] = []
+        lines: list[LogicalLine] = []
+        line: LogicalLine | None = None
+        cells: list[Cell] = []
         found = None
 
         # The cursor as two numbers, because the loop below runs once
@@ -357,7 +359,7 @@ class Page:
             if row is not None:
                 # `default` answers an empty row without writing to it.
                 held = max(row, default=-1) + 1
-                for column in range(0, held):
+                for column in range(held):
                     if number == cursor_row and column == cursor_column:
                         found = (len(lines) - 1, len(cells))
                     cells.append(row[column])

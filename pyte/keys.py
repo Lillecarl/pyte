@@ -56,8 +56,10 @@ The forms follow the encoder of kitty (`kitty/key_encoding.c`), so a
 pane sees what a real kitty gives it.
 """
 
+from __future__ import annotations
+
 from enum import IntEnum, IntFlag
-from typing import List, NamedTuple, Sequence, Tuple
+from typing import NamedTuple, Sequence
 
 __all__ = [
     "translate_key_data",
@@ -291,9 +293,7 @@ BACK_TAB = "[Z"
 #: escape in front of the key, so the legacy encoding writes both. What
 #: it cannot do is tell them apart from something else: ctrl+a is
 #: ctrl+shift+a, and alt+a is an escape and an a.
-_MODIFIERS_THAT_MAKE_A_KEY_AMBIGUOUS = (
-    Modifier.CTRL | Modifier.ALT | Modifier.SUPER | Modifier.HYPER | Modifier.META
-)
+_MODIFIERS_THAT_MAKE_A_KEY_AMBIGUOUS = Modifier.CTRL | Modifier.ALT | Modifier.SUPER | Modifier.HYPER | Modifier.META
 
 #: The modifiers the legacy encoding has no way to write at all.
 #:
@@ -353,11 +353,7 @@ def _legacy_mode(flags: int) -> bool:
     and the forms that belong to it are the SS3 spelling of an arrow
     or of F1 to F4, and the back tab.
     """
-    return not flags & (
-        KeyboardFlag.DISAMBIGUATE
-        | KeyboardFlag.REPORT_EVENT_TYPES
-        | KeyboardFlag.REPORT_ALL_KEYS
-    )
+    return not flags & (KeyboardFlag.DISAMBIGUATE | KeyboardFlag.REPORT_EVENT_TYPES | KeyboardFlag.REPORT_ALL_KEYS)
 
 
 class FunctionalKey(IntEnum):
@@ -470,12 +466,10 @@ MAX_FLAGS_STACK = 64
 #: the layout of the user; the legacy encoding carries neither by
 #: itself. The other three flags are a form to write a key in, so any
 #: terminal serves them.
-FLAGS_THAT_NEED_A_SOURCE = (
-    KeyboardFlag.REPORT_EVENT_TYPES | KeyboardFlag.REPORT_ALTERNATE_KEYS
-)
+FLAGS_THAT_NEED_A_SOURCE = KeyboardFlag.REPORT_EVENT_TYPES | KeyboardFlag.REPORT_ALTERNATE_KEYS
 
 
-def current_flags(stack: Tuple[int, ...]) -> int:
+def current_flags(stack: tuple[int, ...]) -> int:
     "The flags in force: the top of the stack, or none."
     return stack[-1] if stack else 0
 
@@ -495,13 +489,13 @@ def deliverable_flags(flags: int, source_flags: int, synthesize: bool) -> int:
     return flags & ~(FLAGS_THAT_NEED_A_SOURCE & ~source_flags)
 
 
-def pushed(stack: Tuple[int, ...], flags: int) -> Tuple[int, ...]:
+def pushed(stack: tuple[int, ...], flags: int) -> tuple[int, ...]:
     "Put one flag set on top. A full stack drops the oldest."
     grown = stack + (flags,)
     return grown[-MAX_FLAGS_STACK:] if len(grown) > MAX_FLAGS_STACK else grown
 
 
-def popped(stack: Tuple[int, ...], count: int) -> Tuple[int, ...]:
+def popped(stack: tuple[int, ...], count: int) -> tuple[int, ...]:
     """
     Take flag sets off the top.
 
@@ -513,9 +507,7 @@ def popped(stack: Tuple[int, ...], count: int) -> Tuple[int, ...]:
     return stack[: -max(1, count)]
 
 
-def with_flags_set(
-    stack: Tuple[int, ...], flags: int, mode: int
-) -> Tuple[int, ...] | None:
+def with_flags_set(stack: tuple[int, ...], flags: int, mode: int) -> tuple[int, ...] | None:
     """
     The stack that "CSI = flags ; mode u" leaves.
 
@@ -546,7 +538,7 @@ class KeyEvent(NamedTuple):
     #: them, and it leaves a slot empty when it has nothing for it, so
     #: a slot holds None. Nothing reconstructs these from legacy data:
     #: which key gives a character depends on the layout of the user.
-    alternates: Tuple[int | None, ...] = ()
+    alternates: tuple[int | None, ...] = ()
     #: Press, repeat or release. Legacy data holds presses only.
     event: int = EventType.PRESS
 
@@ -556,7 +548,7 @@ class KeyEvent(NamedTuple):
 _Item = KeyEvent | str
 
 
-def _split_slots(part: str) -> List[int | None]:
+def _split_slots(part: str) -> list[int | None]:
     """
     Split one parameter into its subparameters, keeping the empty ones.
 
@@ -574,7 +566,7 @@ def _first(slots: Sequence[int | None], default: int) -> int:
     return default
 
 
-def _trimmed(slots: Sequence[int | None]) -> Tuple[int | None, ...]:
+def _trimmed(slots: Sequence[int | None]) -> tuple[int | None, ...]:
     "The slots without the empty ones at the end. They mean nothing."
     kept = list(slots)
     while kept and kept[-1] is None:
@@ -630,9 +622,7 @@ def _control_or_text_event(char: str) -> KeyEvent:
 MODIFY_OTHER_KEYS = 27
 
 
-def _is_modify_other_keys(
-    final: str, keys: Sequence[int | None], rows: Sequence[Sequence[int | None]]
-) -> bool:
+def _is_modify_other_keys(final: str, keys: Sequence[int | None], rows: Sequence[Sequence[int | None]]) -> bool:
     """
     Whether this is a key in xterm's modifyOtherKeys form.
 
@@ -655,7 +645,7 @@ def _is_modify_other_keys(
     )
 
 
-def _parse_csi(data: str, start: int) -> Tuple[_Item, int]:
+def _parse_csi(data: str, start: int) -> tuple[_Item, int]:
     "Parse a CSI sequence at data[start] ('ESC [')."
     i = start + 2
     params = ""
@@ -729,7 +719,7 @@ def _parse_csi(data: str, start: int) -> Tuple[_Item, int]:
     return raw, i + 1 - start
 
 
-def _parse_ss3(data: str, start: int) -> Tuple[_Item, int]:
+def _parse_ss3(data: str, start: int) -> tuple[_Item, int]:
     "Parse an SS3 sequence at data[start] ('ESC O')."
     if start + 2 >= len(data):
         return data[start:], len(data) - start
@@ -739,7 +729,7 @@ def _parse_ss3(data: str, start: int) -> Tuple[_Item, int]:
     return data[start : start + 3], 3
 
 
-def parse_key_data(data: str) -> List[_Item]:
+def parse_key_data(data: str) -> list[_Item]:
     """
     Decode raw key data into key events and verbatim pass-throughs.
 
@@ -753,7 +743,7 @@ def parse_key_data(data: str) -> List[_Item]:
     below writes bytes for a pane. pymux writes a prompt_toolkit key
     press, because a binding has to be able to name it.
     """
-    items: List[_Item] = []
+    items: list[_Item] = []
     i = 0
     length = len(data)
     while i < length:
@@ -786,7 +776,7 @@ def _serialize(
     code: int,
     mods_value: int,
     final: str,
-    alternates: Tuple[int | None, ...] = (),
+    alternates: tuple[int | None, ...] = (),
     event: int = EventType.PRESS,
     text: str = "",
 ) -> str:
@@ -977,9 +967,7 @@ def _encode_event(
     embedded = text if flags & KeyboardFlag.REPORT_ASSOCIATED_TEXT else ""
 
     if final == "u":
-        ambiguous = (
-            bool(mods & _MODIFIERS_THAT_MAKE_A_KEY_AMBIGUOUS) or code == KeyCode.ESCAPE
-        )
+        ambiguous = bool(mods & _MODIFIERS_THAT_MAKE_A_KEY_AMBIGUOUS) or code == KeyCode.ESCAPE
         # A functional key still here belongs to a pane that reads the
         # number of a key: `_folded` took it away from every other one.
         # It goes out as an escape code whatever else is asked for,
@@ -1128,9 +1116,7 @@ def translate_key_data(
     """
     # The release of a key that the terminal never reports coming up.
     double = bool(
-        synthesize
-        and flags & KeyboardFlag.REPORT_EVENT_TYPES
-        and not source_flags & KeyboardFlag.REPORT_EVENT_TYPES
+        synthesize and flags & KeyboardFlag.REPORT_EVENT_TYPES and not source_flags & KeyboardFlag.REPORT_EVENT_TYPES
     )
 
     parts = []
@@ -1210,9 +1196,7 @@ def translate_key_event(
         backarrow_sends_backspace,
     )
     if double and event.event == EventType.PRESS:
-        encoded += _encode_event(
-            event._replace(event=EventType.RELEASE), flags, application_mode
-        )
+        encoded += _encode_event(event._replace(event=EventType.RELEASE), flags, application_mode)
     return encoded
 
 
@@ -1234,12 +1218,7 @@ class Unhearable(ValueError):
 def _carries_the_number(flags: int) -> bool:
     "Every modifier fits when it does: the form has a field for them."
     return bool(
-        flags
-        & (
-            KeyboardFlag.DISAMBIGUATE
-            | KeyboardFlag.REPORT_ALL_KEYS
-            | KeyboardFlag.REPORT_ASSOCIATED_TEXT
-        )
+        flags & (KeyboardFlag.DISAMBIGUATE | KeyboardFlag.REPORT_ALL_KEYS | KeyboardFlag.REPORT_ASSOCIATED_TEXT)
     )
 
 

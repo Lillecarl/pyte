@@ -24,12 +24,14 @@ whole ranges of rows are the ones that could put a row somewhere
 nobody expects.
 """
 
-from hypothesis import HealthCheck, given, settings
-from hypothesis import strategies as st
+from __future__ import annotations
 
 from a_screen import a_screen
-from pyte.streams import Stream
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 from test_row_versions import a_chunk
+
+from pyte.streams import Stream
 
 LINES = 6
 COLUMNS = 10
@@ -56,15 +58,13 @@ def say_nothing_sits_above_the_screen(screen) -> None:
     )
 
     if buffer:
-        assert max(buffer) <= last, (
-            "row %d is above the last row of the screen, %d (%s)"
-            % (max(buffer), last, where)
-        )
+        assert max(buffer) <= last, "row %d is above the last row of the screen, %d (%s)" % (max(buffer), last, where)
 
     whole = max(buffer) if buffer else screen.max_y
-    assert screen.highest_row() == max(whole, screen.max_y), (
-        "highest_row said %d and the whole buffer says %d (%s)"
-        % (screen.highest_row(), max(whole, screen.max_y), where)
+    assert screen.highest_row() == max(whole, screen.max_y), "highest_row said %d and the whole buffer says %d (%s)" % (
+        screen.highest_row(),
+        max(whole, screen.max_y),
+        where,
     )
 
     # The other answer that rests on the same bound. A reflow asks for
@@ -73,9 +73,10 @@ def say_nothing_sits_above_the_screen(screen) -> None:
     # Lillecarl/pymux#145.
     if buffer:
         found = screen._highest_row_the_buffer_holds(last)
-        assert found == max(buffer), (
-            "the buffer top was read as %d and the whole buffer says %d (%s)"
-            % (found, max(buffer), where)
+        assert found == max(buffer), "the buffer top was read as %d and the whole buffer says %d (%s)" % (
+            found,
+            max(buffer),
+            where,
         )
 
 
@@ -94,9 +95,7 @@ def test_a_sequence_nobody_recorded(chunks):
 
 
 @given(
-    st.lists(
-        st.tuples(st.integers(2, 40), st.integers(1, 12)), min_size=1, max_size=12
-    ),
+    st.lists(st.tuples(st.integers(2, 40), st.integers(1, 12)), min_size=1, max_size=12),
     st.integers(0, 30),
 )
 @settings(
@@ -114,11 +113,7 @@ def test_a_screen_that_is_resized_over_and_over(sizes, written):
     """
     screen = a_screen(columns=COLUMNS, lines=LINES)
     stream = Stream(screen)
-    stream.feed(
-        "".join(
-            "row %d of some text that wraps\r\n" % number for number in range(written)
-        )
-    )
+    stream.feed("".join("row %d of some text that wraps\r\n" % number for number in range(written)))
     for columns, lines in sizes:
         screen.resize(lines=lines, columns=columns)
         say_nothing_sits_above_the_screen(screen)

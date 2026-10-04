@@ -6,11 +6,13 @@ understands therefore gets an answer, and one that it does not
 understand gets the answer that says so.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from pyte.screen import Screen
-from pyte.terminfo import TERMINAL_VERSION
 from pyte.streams import Stream
+from pyte.terminfo import TERMINAL_VERSION
 
 
 def make_screen(lines=24, columns=80):
@@ -321,7 +323,7 @@ def test_a_sixel_image_is_still_decoded():
 # The size in band (private mode 2048).
 
 
-from pyte.images import ASSUMED_CELL_HEIGHT, ASSUMED_CELL_WIDTH  # noqa: E402
+from pyte.images import ASSUMED_CELL_HEIGHT, ASSUMED_CELL_WIDTH
 
 
 def resize_report(lines, columns):

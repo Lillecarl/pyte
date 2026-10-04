@@ -29,15 +29,16 @@ are where whole ranges of rows move at once, and those are the paths a
 recording is least likely to reach.
 """
 
+from __future__ import annotations
+
+from a_screen import a_screen
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from a_screen import a_screen
-from pyte.streams import Stream
 from pyte import escape
 from pyte.modes import PrivateMode
-from pyte.sequences import Csi, csi, reset_mode, set_mode
-from pyte.sequences import Escape, Sharp, esc, sharp
+from pyte.sequences import Csi, Escape, Sharp, csi, esc, reset_mode, set_mode, sharp
+from pyte.streams import Stream
 
 
 def cells_of(screen, row_number: int):
@@ -52,9 +53,7 @@ def cells_of(screen, row_number: int):
     row = screen.page.data_buffer.get(row_number)
     if not row:
         return ()
-    return tuple(
-        (row[column].char, row[column].appearance) for column in range(max(row) + 1)
-    )
+    return tuple((row[column].char, row[column].appearance) for column in range(max(row) + 1))
 
 
 class Believing:
@@ -124,10 +123,7 @@ def check(chunks, lines: int = 24, columns: int = 80, history=None) -> None:
         believed = reader.read(rows)
         truth = {row: cells_of(screen, row) for row in rows}
         wrong = sorted(row for row in rows if believed[row] != truth[row])
-        assert not wrong, (
-            "after chunk %d (%r), these rows changed and did not say so: %s"
-            % (number, chunk[:60], wrong)
-        )
+        assert not wrong, "after chunk %d (%r), these rows changed and did not say so: %s" % (number, chunk[:60], wrong)
 
 
 # ----------------------------------------------------------------------

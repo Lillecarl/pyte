@@ -32,10 +32,12 @@ and not the screen -- wraps `html_of_row` itself, and then the newlines
 this puts between rows have to go.
 """
 
+from __future__ import annotations
+
 import re
 from functools import lru_cache
 from html import escape
-from typing import TYPE_CHECKING, List, NamedTuple, Tuple
+from typing import TYPE_CHECKING, NamedTuple
 
 from .cells import PLAIN_APPEARANCE, appearance_of
 from .colors import DEFAULT_COLORS, PALETTE, SgrColor
@@ -211,7 +213,7 @@ def _color_class(color: SgrColor, paints_background: bool) -> str:
     return "%s-%d" % (under, color.index)
 
 
-def _spelled(appearance: "Appearance", reverse_video: bool) -> Drawn:
+def _spelled(appearance: Appearance, reverse_video: bool) -> Drawn:
     """
     How one cell is drawn.
 
@@ -219,8 +221,8 @@ def _spelled(appearance: "Appearance", reverse_video: bool) -> Drawn:
     calls this one directly.
     """
     rendition = appearance.rendition
-    declarations: List[str] = []
-    classes: List[str] = []
+    declarations: list[str] = []
+    classes: list[str] = []
 
     # **Reverse is a swap and not a property.** CSS has nothing that
     # exchanges the two colours, so the exchange happens here, and a
@@ -251,9 +253,7 @@ def _spelled(appearance: "Appearance", reverse_video: bool) -> Drawn:
     elif rendition.dim:
         # Mixed here rather than left to the cascade: the mix needs both
         # colours, and the cell is the only place that knows them.
-        declarations.append(
-            "color:color-mix(in srgb, %s %d%%, %s)" % (foreground, _DIM, background)
-        )
+        declarations.append("color:color-mix(in srgb, %s %d%%, %s)" % (foreground, _DIM, background))
     elif rendition.color or rendition.reverse != reverse_video:
         painted = _color_class(color, paints_background=False)
         if painted:
@@ -274,9 +274,7 @@ def _spelled(appearance: "Appearance", reverse_video: bool) -> Drawn:
         classes.append(_CLASS + "italic")
 
     if rendition.underline or rendition.strike:
-        classes.append(
-            _LINE_CLASSES[(bool(rendition.underline), bool(rendition.strike))]
-        )
+        classes.append(_LINE_CLASSES[(bool(rendition.underline), bool(rendition.strike))])
     if rendition.underline:
         # The class is the CSS keyword, so the rule and the word cannot
         # drift. A solid line is what CSS draws without being told.
@@ -286,9 +284,7 @@ def _spelled(appearance: "Appearance", reverse_video: bool) -> Drawn:
         # The colour of a line that nobody draws would travel with every
         # cell for nothing.
         if rendition.underline_color:
-            declarations.append(
-                "text-decoration-color:" + color_value(rendition.underline_color)
-            )
+            declarations.append("text-decoration-color:" + color_value(rendition.underline_color))
 
     if rendition.blink:
         classes.append(_CLASS + "blink")
@@ -367,7 +363,7 @@ def href_of(hyperlink: str) -> str:
     return escape(hyperlink, quote=True)
 
 
-def _draws(cell: "Cell", reverse_video: bool) -> bool:
+def _draws(cell: Cell, reverse_video: bool) -> bool:
     """
     Whether a cell puts anything on the screen at all.
 
@@ -383,9 +379,7 @@ def _draws(cell: "Cell", reverse_video: bool) -> bool:
     return visible_char(cell.char) not in ("", " ")
 
 
-def runs_of_row(
-    row: "Row", columns: int, reverse_video: bool = False
-) -> List[Tuple["Appearance", str]]:
+def runs_of_row(row: Row, columns: int, reverse_video: bool = False) -> list[tuple[Appearance, str]]:
     """
     One row, as the stretches of it that draw the same way.
 
@@ -408,8 +402,8 @@ def runs_of_row(
     if last < 0:
         return []
 
-    runs: List[Tuple["Appearance", str]] = []
-    text: List[str] = []
+    runs: list[tuple[Appearance, str]] = []
+    text: list[str] = []
     appearance = row[0].appearance
 
     for column in range(last + 1):
@@ -429,9 +423,9 @@ def runs_of_row(
     return runs
 
 
-def html_of_row(row: "Row", columns: int, reverse_video: bool = False) -> str:
+def html_of_row(row: Row, columns: int, reverse_video: bool = False) -> str:
     "One row of a screen, as the spans that draw it."
-    pieces: List[str] = []
+    pieces: list[str] = []
 
     for appearance, run in runs_of_row(row, columns, reverse_video):
         content = escape(run)
@@ -455,7 +449,7 @@ def html_of_row(row: "Row", columns: int, reverse_video: bool = False) -> str:
 
 
 def html_of_page(
-    page: "Page",
+    page: Page,
     first: int,
     last: int,
     columns: int,
@@ -523,16 +517,12 @@ def _renditions() -> str:
         ("hidden", "color: transparent;"),
     ]
     for (underline, strike), name in _LINE_CLASSES.items():
-        lines = " ".join(
-            ["underline"] * underline + ["line-through"] * strike
-        )
+        lines = " ".join(["underline"] * underline + ["line-through"] * strike)
         rules.append((name[len(_CLASS) :], "text-decoration-line: %s;" % (lines,)))
     for shape in set(_UNDERLINE_STYLES.values()) - {"solid"}:
         rules.append((shape, "text-decoration-style: %s;" % (shape,)))
     for baseline, where in _BASELINES.items():
-        rules.append(
-            (baseline, "vertical-align: %s;\n  font-size: smaller;" % (where,))
-        )
+        rules.append((baseline, "vertical-align: %s;\n  font-size: smaller;" % (where,)))
     for index in range(THEMED):
         value = "var(%s)" % (_PROPERTY % index,)
         rules.append(("fg-%d" % index, "color: %s;" % (value,)))
@@ -540,10 +530,7 @@ def _renditions() -> str:
 
     # A descendant of the screen, so that a colour here beats the one
     # the screen itself sets.
-    return "\n".join(
-        ".%s .%s%s { %s }" % (SCREEN_CLASS, _CLASS, name, body)
-        for name, body in rules
-    )
+    return "\n".join(".%s .%s%s { %s }" % (SCREEN_CLASS, _CLASS, name, body) for name, body in rules)
 
 
 #: The custom properties are the theme, and a page that wants another
@@ -580,7 +567,7 @@ CSS = """.%s {
 )
 
 
-def theme_css(colors: "ColorOverrides") -> str:
+def theme_css(colors: ColorOverrides) -> str:
     """
     The rule that makes a page draw in one screen's own colours.
 

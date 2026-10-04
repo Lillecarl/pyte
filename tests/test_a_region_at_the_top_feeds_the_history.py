@@ -20,6 +20,8 @@ libvterm `rect.start_row == 0` over the full width (`screen.c`,
 `premove`). Lillecarl/pymux#423.
 """
 
+from __future__ import annotations
+
 from pyte import escape
 from pyte.modes import PrivateMode
 from pyte.screen import Screen
@@ -150,9 +152,7 @@ def test_a_screen_that_has_not_filled_once_still_keeps_the_row():
 def test_a_region_below_the_first_row_keeps_nothing():
     screen, stream = _screen()
     _fill(stream)
-    stream.feed(
-        csi(escape.DECSTBM, 2, REGION_BOTTOM) + csi(escape.CUP, REGION_BOTTOM, 1) + "\n"
-    )
+    stream.feed(csi(escape.DECSTBM, 2, REGION_BOTTOM) + csi(escape.CUP, REGION_BOTTOM, 1) + "\n")
 
     assert _history(screen) == []
     assert _screen_rows(screen) == ["row0", "row2", "row3", "", "row4", "row5"]
@@ -162,10 +162,7 @@ def test_a_left_margin_keeps_nothing():
     screen, stream = _screen()
     _fill(stream)
     stream.feed(
-        set_mode(PrivateMode.LEFT_RIGHT_MARGIN)
-        + csi(Csi.DECSLRM, 1, 4)
-        + _at_the_bottom_of_the_region()
-        + "\n"
+        set_mode(PrivateMode.LEFT_RIGHT_MARGIN) + csi(Csi.DECSLRM, 1, 4) + _at_the_bottom_of_the_region() + "\n"
     )
 
     assert _history(screen) == []

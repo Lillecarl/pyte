@@ -5,12 +5,14 @@ A terminal that does not do this loses the colour bar that a program
 draws with "CSI K", which is how htop paints the header of its table.
 """
 
-from pyte.colors import SgrColor
-from pyte.cells import WrittenCell
-from pyte.screen import Screen
-from pyte.streams import Stream
+from __future__ import annotations
+
 from pyte import escape
+from pyte.cells import WrittenCell
+from pyte.colors import SgrColor
+from pyte.screen import Screen
 from pyte.sequences import csi
+from pyte.streams import Stream
 
 
 def _screen(lines=5, columns=20):
@@ -72,7 +74,7 @@ def test_erase_in_line_to_the_left_keeps_a_background():
     screen, stream = _screen()
     stream.feed(csi(escape.SGR, 44) + "hello" + csi(escape.EL, 1))
     row = _row(screen, 0)
-    for column in range(0, 6):
+    for column in range(6):
         assert row[column].char == " "
         assert _rendition(row, column).bgcolor is not None
 
@@ -81,7 +83,7 @@ def test_erase_the_whole_line_keeps_a_background():
     screen, stream = _screen()
     stream.feed(csi(escape.SGR, 41) + "hello" + csi(escape.EL, 2))
     row = _row(screen, 0)
-    for column in range(0, 20):
+    for column in range(20):
         assert row[column].char == " "
         assert _rendition(row, column).bgcolor is not None
 
@@ -116,9 +118,7 @@ def test_erase_in_display_reaches_a_screen_that_holds_nothing():
 
 def test_erase_characters_takes_the_background_of_now():
     screen, stream = _screen()
-    stream.feed(
-        "hello" + csi(escape.CUP, 1, 1) + csi(escape.SGR, 43) + csi(escape.ECH, 3)
-    )
+    stream.feed("hello" + csi(escape.CUP, 1, 1) + csi(escape.SGR, 43) + csi(escape.ECH, 3))
     row = _row(screen, 0)
     for column in range(3):
         assert row[column].char == " "
@@ -159,10 +159,7 @@ def test_a_background_still_reaches_the_erased_cells():
 
 def _line(screen, y):
     row = screen.data_buffer[y + screen.line_offset]
-    return "".join(
-        (row[column].char or " ") if column in row else " "
-        for column in range(screen.columns)
-    ).rstrip()
+    return "".join((row[column].char or " ") if column in row else " " for column in range(screen.columns)).rstrip()
 
 
 def test_erasing_the_history_leaves_the_screen():
