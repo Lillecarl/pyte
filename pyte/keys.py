@@ -492,7 +492,7 @@ def deliverable_flags(flags: int, source_flags: int, synthesize: bool) -> int:
 
 def pushed(stack: tuple[int, ...], flags: int) -> tuple[int, ...]:
     "Put one flag set on top. A full stack drops the oldest."
-    grown = stack + (flags,)
+    grown = (*stack, flags)
     return grown[-MAX_FLAGS_STACK:] if len(grown) > MAX_FLAGS_STACK else grown
 
 

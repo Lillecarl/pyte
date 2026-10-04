@@ -2051,7 +2051,7 @@ class Screen:
 
         for char in chars:
             # Create 'Cell' instance.
-            pt_char = char_cache[(char,) + key_tail]
+            pt_char = char_cache[(char, *key_tail)]
             char_width = pt_char.width
 
             # A character that does not fit in what is left of the line
@@ -2126,7 +2126,7 @@ class Screen:
                 # causes the render engine to clear this character, when
                 # overwritten.
                 row[cursor_position_x] = pt_char
-                row[cursor_position_x + 1] = char_cache[("",) + key_tail]
+                row[cursor_position_x + 1] = char_cache[("", *key_tail)]
                 self.repair_wide_char(row, cursor_position_x)
                 self.repair_wide_char(row, cursor_position_x + 2)
                 if not wide_chars:
@@ -4885,7 +4885,7 @@ class Screen:
                 else:
                     parts.append("%i;5;%i" % (code, color.index))
             elif color.rgb is not None:
-                parts.append("%i;2;%i;%i;%i" % ((code,) + color.rgb))
+                parts.append("%i;2;%i;%i;%i" % ((code, *color.rgb)))
 
         underline_color = rendition.underline_color
         if rendition.underline and underline_color is not None:

@@ -49,7 +49,7 @@ def test_one_data_character_is_a_column_of_six():
     width, height, pixel = decode(DEFINE_RED + RED_ + "~")
     assert (width, height) == (1, 6)
     for y in range(6):
-        assert pixel(0, y) == RED + (255,)
+        assert pixel(0, y) == (*RED, 255)
 
 
 def test_the_bits_select_the_rows():
@@ -57,7 +57,7 @@ def test_the_bits_select_the_rows():
     width, height, pixel = decode(DEFINE_RED + RED_ + "A")
     assert (width, height) == (1, 6)
     assert pixel(0, 0) == (0, 0, 0, 255)  # Background: register 0...
-    assert pixel(0, 1) == RED + (255,)
+    assert pixel(0, 1) == (*RED, 255)
     assert pixel(0, 2) == (0, 0, 0, 255)
 
 
@@ -70,14 +70,14 @@ def test_the_default_palette_is_the_vt340_one():
 
 def test_an_rgb_definition():
     _width, _height, pixel = decode("#4;2;0;100;0#4~")
-    assert pixel(0, 0) == GREEN + (255,)
+    assert pixel(0, 0) == (*GREEN, 255)
 
 
 def test_an_hls_definition_starts_the_wheel_at_blue():
     # DEC turns the hue wheel: 0 is blue, 120 is red, 240 is green.
     for hue, expected in ((0, BLUE), (120, RED), (240, GREEN)):
         _width, _height, pixel = decode("#4;1;%i;50;100#4~" % hue)
-        assert pixel(0, 0) == expected + (255,)
+        assert pixel(0, 0) == (*expected, 255)
 
 
 def test_an_hls_definition_uses_lightness_and_saturation():
@@ -91,7 +91,7 @@ def test_repeat():
     width, height, pixel = decode(DEFINE_RED + RED_ + "!5~")
     assert (width, height) == (5, 6)
     for x in range(5):
-        assert pixel(x, 0) == RED + (255,)
+        assert pixel(x, 0) == (*RED, 255)
 
 
 def test_a_repeat_without_a_count_writes_once():
@@ -103,24 +103,24 @@ def test_carriage_return_paints_over_the_same_band():
     body = DEFINE_RED + DEFINE_GREEN + "#4!4~$#5!2~"
     width, height, pixel = decode(body)
     assert (width, height) == (4, 6)
-    assert pixel(0, 0) == GREEN + (255,)
-    assert pixel(1, 0) == GREEN + (255,)
-    assert pixel(2, 0) == RED + (255,)
+    assert pixel(0, 0) == (*GREEN, 255)
+    assert pixel(1, 0) == (*GREEN, 255)
+    assert pixel(2, 0) == (*RED, 255)
 
 
 def test_graphics_new_line_starts_the_next_band():
     body = DEFINE_RED + DEFINE_GREEN + "#4~-#5~"
     width, height, pixel = decode(body)
     assert (width, height) == (1, 12)
-    assert pixel(0, 5) == RED + (255,)
-    assert pixel(0, 6) == GREEN + (255,)
+    assert pixel(0, 5) == (*RED, 255)
+    assert pixel(0, 6) == (*GREEN, 255)
 
 
 def test_raster_attributes_extend_the_canvas():
     width, height, pixel = decode('"1;1;10;20' + DEFINE_RED + RED_ + "~")
     assert (width, height) == (10, 20)
     # The body only wrote the first column.
-    assert pixel(0, 0) == RED + (255,)
+    assert pixel(0, 0) == (*RED, 255)
     assert pixel(9, 19) == (0, 0, 0, 255)
 
 
@@ -150,12 +150,12 @@ def test_unwritten_pixels_are_transparent_with_p2_one():
 def test_unwritten_pixels_take_register_zero_otherwise():
     _width, _height, pixel = decode("#1;2;0;100;0#1A", params="0;0;0")
     assert pixel(0, 0) == (0, 0, 0, 255)  # Register 0 is black.
-    assert pixel(0, 1) == GREEN + (255,)
+    assert pixel(0, 1) == (*GREEN, 255)
 
 
 def test_the_background_follows_register_zero():
     _width, _height, pixel = decode("#0;2;0;0;100#1A")
-    assert pixel(0, 0) == BLUE + (255,)
+    assert pixel(0, 0) == (*BLUE, 255)
 
 
 def test_whitespace_in_the_body_is_ignored():

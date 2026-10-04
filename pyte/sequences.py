@@ -474,7 +474,7 @@ def osc(code: str, *fields: str, end: str = Terminator.ST) -> str:
     The fields are joined with semicolons, which is all the structure
     an OSC has. What each one means belongs to its code.
     """
-    return "%s%s%s" % (_OSC, ";".join((code,) + fields), end)
+    return "%s%s%s" % (_OSC, ";".join((code, *fields)), end)
 
 
 def dcs(payload: str, end: str = Terminator.ST) -> str:

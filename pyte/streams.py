@@ -607,7 +607,7 @@ class Stream:
                             # Lillecarl/pymux#178.
                             params.append(None if current == "" else int(current))
                         else:
-                            params.append(tuple(subparams + [int(current or 0)]))
+                            params.append(tuple([*subparams, int(current or 0)]))
                             subparams = None
                         current = ""
                     else:
@@ -617,7 +617,7 @@ class Stream:
                         # keyboard protocol uses functional key codes above
                         # 9999.
                         if subparams is not None:
-                            params.append(tuple(subparams + [int(current or 0)]))
+                            params.append(tuple([*subparams, int(current or 0)]))
                         elif current != "" or params:
                             # An empty parameter *string* is not one empty
                             # parameter. ECMA-48 reads "CSI m" as "the
