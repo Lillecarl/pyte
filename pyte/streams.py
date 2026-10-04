@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 
     from .screen import Screen as Screen
 
-    ParserGenerator = Generator[bool | None, str, None]
+    ParserGenerator = Generator[bool | None, str]
 
 
 def fit_parameters(handler: Callable[..., None]) -> Callable[..., None]:
@@ -305,7 +305,7 @@ class Stream:
             warnings.warn(
                 "As of version 0.6.0 the listener queue is "
                 "restricted to a single element. Existing "
-                "listener {} will be replaced.".format(self.listener),
+                f"listener {self.listener} will be replaced.",
                 DeprecationWarning,
             )
 
@@ -663,8 +663,7 @@ class Stream:
                     param += char
                     char = yield None
 
-                if param.startswith(";"):
-                    param = param[1:]
+                param = param.removeprefix(";")
 
                 if code in ("0", "1", "2"):
                     if code in ("0", "1"):

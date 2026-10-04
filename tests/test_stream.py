@@ -409,7 +409,7 @@ def test_handler_exception():
     # work. See PR #101 for details.
 
     def failing_handler(*args, **kwargs):
-        raise IntentionalException()
+        raise IntentionalException
 
     handler = argcheck()
     screen = a_screen(80, 24)

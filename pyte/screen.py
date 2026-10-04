@@ -5713,7 +5713,8 @@ class Screen:
         cell = None if row is None else row.get(cursor_position.x)
         if cursor_character is not None and cursor_character != (None if cell is None else cell.char):
             # FIXME:
-            raise Exception("Reflow failed: {!r} {!r}".format(cursor_character, cell))
+            message = f"Reflow failed: {cursor_character!r} {cell!r}"
+            raise Exception(message)
 
         # **The content says how far the buffer reaches.** The screen
         # is the last `lines` rows of it, and everything above them is
