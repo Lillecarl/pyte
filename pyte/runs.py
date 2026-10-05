@@ -85,6 +85,13 @@ def runs_of(row: Row) -> list[Run]:
 
     for column, cell in sorted(row.items()):
         char = cell.char
+        # The empty second half of a wide character is no run: the
+        # run of the character itself already spans both columns, and
+        # a run that covers nothing would move the end the assembly
+        # tracks backwards, so the next run would see a gap and draw a
+        # blank no program wrote.
+        if char == "":
+            continue
         # Whether the character draws as it stands: printable ASCII
         # does, and so does anything above it that is not an image
         # placeholder. A control -- the parser eats those, so one in a
