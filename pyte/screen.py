@@ -253,6 +253,18 @@ class Screen:
         self.writes = 0
         self.written_at: dict[int, int] = {}
 
+        # The cells one draw asks for, by what they are made of. A
+        # draw looks every character up by `(character, appearance,
+        # marks)`, and building that key for every character of every
+        # frame is tuple upon tuple for answers that do not change. An
+        # appearance draws the same characters frame after frame, so
+        # one small map per appearance answers them with one lookup,
+        # and the shared cache is only asked for characters this
+        # screen has not drawn yet. True colour names a new appearance
+        # per pixel, so a crowd of them empties the whole memory
+        # rather than growing it without end.
+        self._cell_caches: dict[tuple[object, ...], dict[str, Cell]] = {}
+
         # The count that a row with no count of its own carries. A
         # reader reads it as the default of `written_at`, so it costs a
         # reader nothing. `touch_everything` says why it exists.
@@ -2015,6 +2027,16 @@ class Screen:
         else:
             key_tail = (self._appearance,)
 
+        # The characters this appearance draws, kept from draw to
+        # draw. The loop below asks for every character it draws, and
+        # nearly every one is a character it drew before.
+        try:
+            cells_of_kind = self._cell_caches[key_tail]
+        except KeyError:
+            if len(self._cell_caches) > 256:
+                self._cell_caches.clear()
+            cells_of_kind = self._cell_caches[key_tail] = {}
+
         # What REP repeats. It is kept before the translation, so that
         # a repeat travels the same road the character did.
         if chars:
@@ -2065,7 +2087,10 @@ class Screen:
 
         for char in chars:
             # Create 'Cell' instance.
-            pt_char = char_cache[(char, *key_tail)]
+            try:
+                pt_char = cells_of_kind[char]
+            except KeyError:
+                pt_char = cells_of_kind[char] = char_cache[(char, *key_tail)]
             char_width = pt_char.width
 
             # A character that does not fit in what is left of the line
@@ -2143,15 +2168,23 @@ class Screen:
                 # nothing new, so it is left alone and counts nothing.
                 # The object says what the cell is made of -- the
                 # character, the appearance, the marks -- and the same
-                # object draws the same cell.
-                elif row.get(cursor_position_x) is not pt_char:
-                    row[cursor_position_x] = pt_char
-                    if changed_first < 0:
-                        changed_first = changed_last = cursor_position_y
-                    elif cursor_position_y < changed_first:
-                        changed_first = cursor_position_y
-                    elif cursor_position_y > changed_last:
-                        changed_last = cursor_position_y
+                # object draws the same cell. A cell nobody wrote is
+                # absent, so it always draws. The lookup reads the row
+                # directly rather than calling `get`, which is what
+                # keeps one draw of one cell this cheap.
+                else:
+                    try:
+                        same = row[cursor_position_x] is pt_char
+                    except KeyError:
+                        same = False
+                    if not same:
+                        row[cursor_position_x] = pt_char
+                        if changed_first < 0:
+                            changed_first = changed_last = cursor_position_y
+                        elif cursor_position_y < changed_first:
+                            changed_first = cursor_position_y
+                        elif cursor_position_y > changed_last:
+                            changed_last = cursor_position_y
             elif char_width > 1:  # 2
                 # Double width character. Put an empty string in the second
                 # cell, because this is different from every character and
