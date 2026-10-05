@@ -2049,6 +2049,20 @@ class Screen:
         # as it was. Lillecarl/pymux#126.
         first_row = cursor_position_y
 
+        # The rows this run changed, for the version count below. A
+        # run that writes what is already there changes nothing, and
+        # the readers keep what they built: a frame after a program
+        # repaints its screen then rebuilds one row. Nearly every run
+        # stays on one row, so the common case is two numbers and no
+        # allocation. Lillecarl/pymux#126.
+        changed_first = -1
+        changed_last = -1
+        # A double width character or a combining mark took a path
+        # below that this narrowing does not follow cell by cell, so
+        # the run counts the way it always did. The common case above
+        # is what narrows, and this costs it nothing.
+        changed_exotic = False
+
         for char in chars:
             # Create 'Cell' instance.
             pt_char = char_cache[(char, *key_tail)]
@@ -2114,12 +2128,30 @@ class Screen:
                 # does not even look.
                 if wide_chars:
                     broken = row.get(cursor_position_x)
+                    if broken is not pt_char:
+                        row[cursor_position_x] = pt_char
+                        if broken is not None and (broken.char == "" or broken.width > 1):
+                            self.repair_wide_char(row, cursor_position_x)
+                            self.repair_wide_char(row, cursor_position_x + 1)
+                        if changed_first < 0:
+                            changed_first = changed_last = cursor_position_y
+                        elif cursor_position_y < changed_first:
+                            changed_first = cursor_position_y
+                        elif cursor_position_y > changed_last:
+                            changed_last = cursor_position_y
+                # A cell that already holds this exact object draws
+                # nothing new, so it is left alone and counts nothing.
+                # The object says what the cell is made of -- the
+                # character, the appearance, the marks -- and the same
+                # object draws the same cell.
+                elif row.get(cursor_position_x) is not pt_char:
                     row[cursor_position_x] = pt_char
-                    if broken is not None and (broken.char == "" or broken.width > 1):
-                        self.repair_wide_char(row, cursor_position_x)
-                        self.repair_wide_char(row, cursor_position_x + 1)
-                else:
-                    row[cursor_position_x] = pt_char
+                    if changed_first < 0:
+                        changed_first = changed_last = cursor_position_y
+                    elif cursor_position_y < changed_first:
+                        changed_first = cursor_position_y
+                    elif cursor_position_y > changed_last:
+                        changed_last = cursor_position_y
             elif char_width > 1:  # 2
                 # Double width character. Put an empty string in the second
                 # cell, because this is different from every character and
@@ -2131,6 +2163,7 @@ class Screen:
                 self.repair_wide_char(row, cursor_position_x + 2)
                 if not wide_chars:
                     wide_chars = self._wide_chars = True
+                changed_exotic = True
             elif char_width == 0:
                 # A mark of no width of its own belongs to the character
                 # before it. See:
@@ -2155,6 +2188,7 @@ class Screen:
                         row[previous] = _PROTECTED_CHAR_CACHE[cell.char + pt_char.char, cell.appearance, marks]
                     else:
                         row[previous] = _CHAR_CACHE[cell.char + pt_char.char, cell.appearance]
+                    changed_exotic = True
             else:  # char_width < 0
                 # (Should not happen.)
                 char_width = 0
@@ -2177,16 +2211,26 @@ class Screen:
         # changed no row either.
         if chars:
             self.pending_wrap = waiting_to_wrap
-            # Nearly every run stays on one row, so that case is
-            # written out rather than called. A run that began with the
-            # cursor waiting to wrap counts the row it came from as
-            # well, which costs a reader one row it need not have
-            # drawn and never costs it a row it should have.
-            if cursor_position_y == first_row:
-                self.writes += 1
-                self.written_at[first_row] = self.writes
-            else:
-                self.touch_rows(range(first_row, cursor_position_y + 1))
+            if in_irm or changed_exotic:
+                # Nearly every run stays on one row, so that case is
+                # written out rather than called. A run that began with the
+                # cursor waiting to wrap counts the row it came from as
+                # well, which costs a reader one row it need not have
+                # drawn and never costs it a row it should have.
+                if cursor_position_y == first_row:
+                    self.writes += 1
+                    self.written_at[first_row] = self.writes
+                else:
+                    self.touch_rows(range(first_row, cursor_position_y + 1))
+            elif changed_first >= 0:
+                # Only the rows that changed count. A run that wrote
+                # what is already there changed no row, and the readers
+                # keep what they built.
+                if changed_first == changed_last:
+                    self.writes += 1
+                    self.written_at[changed_first] = self.writes
+                else:
+                    self.touch_rows(range(changed_first, changed_last + 1))
 
     def _leave_the_pending_wrap(self) -> None:
         """

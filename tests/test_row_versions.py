@@ -261,10 +261,32 @@ def test_the_count_only_goes_up():
     stream = Stream(screen)
 
     seen = []
-    for _ in range(5):
-        stream.feed(csi(escape.CUP, 1, 1) + "x")
+    for number in range(5):
+        stream.feed(csi(escape.CUP, 1, 1) + str(number))
         seen.append(screen.written_at[0])
     assert seen == sorted(set(seen))
+
+
+def test_a_write_that_changes_nothing_counts_nothing():
+    """
+    A repeat of what is already there is not a change.
+
+    The screen counts the writes that change a row, and a reader
+    keeps what it drew while the count stands still. Five identical
+    writes move the count once, and a different write moves it again
+    and reads back what it wrote.
+    """
+    screen = a_screen(columns=10, lines=4)
+    stream = Stream(screen)
+
+    stream.feed(csi(escape.CUP, 1, 1) + "x")
+    first = screen.written_at[0]
+    for _ in range(4):
+        stream.feed(csi(escape.CUP, 1, 1) + "x")
+        assert screen.written_at[0] == first
+    stream.feed(csi(escape.CUP, 1, 1) + "y")
+    assert screen.written_at[0] > first
+    assert cells_of(screen, 0)[0][0] == "y"
 
 
 def test_a_resize_says_that_every_row_changed():
