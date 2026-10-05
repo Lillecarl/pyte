@@ -49,6 +49,7 @@ PURE = {
     "parameters",
     "placeholders",
     "png",
+    "runs",
     "screen",
     "sequences",
     "sixel",

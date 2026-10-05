@@ -124,9 +124,7 @@ def runs_of(row: Row) -> list[Run]:
             continue
         if text is not None:
             assert appearance is not None
-            runs.append(
-                Run(start, end, "".join(text), appearance, written, True, blank)
-            )
+            runs.append(Run(start, end, "".join(text), appearance, written, True, blank))
         if cell.width == 1 and char_plain:
             start = column
             end = column + 1
