@@ -253,6 +253,21 @@ class Screen:
         self.writes = 0
         self.written_at: dict[int, int] = {}
 
+        # The whole-line scrolls since the last reset, oldest first:
+        # (first row, last row, distance, write count, sequence).
+        # Rows are buffer rows, like `written_at`, and a positive
+        # distance moves them up. A front end that keeps what it drew
+        # per row rotates those rows instead of rebuilding them; the
+        # count says which rows moved since, so rows written after a
+        # scroll stay where they are, and the sequence says which
+        # scrolls a reader has missed, so a reader that missed any
+        # rebuilds everything instead. Rectangle scrolls inside left
+        # and right margins are not whole lines and say nothing: their
+        # rows were touched, so they rebuild as before.
+        # Lillecarl/pymux#516.
+        self.scrolls: list[tuple[int, int, int, int, int]] = []
+        self.scroll_seq = 0
+
         # The cells one draw asks for, by what they are made of. A
         # draw looks every character up by `(character, appearance,
         # marks)`, and building that key for every character of every
@@ -1055,6 +1070,13 @@ class Screen:
         self.writes += 1
         self.everything_at = self.writes
         self.written_at.clear()
+        # Rotations refer to rows this replaces, so they go with it.
+        # The sequence keeps counting: a reader whose mark predates
+        # the new oldest entry rebuilds everything instead, which also
+        # drops entries from before the reset that every guard would
+        # otherwise let through.
+        self.scroll_seq += 1
+        del self.scrolls[:]
 
     def _reset_screen(self) -> None:
         """Reset the Screen content. (also called when switching from/to
@@ -2628,6 +2650,23 @@ class Screen:
             # Graphics placements scroll with the text. An image sits on
             # whole lines, so it moves only when whole lines move.
             self.graphics.scroll(top + line_offset, bottom + line_offset, amount)
+
+            # Whole lines moved, so readers can move with them: the
+            # region in buffer rows, the signed distance (up positive),
+            # the write count, so a reader rotates only rows no later
+            # write has touched, and the sequence, so a reader that
+            # missed any rebuilds everything instead.
+            self.scroll_seq += 1
+            self.scrolls.append(
+                (
+                    top + line_offset,
+                    bottom + line_offset,
+                    steps if amount > 0 else -steps,
+                    self.writes,
+                    self.scroll_seq,
+                )
+            )
+            del self.scrolls[:-32]
 
             # The continuation mark moves with the line, because the
             # line carries it. A rectangle carries cells and not lines,
