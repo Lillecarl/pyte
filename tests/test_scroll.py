@@ -70,17 +70,38 @@ def test_a_region_scroll_reports_its_region_and_distance():
     """
     A reader that keeps what it drew per row rotates those rows
     instead of rebuilding them. The report is the region in buffer
-    rows, the signed distance (up positive), the write count so a
-    reader rotates only rows no later write touched, and the
-    sequence so a reader that missed any rebuilds instead.
+    rows, the signed distance (up positive), the counts of its rows
+    before and after so a reader moves only what still shows its row,
+    and the sequence so a reader that missed any rebuilds instead.
     Lillecarl/pymux#516.
     """
     screen, stream = _screen()
-    stream.feed("a\r\nb\r\nc\r\nd" + csi(escape.DECSTBM, 2, 3) + csi(Csi.SU, 1))
-    [(top, bottom, distance, at, seq)] = screen.scrolls
+    stream.feed("a\r\nb\r\nc\r\nd" + csi(escape.DECSTBM, 2, 3))
+    held = (screen.written_at[1], screen.written_at[2])
+    stream.feed(csi(Csi.SU, 1))
+    [(top, bottom, distance, counts, seq)] = screen.scrolls
     assert (top, bottom, distance) == (1, 2, 1)
-    assert at == screen.writes
+    assert counts.before == held
+    assert counts.after == (screen.written_at[1], screen.written_at[2])
     assert seq == 1
+
+
+def test_the_counts_before_a_scroll_hold_a_write_the_scroll_hides():
+    """
+    A row written just before the scroll keeps that count in `before`,
+    though the scroll writes the row again. A reader that drew the row
+    earlier compares against it, and sees that its line is stale.
+    """
+    screen, stream = _screen()
+    stream.feed("a\r\nb\r\nc\r\nd" + csi(escape.DECSTBM, 2, 3))
+    drawn = screen.written_at[2]
+    stream.feed(csi(escape.CUP, 3, 1) + "z")
+    written = screen.written_at[2]
+    stream.feed(csi(Csi.SU, 1))
+    [(_top, _bottom, _distance, counts, _seq)] = screen.scrolls
+    assert written != drawn
+    assert counts.before[1] == written
+    assert counts.after[1] != written
 
 
 def test_a_region_scroll_down_reports_a_negative_distance():

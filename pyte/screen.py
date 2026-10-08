@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from collections import namedtuple
 from collections.abc import Callable, Iterable, Sequence
+from typing import NamedTuple
 
 from . import charsets as cs
 from . import keys
@@ -169,6 +170,22 @@ _Savepoint = namedtuple(
 )
 
 
+class RegionCounts(NamedTuple):
+    """
+    The write counts of a scrolled region's rows, top first.
+
+    `before` is what each row held just before the scroll, and `after`
+    what it holds once the scroll is done. A reader moves what it drew
+    for a row only when that matches `before`: a row written since the
+    reader drew it holds something else, and the scroll's own writes
+    would hide that write from a later count. A moved row then takes
+    its new row's `after`.
+    """
+
+    before: tuple[int, ...]
+    after: tuple[int, ...]
+
+
 class Screen:
     """
     Custom screen class. Most of the methods are called from a vt100 Pyte
@@ -258,14 +275,13 @@ class Screen:
         # Rows are buffer rows, like `written_at`, and a positive
         # distance moves them up. A front end that keeps what it drew
         # per row rotates those rows instead of rebuilding them; the
-        # count says which rows moved since, so rows written after a
-        # scroll stay where they are, and the sequence says which
-        # scrolls a reader has missed, so a reader that missed any
-        # rebuilds everything instead. Rectangle scrolls inside left
-        # and right margins are not whole lines and say nothing: their
-        # rows were touched, so they rebuild as before.
-        # Lillecarl/pymux#516.
-        self.scrolls: list[tuple[int, int, int, int, int]] = []
+        # counts say which of them still hold what it drew, and the
+        # sequence says which scrolls a reader has missed, so a reader
+        # that missed any rebuilds everything instead. Rectangle
+        # scrolls inside left and right margins are not whole lines
+        # and say nothing: their rows were touched, so they rebuild as
+        # before. Lillecarl/pymux#516.
+        self.scrolls: list[tuple[int, int, int, RegionCounts, int]] = []
         self.scroll_seq = 0
 
         # The cells one draw asks for, by what they are made of. A
@@ -2579,6 +2595,10 @@ class Screen:
         line_offset = self.line_offset
         data_buffer = self.data_buffer
         horizontal = self.horizontal_margins
+        region = range(top + line_offset, bottom + line_offset + 1)
+        everything_at = self.everything_at
+        if horizontal is None:
+            before = tuple(self.written_at.get(row, everything_at) for row in region)
 
         # Every row of the region takes new content, whether it comes
         # from another row or is empty. A scroll is the commonest thing
@@ -2653,16 +2673,17 @@ class Screen:
 
             # Whole lines moved, so readers can move with them: the
             # region in buffer rows, the signed distance (up positive),
-            # the write count, so a reader rotates only rows no later
-            # write has touched, and the sequence, so a reader that
-            # missed any rebuilds everything instead.
+            # the counts of its rows before and after, so a reader
+            # moves only what still shows its row, and the sequence, so
+            # a reader that missed any rebuilds everything instead.
+            after = tuple(self.written_at.get(row, everything_at) for row in region)
             self.scroll_seq += 1
             self.scrolls.append(
                 (
                     top + line_offset,
                     bottom + line_offset,
                     steps if amount > 0 else -steps,
-                    self.writes,
+                    RegionCounts(before, after),
                     self.scroll_seq,
                 )
             )
