@@ -32,7 +32,7 @@ changes no attribute, only the measurement.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, Final, NamedTuple
 
 from .cells import Appearance
 from .placeholders import PLACEHOLDER
@@ -66,6 +66,12 @@ class Run(NamedTuple):
     blank: bool
 
 
+#: Builds a `Run` without the `__new__` that `NamedTuple` writes in
+#: Python: half the cost, and a row of highlighted text makes a run
+#: every few cells. Lillecarl/pymux#517.
+_new_run: Final = tuple.__new__
+
+
 def runs_of(row: Row) -> list[Run]:
     """
     The runs of one row, by column.
@@ -83,8 +89,28 @@ def runs_of(row: Row) -> list[Run]:
     written = False
     blank = True
 
-    for column, cell in sorted(row.items()):
+    for column in sorted(row):
+        cell = row[column]
         char = cell.char
+        # The common cell first: printable ASCII, one column, beside the
+        # last one and drawn the same way, which joins the open run. It
+        # is most of every row, and testing it before the full
+        # classification below spares four names and a ladder of
+        # comparisons per cell. It joins exactly the cells the
+        # classification would. Lillecarl/pymux#517.
+        if (
+            column == end
+            and text is not None
+            and cell.appearance is appearance
+            and cell.written is written
+            and " " <= char <= "~"
+            and cell.width == 1
+        ):
+            if blank and char != " ":
+                blank = False
+            text.append(char)
+            end += 1
+            continue
         # The empty second half of a wide character is no run: the
         # run of the character itself already spans both columns, and
         # a run that covers nothing would move the end the assembly
@@ -131,7 +157,7 @@ def runs_of(row: Row) -> list[Run]:
             continue
         if text is not None:
             assert appearance is not None
-            runs.append(Run(start, end, "".join(text), appearance, written, True, blank))
+            runs.append(_new_run(Run, (start, end, "".join(text), appearance, written, True, blank)))
         if cell.width == 1 and char_plain:
             start = column
             end = column + 1
@@ -140,21 +166,11 @@ def runs_of(row: Row) -> list[Run]:
             written = char_written
             blank = char_blank
         else:
-            runs.append(
-                Run(
-                    column,
-                    column + cell.width,
-                    char,
-                    char_appearance,
-                    char_written,
-                    False,
-                    False,
-                )
-            )
+            runs.append(_new_run(Run, (column, column + cell.width, char, char_appearance, char_written, False, False)))
             text = None
     if text is not None:
         assert appearance is not None
-        runs.append(Run(start, end, "".join(text), appearance, written, True, blank))
+        runs.append(_new_run(Run, (start, end, "".join(text), appearance, written, True, blank)))
 
     # A blank a program wrote keeps its trailing column, so the run
     # at the end gives up its trailing blanks: they draw under a
