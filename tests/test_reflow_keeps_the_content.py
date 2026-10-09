@@ -41,6 +41,7 @@ lines before it. Lillecarl/pymux#143.
 
 from __future__ import annotations
 
+import pytest
 from a_screen import a_screen
 from hypothesis import HealthCheck, assume, example, given, settings
 from hypothesis import strategies as st
@@ -149,6 +150,31 @@ def test_a_cursor_waiting_to_wrap_invents_no_blank():
     screen.resize(6, 4)
 
     assert logical_lines(screen) == before
+
+
+@pytest.mark.parametrize("columns", [50, 7, 6, 12])
+def test_a_double_width_character_keeps_its_second_half(columns):
+    """
+    The second half of a wide character is a zero wide cell, and the
+    reflow put it at the next free column, where the next character
+    landed on it. Every wide character came out of a resize followed by
+    a blank: "wide 漢 字", in the first pictures with a CJK font.
+    Lillecarl/pymux#548.
+
+    7 and 6 put 漢 against the edge, where it moves to the next row
+    whole, its half with it.
+    """
+    screen = a_screen(columns=80, lines=6)
+    Stream(screen).feed(" wide 漢字 x")
+    before = logical_lines(screen)
+
+    screen.resize(6, columns)
+
+    assert logical_lines(screen) == before
+    for row in screen.page.data_buffer.values():
+        for column, cell in row.items():
+            if cell.width > 1:
+                assert row[column + 1].char == "", (column, columns)
 
 
 @given(st.lists(a_chunk(), min_size=1, max_size=40), WIDTHS)

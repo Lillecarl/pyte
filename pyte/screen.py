@@ -5906,19 +5906,44 @@ class Screen:
         new_cursor_position = None
 
         for line_index, line in enumerate(all_lines):
+            # The row being written, held rather than looked up per cell:
+            # this loop is the cost of a resize, and ptterm's
+            # `tests/instruction-budgets.txt` counts it. Only a line with
+            # cells takes one, because looking a row up makes it.
+            if line.cells:
+                row = data_buffer[new_row_index]
+
             for column_index, char in enumerate(line.cells):
+                char_width = char.width
+
+                # **The empty second half of a double width character goes
+                # in the second of the two cells its character took**, and
+                # not at the next free one: it is zero wide, so the next
+                # character landed on it and took its place, and every
+                # wide character came out of a resize followed by a blank
+                # (Lillecarl/pymux#548's pictures). A half whose
+                # character is not there is dropped, as an edit drops it.
+                if not char_width and char.char == "":
+                    before = row.get(new_column_index - 2)
+                    if before is not None and before.width > 1:
+                        row[new_column_index - 1] = char
+                        if cy == line_index and cx == column_index:
+                            new_cursor_position = (new_row_index, new_column_index - 1)
+                    continue
+
                 # Check for space on the current line.
-                if new_column_index + char.width > width:
+                if new_column_index + char_width > width:
                     new_row_index += 1
                     new_column_index = 0
-                    data_buffer[new_row_index].wrapped = True
+                    row = data_buffer[new_row_index]
+                    row.wrapped = True
 
                 if cy == line_index and cx == column_index:
                     new_cursor_position = (new_row_index, new_column_index)
 
                 # Add character to new buffer.
-                data_buffer[new_row_index][new_column_index] = char
-                new_column_index += char.width
+                row[new_column_index] = char
+                new_column_index += char_width
                 highest = new_row_index
 
             # A cursor that stands past the end of its line lands the

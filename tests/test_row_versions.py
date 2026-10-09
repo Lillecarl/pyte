@@ -185,6 +185,10 @@ PLAIN = [
     esc(Escape.EPA),  # SPA and EPA, the other mark.
     "text",
     "wider text that wraps around the end of a short row",
+    # Two cells each: a resize lost the second of them until
+    # Lillecarl/pymux#548, and no chunk here drew one.
+    "漢字",
+    "wide 漢字 that wraps 漢 at the edge",
 ]
 
 
