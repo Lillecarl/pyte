@@ -19,7 +19,7 @@ different, and is now simply what this package does:
 
 from __future__ import annotations
 
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from collections.abc import Callable, Iterable, Sequence
 from typing import ClassVar, NamedTuple
 
@@ -4526,6 +4526,21 @@ class Screen:
 
         self._rendition = self._rendition._replace(**replace)  # type:ignore
         self._rebuild_appearance()
+
+    def write_mark(self) -> int:
+        "This moment, for `changes_since`. (`pyte.freeze.Freezer` asks.)"
+        return self.writes
+
+    def changes_since(self, mark: int) -> list[tuple[defaultdict[int, Row], list[int]]] | None:
+        """
+        The rows of the buffer in front written since `mark`, or `None`
+        when a reset, a switch or a reflow replaced the buffer and every
+        row may have moved. A parked buffer takes no writes: the switch
+        that brings it back says `None`.
+        """
+        if self.everything_at > mark:
+            return None
+        return [(self.data_buffer, [row for row, at in self.written_at.items() if at > mark])]
 
     def after_thaw(self) -> None:
         """

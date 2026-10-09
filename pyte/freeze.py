@@ -59,14 +59,27 @@ FrozenRow = list
 
 
 class Frozen(NamedTuple):
-    "One frozen object, and the cells and appearances it points into."
+    """
+    One frozen object, and the rows and appearances it points into.
+
+    A first freeze holds everything. A later freeze by the same
+    `Freezer` holds what changed since the one before it, and `merge`
+    lays it over that one.
+    """
 
     root: Any
-    #: Each buffer's rows by its id, as a string so JSON keeps it:
-    #: `[number, wrapped, cells]`.
+    #: Rows by the id of their buffer, as a string so JSON keeps it:
+    #: `[number, wrapped, cells]`. Every row of a buffer in `whole`, and
+    #: the rows written since the freeze before for any other.
     buffers: dict[str, list[FrozenRow]]
-    #: Each appearance, frozen: `[rendition, hyperlink, hyperlink_id]`.
+    #: The appearances new since the freeze before, each one
+    #: `[rendition, hyperlink, hyperlink_id]`. A cell's index counts
+    #: from the first freeze.
     appearances: list[Any]
+    #: The buffers given whole, which replace what the freeze before said.
+    whole: list[str]
+    #: Rows gone since the freeze before, by buffer.
+    removed: dict[str, list[int]]
 
 
 def saved_fields(cls: type) -> list[str]:
@@ -91,21 +104,90 @@ def _class(name: str) -> type:
 
 def freeze(root: object) -> Frozen:
     "Everything `root` saves, and everything that reaches, as plain data."
-    return _Freezer().run(root)
+    return Freezer().freeze(root)
 
 
-class _Freezer:
+def merge(base: Frozen, later: Frozen) -> Frozen:
+    "What `base` holds once a later freeze by the same `Freezer` is laid over it."
+    buffers = {}
+    for number in later.whole:
+        buffers[number] = later.buffers[number]
+    for number, rows in base.buffers.items():
+        if number in buffers:
+            continue
+        by_row = {row[0]: row for row in rows}
+        for gone in later.removed.get(number, ()):
+            by_row.pop(gone, None)
+        for row in later.buffers.get(number, ()):
+            by_row[row[0]] = row
+        buffers[number] = [by_row[row] for row in sorted(by_row)]
+    for number, rows in later.buffers.items():
+        buffers.setdefault(number, rows)
+    return Frozen(later.root, buffers, [*base.appearances, *later.appearances], sorted(buffers), {})
+
+
+class Freezer:
+    """
+    Freezes one object, and then again with only the rows that changed.
+
+    The rows are most of a screen and a program writes few of them at
+    a time, so a second freeze costs what was written since the first,
+    not the depth of the history. That is what bounds the pause of an
+    upgrade: the first freeze runs while the server still serves, and
+    only the second runs in the pause. Lillecarl/pymux#399.
+
+    The root says what changed through two methods: `write_mark()`,
+    which names this moment, and `changes_since(mark)`, which gives
+    `(buffer, rows)` for each buffer written since, or `None` when it
+    cannot say and every buffer goes again. A root without them is
+    frozen whole every time.
+    """
+
     def __init__(self) -> None:
-        self.ids: dict[int, int] = {}
-        # Holds every object that has an id, so no id is reused for a
-        # new object while the walk runs.
+        self.mark: Any = None
+        # Holds every object the freezer gave an id, so no id is reused.
         self.held: list[object] = []
-        self.buffers: dict[str, list[FrozenRow]] = {}
-        self.appearances: list[Any] = []
+        self.buffer_ids: dict[int, str] = {}
+        self.rows_frozen: dict[str, set[int]] = {}
         self.appearance_index: dict[int, int] = {}
 
+    def freeze(self, root: object) -> Frozen:
+        changes = None
+        if self.mark is not None and hasattr(root, "changes_since"):
+            changes = root.changes_since(self.mark)  # type: ignore[attr-defined]
+        mark = root.write_mark() if hasattr(root, "write_mark") else None  # type: ignore[attr-defined]
+        walk = _Walk(self, None if changes is None else {id(buffer): rows for buffer, rows in changes})
+        frozen = walk.run(root)
+        self.mark = mark
+        return frozen
+
+    def buffer_id(self, buffer: object) -> tuple[str, bool]:
+        "The stable id of a buffer, and whether an earlier freeze gave it."
+        known = self.buffer_ids.get(id(buffer))
+        if known is not None:
+            return known, True
+        self.held.append(buffer)
+        new = self.buffer_ids[id(buffer)] = str(len(self.buffer_ids))
+        return new, False
+
+
+class _Walk:
+    "One freeze: the state whole, and the rows the freezer has not seen."
+
+    def __init__(self, freezer: Freezer, changes: dict[int, list[int]] | None) -> None:
+        self.freezer = freezer
+        #: Rows written since the freeze before, by `id(buffer)`, or
+        #: `None` for every buffer whole.
+        self.changes = changes
+        self.ids: dict[int, int] = {}
+        self.held: list[object] = []
+        self.buffers: dict[str, list[FrozenRow]] = {}
+        self.whole: list[str] = []
+        self.removed: dict[str, list[int]] = {}
+        self.appearances: list[Any] = []
+
     def run(self, root: object) -> Frozen:
-        return Frozen(self.value(root), self.buffers, self.appearances)
+        return Frozen(self.value(root), self.buffers, self.appearances, self.whole, self.removed)
 
     def _id(self, value: object) -> tuple[int, bool]:
         "The id of a mutable value, and whether the walk met it before."
@@ -128,13 +210,12 @@ class _Freezer:
             return {"tuple": [self.value(item) for item in value]}
         if kind is bytes:
             return {"bytes": value.hex()}
+        if kind is defaultdict and value.default_factory is Row:
+            return {"buffer": self.buffer(value)}
 
         number, seen = self._id(value)
         if seen:
             return {"ref": number}
-        if kind is defaultdict and value.default_factory is Row:
-            self.buffers[str(number)] = [self.row(index, row) for index, row in sorted(value.items())]
-            return {"buffer": number}
         if kind is list:
             return {"list": [self.value(item) for item in value], "id": number}
         if kind in (set, frozenset):
@@ -150,11 +231,32 @@ class _Freezer:
             "fields": {field: self.value(getattr(value, field)) for field in fields if hasattr(value, field)},
         }
 
+    def buffer(self, buffer: defaultdict[int, Row]) -> str:
+        number, known = self.freezer.buffer_id(buffer)
+        if number in self.buffers or number in self.removed:
+            return number
+        frozen = self.freezer.rows_frozen
+        if not known or self.changes is None:
+            self.buffers[number] = [self.row(index, row) for index, row in sorted(buffer.items())]
+            self.whole.append(number)
+            frozen[number] = set(buffer)
+            return number
+        written = self.changes.get(id(buffer))
+        if written is None:
+            return number
+        had = frozen[number]
+        now = set(buffer)
+        self.buffers[number] = [self.row(index, buffer[index]) for index in sorted(set(written) & now)]
+        self.removed[number] = sorted(had - now)
+        frozen[number] = now
+        return number
+
     def appearance(self, appearance: Appearance) -> int:
-        index = self.appearance_index.get(id(appearance))
+        index_of = self.freezer.appearance_index
+        index = index_of.get(id(appearance))
         if index is None:
-            index = self.appearance_index[id(appearance)] = len(self.appearances)
-            self.held.append(appearance)
+            index = index_of[id(appearance)] = len(index_of)
+            self.freezer.held.append(appearance)
             self.appearances.append([self.value(appearance.rendition), appearance.hyperlink, appearance.hyperlink_id])
         return index
 
@@ -186,6 +288,7 @@ class _Thawer:
     def __init__(self, frozen: Frozen) -> None:
         self.frozen = frozen
         self.made: dict[int, object] = {}
+        self.made_buffers: dict[str, defaultdict[int, Row]] = {}
         self.appearances = [self.appearance(*entry) for entry in frozen.appearances]
         # One erased blank per appearance, the way a screen's erase makes one per call.
         self.erased: dict[int, ErasedCell] = {}
@@ -222,9 +325,12 @@ class _Thawer:
         if "bytes" in value:
             return bytes.fromhex(value["bytes"])
         if "buffer" in value:
+            made = self.made_buffers.get(value["buffer"])
+            if made is not None:
+                return made
             buffer: defaultdict[int, Row] = defaultdict(Row)
-            self.made[value["buffer"]] = buffer
-            for number, wrapped, cells in self.frozen.buffers[str(value["buffer"])]:
+            self.made_buffers[value["buffer"]] = buffer
+            for number, wrapped, cells in self.frozen.buffers.get(value["buffer"], ()):
                 buffer[number] = self.row(wrapped, cells)
             return buffer
         if "list" in value:

@@ -7,12 +7,13 @@ Lillecarl/pymux#399.
 from __future__ import annotations
 
 import json
+import random
 import time
 
 import pytest
 from a_screen import a_screen
 
-from pyte.freeze import Frozen, freeze, thaw
+from pyte.freeze import Freezer, Frozen, freeze, merge, thaw
 from pyte.streams import Stream
 
 ESC = "\x1b"
@@ -144,6 +145,77 @@ def test_the_parked_page_and_its_buffer_stay_one_object(screens):
     assert thawed._original_screen_vars["data_buffer"] is thawed._original_screen.data_buffer
 
 
+#: What a program may do between two freezes. Each one moves, clears,
+#: replaces or trims rows some way the screen has to report.
+STEPS = [
+    "plain text\r\n",
+    "a line long enough to wrap past the edge of a narrow screen, and then some more of it\r\n",
+    CSI + "1;31mred" + CSI + "0m\r\n",
+    CSI + "?1049h",
+    CSI + "?1049l",
+    CSI + "?47h",
+    CSI + "?47l",
+    CSI + "2J",
+    CSI + "3J",
+    CSI + "K",
+    CSI + "2L",
+    CSI + "2M",
+    CSI + "3S",
+    CSI + "2T",
+    CSI + "4;10r",
+    CSI + "r",
+    CSI + "5;3H",
+    ESC + "c",
+    ESC + "#8",
+    "\r\n" * 15,
+    "resize",
+]
+
+
+def _program(seed: int, length: int) -> list[str]:
+    choose = random.Random(seed)
+    return [choose.choice(STEPS) for _ in range(length)]
+
+
+def _run(screen, program: list[str], seed: int) -> None:
+    stream = Stream(screen)
+    sizes = random.Random(seed)
+    for step in program:
+        if step == "resize":
+            screen.resize(sizes.randint(5, 30), sizes.randint(20, 100))
+        else:
+            stream.feed(step)
+
+
+@pytest.mark.parametrize("seed", range(40))
+def test_a_later_freeze_merges_into_what_a_whole_one_says(seed):
+    screen = a_screen(40, 12, history=50)
+    _run(screen, _program(seed, 30), seed)
+    freezer = Freezer()
+    merged = _json(freezer.freeze(screen))
+    for round in range(3):
+        _run(screen, _program(seed * 7 + round, 12), seed + round)
+        merged = merge(merged, _json(freezer.freeze(screen)))
+
+        from_merge = a_screen(40, 12, history=50)
+        thaw(merged, from_merge)
+        from_whole = a_screen(40, 12, history=50)
+        thaw(_json(freeze(screen)), from_whole)
+        assert _cells(from_merge) == _cells(from_whole), "round %d" % round
+        _same(freeze(from_merge), freeze(from_whole))
+
+
+def test_a_later_freeze_of_a_deep_history_holds_only_what_changed():
+    screen = a_screen(80, 24, history=10_000)
+    Stream(screen).feed("".join("row %d\r\n" % number for number in range(10_024)))
+    freezer = Freezer()
+    freezer.freeze(screen)
+    Stream(screen).feed("one more\r\n" + CSI + "1;1Htop")
+    later = freezer.freeze(screen)
+    assert later.whole == []
+    assert sum(len(rows) for rows in later.buffers.values()) <= 3
+
+
 @pytest.mark.parametrize("rows", [2_000, 10_000, 50_000])
 def test_how_long_a_deep_history_takes(rows, capsys):
     """
@@ -157,18 +229,31 @@ def test_how_long_a_deep_history_takes(rows, capsys):
     line = CSI + "32m%06d" + CSI + "0m " + "the quick brown fox jumps over the lazy dog " * 2
     Stream(screen).feed("".join((line % number)[:200] + "\r\n" for number in range(rows + 24)))
 
+    freezer = Freezer()
     started = time.perf_counter()
-    frozen = freeze(screen)
+    frozen = freezer.freeze(screen)
     frozen_at = time.perf_counter()
     text = json.dumps(frozen)
     dumped_at = time.perf_counter()
     thaw(Frozen(*json.loads(text)), a_screen(80, 24, history=rows))
     thawed_at = time.perf_counter()
+    # What the pause pays: a screenful written since the first freeze.
+    Stream(screen).feed("".join((line % number)[:200] + "\r\n" for number in range(24)))
+    again_at = time.perf_counter()
+    freezer.freeze(screen)
+    later_at = time.perf_counter()
 
     with capsys.disabled():
         print(
-            "\nfreeze %d rows: freeze %.3fs, json %.3fs (%.1f MB), load and thaw %.3fs"
-            % (rows, frozen_at - started, dumped_at - frozen_at, len(text) / 1e6, thawed_at - dumped_at)
+            "\nfreeze %d rows: freeze %.3fs, json %.3fs (%.1f MB), load and thaw %.3fs, a screenful later %.4fs"
+            % (
+                rows,
+                frozen_at - started,
+                dumped_at - frozen_at,
+                len(text) / 1e6,
+                thawed_at - dumped_at,
+                later_at - again_at,
+            )
         )
     assert frozen_at - started < 30
 
@@ -182,7 +267,7 @@ def test_what_declares_no_keep_is_refused():
 
 
 def test_a_class_outside_pyte_is_never_built():
-    frozen = Frozen({"dict": [["x", {"object": "os.Popen", "id": 1, "fields": {}}]], "id": 0}, {}, [])
-    holder = a_screen()
+    stranger = {"dict": [["x", {"object": "os.Popen", "id": 1, "fields": {}}]], "id": 0}
+    root = {"object": "pyte.screen.Screen", "id": 9, "fields": {"saved_modes": stranger}}
     with pytest.raises(ValueError, match="not pyte's"):
-        thaw(Frozen({"object": "pyte.screen.Screen", "id": 9, "fields": {"saved_modes": frozen.root}}, {}, []), holder)
+        thaw(Frozen(root, {}, [], [], {}), a_screen())
