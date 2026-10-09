@@ -246,6 +246,7 @@ class Screen:
         "page": Keep.SAVED,
         "data_buffer": Keep.REBUILT,  # `page.data_buffer`, the same dict
         "_original_screen": Keep.SAVED,
+        "_original_screen_vars": Keep.SAVED,
         "_alternate_screen": Keep.SAVED,
         "_alternate_screen_vars": Keep.SAVED,
         "lines": Keep.SAVED,
@@ -985,6 +986,8 @@ class Screen:
         # `None` means that nothing was ever drawn on it.
         self._alternate_screen: Page | None = None
         self._alternate_screen_vars: dict = {}
+        # The first page's state, while the alternate screen is in front.
+        self._original_screen_vars: dict = {}
 
         # A reset gives the 80 column page back. The ask goes out last,
         # because the modes above decide whether it goes out at all,
@@ -4523,6 +4526,19 @@ class Screen:
 
         self._rendition = self._rendition._replace(**replace)  # type:ignore
         self._rebuild_appearance()
+
+    def after_thaw(self) -> None:
+        """
+        Rebuild what `KEEP` calls rebuilt, once `pyte.freeze.thaw` has
+        written the saved fields.
+
+        The two flags only let a write skip work, so true is always
+        safe: it costs a lookup until the next reset clears them.
+        """
+        self.data_buffer = self.page.data_buffer
+        self._rebuild_appearance()
+        self._wide_chars = True
+        self._protected_chars = True
 
     def _rebuild_appearance(self) -> None:
         """

@@ -53,6 +53,8 @@ HorizontalMargins = namedtuple("HorizontalMargins", "left right")
 class CursorPosition:
     "Mutable CursorPosition."
 
+    KEEP: ClassVar[dict[str, Keep]] = {"x": Keep.SAVED, "y": Keep.SAVED}
+
     def __init__(self, x: int = 0, y: int = 0) -> None:
         self.x = x
         self.y = y

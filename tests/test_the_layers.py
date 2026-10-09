@@ -40,6 +40,7 @@ PURE = {
     "colors",
     "control",
     "escape",
+    "freeze",
     "html",
     "images",
     "keep",
