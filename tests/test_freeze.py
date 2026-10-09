@@ -40,6 +40,8 @@ BEFORE = "".join(
         CSI + "4 q",
         CSI + "3g" + CSI + "5G" + ESC + "H",
         ESC + ")0" + "\x0e" + "lqk" + "\x0f",
+        # A kitty image, sent and placed: one red pixel.
+        ESC + "_Ga=T,f=24,s=1,v=1,i=7;/wAA" + ST,
         # Keyboard settings a program reads back.
         CSI + ">1u" + CSI + ">4;2m",
         # A region, a saved cursor, and a pending wrap on the last line.
@@ -137,6 +139,14 @@ def test_a_thawed_screen_behaves_the_same(screens):
     Stream(thawed).feed(AFTER)
     _same(freeze(thawed), freeze(screen))
     assert _cells(thawed) == _cells(screen)
+
+
+def test_a_thawed_screen_keeps_its_image(screens):
+    screen, thawed, _ = screens
+    parked = thawed._original_screen_vars["graphics"]
+    assert screen._original_screen_vars["graphics"].images_by_id
+    assert parked.images_by_id[7].data == b"\xff\x00\x00"
+    assert len(parked.placements) == 1
 
 
 def test_the_parked_page_and_its_buffer_stay_one_object(screens):

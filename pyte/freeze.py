@@ -26,6 +26,7 @@ embedder stores them as rows of its own, and their encoding is short:
 
 from __future__ import annotations
 
+import base64
 import sys
 from collections import defaultdict
 from enum import Enum
@@ -209,7 +210,7 @@ class _Walk:
                 return {"namedtuple": _name(kind), "fields": [self.value(item) for item in value]}
             return {"tuple": [self.value(item) for item in value]}
         if kind is bytes:
-            return {"bytes": value.hex()}
+            return {"bytes": base64.b64encode(value).decode("ascii")}
         if kind is defaultdict and value.default_factory is Row:
             return {"buffer": self.buffer(value)}
 
@@ -323,7 +324,7 @@ class _Thawer:
         if "tuple" in value:
             return tuple(self.value(item) for item in value["tuple"])
         if "bytes" in value:
-            return bytes.fromhex(value["bytes"])
+            return base64.b64decode(value["bytes"])
         if "buffer" in value:
             made = self.made_buffers.get(value["buffer"])
             if made is not None:
@@ -350,7 +351,11 @@ class _Thawer:
                 mapping[self.value(key)] = self.value(item)
             return mapping
         if "object" in value:
-            made_object = _class(value["object"])()
+            # Not the constructor, which may want arguments: every field
+            # of a class a thaw builds is saved, and what derives from
+            # them its `after_thaw` rebuilds.
+            cls = _class(value["object"])
+            made_object = cls.__new__(cls)
             self.fields(value, made_object)
             return made_object
         raise ValueError("a frozen value of no known shape: %r" % (value,))

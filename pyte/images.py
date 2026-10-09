@@ -95,6 +95,8 @@ class GraphicsImage:
 
     __slots__ = ("data", "format", "height", "number", "width")
 
+    KEEP: ClassVar[dict[str, Keep]] = {name: Keep.SAVED for name in __slots__}
+
     def __init__(self, format: int, width: int, height: int, data: bytes, number: int = 0) -> None:
         self.format = format  # A `PixelFormat`.
         self.width = width  # in pixels
@@ -117,6 +119,8 @@ class GraphicsPlacement:
         "y",
         "z",
     )
+
+    KEEP: ClassVar[dict[str, Keep]] = {name: Keep.SAVED for name in __slots__}
 
     def __init__(
         self,
