@@ -28,10 +28,11 @@ import itertools
 import re
 import warnings
 from collections import defaultdict
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from . import control as ctrl
 from . import escape as esc
+from .keep import Keep
 from .sequences import Csi, Escape
 
 if TYPE_CHECKING:
@@ -285,6 +286,19 @@ class Stream:
     _special.update(basic)
     _text_pattern = re.compile("[^" + "".join(map(re.escape, _special)) + "]+")
     del _special
+
+    #: What a hot upgrade does with each attribute; `pyte.keep` says.
+    #: The parser is a suspended generator, which no snapshot can hold.
+    #: A load starts it on the ground state, and the bytes of a
+    #: sequence it was in the middle of are replayed into it.
+    #: Lillecarl/pymux#399.
+    KEEP: ClassVar[dict[str, Keep]] = {
+        "listener": Keep.REBUILT,
+        "strict": Keep.REBUILT,
+        "use_utf8": Keep.SAVED,
+        "_parser": Keep.DROPPED,
+        "_taking_plain_text": Keep.DROPPED,
+    }
 
     def __init__(self, screen: Screen | None = None, strict: bool = True) -> None:
         self.listener: Screen | None = None

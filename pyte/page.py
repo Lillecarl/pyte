@@ -15,9 +15,10 @@ Lillecarl/pymux#129.
 from __future__ import annotations
 
 from collections import defaultdict, namedtuple
-from typing import NamedTuple
+from typing import ClassVar, NamedTuple
 
 from .cells import UNWRITTEN, Cell
+from .keep import Keep
 
 __all__ = (
     "CursorPosition",
@@ -164,6 +165,11 @@ class Page:
     """
 
     __slots__ = ("data_buffer", "show_cursor")
+
+    KEEP: ClassVar[dict[str, Keep]] = {
+        "data_buffer": Keep.SAVED,
+        "show_cursor": Keep.SAVED,
+    }
 
     def __init__(self) -> None:
         #: The cells, by row and then by column. A row that nobody

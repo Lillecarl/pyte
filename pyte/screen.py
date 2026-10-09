@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from collections import namedtuple
 from collections.abc import Callable, Iterable, Sequence
-from typing import NamedTuple
+from typing import ClassVar, NamedTuple
 
 from . import charsets as cs
 from . import keys
@@ -54,6 +54,7 @@ from .images import (
     ASSUMED_CELL_WIDTH,
     GraphicsState,
 )
+from .keep import Keep
 from .modes import AnsiMode, ModeReport, PrivateMode, flag_of
 from .osc import (
     COLOR_BASE,
@@ -235,6 +236,86 @@ class Screen:
         # restored when leaving the alternate screen.
         "graphics",
     ]
+
+    #: What a hot upgrade does with each attribute. `pyte.keep` says
+    #: what the three words mean. The parked alternate-screen state is
+    #: saved whole: a serializer that walks only the live attributes
+    #: drops the screen that is not showing.
+    KEEP: ClassVar[dict[str, Keep]] = {
+        # The cells, the history and where the screen stands in them.
+        "page": Keep.SAVED,
+        "data_buffer": Keep.REBUILT,  # `page.data_buffer`, the same dict
+        "_original_screen": Keep.SAVED,
+        "_alternate_screen": Keep.SAVED,
+        "_alternate_screen_vars": Keep.SAVED,
+        "lines": Keep.SAVED,
+        "columns": Keep.SAVED,
+        "max_y": Keep.SAVED,
+        "history_floor": Keep.SAVED,
+        "reflow_floor": Keep.SAVED,
+        # The cursor and what it carries.
+        "pt_cursor_position": Keep.SAVED,
+        "pending_wrap": Keep.SAVED,
+        "savepoints": Keep.SAVED,
+        "cursor_style": Keep.SAVED,
+        "cursor_style_asked": Keep.SAVED,
+        "margins": Keep.SAVED,
+        "horizontal_margins": Keep.SAVED,
+        "tabstops": Keep.SAVED,
+        # Modes and character sets, the raw numbers included.
+        "mode": Keep.SAVED,
+        "saved_modes": Keep.SAVED,
+        "gl": Keep.SAVED,
+        "g_charsets": Keep.SAVED,
+        "single_shift": Keep.SAVED,
+        # The pen.
+        "_rendition": Keep.SAVED,
+        "_appearance": Keep.REBUILT,  # interned from `_rendition`
+        "hyperlink": Keep.SAVED,
+        "hyperlink_id": Keep.SAVED,
+        "protection": Keep.SAVED,
+        "last_character": Keep.SAVED,
+        # What the program set and reads back.
+        "kitty_flags_stack": Keep.SAVED,
+        "key_modifier_options": Keep.SAVED,
+        "key_format_options": Keep.SAVED,
+        "titles": Keep.SAVED,
+        "colors": Keep.SAVED,
+        "pointer_shapes": Keep.SAVED,
+        "graphics": Keep.SAVED,
+        "attribute_extent": Keep.SAVED,
+        "active_display": Keep.SAVED,
+        "status_line": Keep.SAVED,
+        "conformance_level": Keep.SAVED,
+        "seven_bit_controls": Keep.SAVED,
+        "lines_per_screen": Keep.SAVED,
+        # What the embedder sets, which it pushes again after a load.
+        "color_base": Keep.REBUILT,
+        "cell_width": Keep.REBUILT,
+        "cell_height": Keep.REBUILT,
+        "keyboard_source_flags": Keep.REBUILT,
+        "synthesize_key_events": Keep.REBUILT,
+        "extended_keys_allowed": Keep.REBUILT,
+        # The embedder's callbacks.
+        "write_process_input": Keep.REBUILT,
+        "bell_func": Keep.REBUILT,
+        "get_history_limit": Keep.REBUILT,
+        "osc_func": Keep.REBUILT,
+        "resize_func": Keep.REBUILT,
+        "may_resize": Keep.REBUILT,
+        # Caches of what the cells say.
+        "_cell_caches": Keep.REBUILT,
+        "_wide_chars": Keep.REBUILT,
+        "_protected_chars": Keep.REBUILT,
+        # What readers count changes by. A loaded screen has new
+        # readers, and they start from nothing.
+        "writes": Keep.DROPPED,
+        "written_at": Keep.DROPPED,
+        "everything_at": Keep.DROPPED,
+        "scrolls": Keep.DROPPED,
+        "scroll_seq": Keep.DROPPED,
+        "_history_cleanup_counter": Keep.DROPPED,
+    }
 
     def __init__(
         self,

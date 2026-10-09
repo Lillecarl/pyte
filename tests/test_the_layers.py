@@ -42,6 +42,7 @@ PURE = {
     "escape",
     "html",
     "images",
+    "keep",
     "keys",
     "modes",
     "osc",
