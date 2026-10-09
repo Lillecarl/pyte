@@ -216,6 +216,48 @@ def test_a_later_freeze_of_a_deep_history_holds_only_what_changed():
     assert sum(len(rows) for rows in later.buffers.values()) <= 3
 
 
+#: Output cut inside a sequence of every kind. The cut is `|`.
+CUTS = [
+    "before" + CSI + "3|1;4" + "\n" + "2mred",
+    "before" + CSI + "?10|49hon the alternate screen",
+    OSC + "2;half a ti|tle" + ST + "after",
+    OSC + "2;a title that ends with a bell|\x07after",
+    ESC + "P1$|r" + ESC + "\\after",
+    ESC + "(|0lqk",
+    "text" + ESC + "|[1mbold",
+    "text" + ESC + "|",
+    CSI + "1;" + "\t" + "|" + "31mafter a tab inside",
+]
+
+
+@pytest.mark.parametrize("cut", CUTS)
+def test_a_sequence_cut_by_a_thaw_reads_on_the_same(cut):
+    head, tail = cut.split("|")
+    screen = a_screen(40, 10)
+    stream = Stream(screen)
+    stream.feed(head)
+
+    thawed = a_screen(40, 10)
+    thawed_stream = Stream(thawed)
+    thaw(_json(freeze(screen)), thawed)
+    thaw(_json(freeze(stream)), thawed_stream)
+
+    stream.feed(tail)
+    thawed_stream.feed(tail)
+    _same(freeze(thawed), freeze(screen))
+    assert _cells(thawed) == _cells(screen)
+
+
+def test_a_sequence_fed_in_pieces_is_pending_whole():
+    screen = a_screen()
+    stream = Stream(screen)
+    for piece in ["plain", CSI, "1", ";", "\n", "3"]:
+        stream.feed(piece)
+    assert stream.replay() == CSI + "1;3"
+    stream.feed("1m")
+    assert stream.replay() == ""
+
+
 @pytest.mark.parametrize("rows", [2_000, 10_000, 50_000])
 def test_how_long_a_deep_history_takes(rows, capsys):
     """

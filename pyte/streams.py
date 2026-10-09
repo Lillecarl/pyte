@@ -106,6 +106,11 @@ def fit_parameters(handler: Callable[..., None]) -> Callable[..., None]:
 MAX_OSC_CODE_LENGTH = 8
 
 
+#: The controls a CSI sequence runs where it meets them, and goes on.
+CONTROLS_IN_CSI = "".join([ctrl.BEL, ctrl.BS, ctrl.HT, ctrl.LF, ctrl.VT, ctrl.FF, ctrl.CR])
+_RUN_IN_CSI = {ord(control): None for control in CONTROLS_IN_CSI}
+
+
 class Stream:
     """A stream is a state machine that parses a stream of bytes and
     dispatches events based on what it sees.
@@ -298,6 +303,7 @@ class Stream:
         "use_utf8": Keep.SAVED,
         "_parser": Keep.DROPPED,
         "_taking_plain_text": Keep.DROPPED,
+        "_pending": Keep.SAVED,
     }
 
     def __init__(self, screen: Screen | None = None, strict: bool = True) -> None:
@@ -306,6 +312,10 @@ class Stream:
         self.use_utf8: bool = True
 
         self._taking_plain_text: bool | None = None
+
+        #: What the parser read since it last stood on the ground state:
+        #: the open sequence, which `replay` gives a new parser.
+        self._pending = ""
 
         if screen is not None:
             self.attach(screen)
@@ -356,19 +366,38 @@ class Stream:
 
         length = len(data)
         offset = 0
+        # Where the sequence that is open began, in `data`. Noted per
+        # sequence and sliced once per feed, not kept per character:
+        # this loop is the hottest one in a pane.
+        opened = 0
         while offset < length:
             if taking_plain_text:
                 match = match_text(data, offset)
                 if match:
                     start, offset = match.span()
                     draw(data[start:offset])
+                    opened = offset
                 else:
                     taking_plain_text = False
             else:
-                taking_plain_text = send(data[offset : offset + 1])
-                offset += 1
+                # A sequence is read here to its end, so the test of
+                # the loop above runs once per sequence and not per byte.
+                while True:
+                    taking_plain_text = send(data[offset : offset + 1])
+                    offset += 1
+                    if taking_plain_text:
+                        opened = offset
+                        break
+                    if offset >= length:
+                        break
 
         self._taking_plain_text = taking_plain_text
+        if taking_plain_text:
+            self._pending = ""
+        elif opened:
+            self._pending = data[opened:]
+        else:
+            self._pending += data
 
     def _send_to_parser(self, data: str) -> bool | None:
         try:
@@ -383,6 +412,28 @@ class Stream:
     def _initialize_parser(self) -> None:
         self._parser = self._parser_fsm()
         self._taking_plain_text = next(self._parser)
+        self._pending = ""
+
+    def replay(self) -> str:
+        """
+        What a new parser reads to stand where this one stands.
+
+        That is the open sequence, less the controls a CSI sequence
+        runs as it goes: those already acted, and a second parser would
+        act on them again. Everywhere else a control either ends the
+        sequence, and so is never pending, or is payload.
+        """
+        pending = self._pending
+        if pending.startswith((ctrl.ESC + "[", ctrl.CSI_C1)):
+            return pending.translate(_RUN_IN_CSI)
+        return pending
+
+    def after_thaw(self) -> None:
+        "Start the parser on the ground state, and read the open sequence again."
+        replay = self.replay()
+        self._initialize_parser()
+        if replay:
+            self.feed(replay)
 
     @property
     def ground_timer_active(self) -> bool:
@@ -422,7 +473,7 @@ class Stream:
         OSC_C1 = ctrl.OSC_C1
         NUL_OR_DEL = ctrl.NUL + ctrl.DEL
         CAN_OR_SUB = ctrl.CAN + ctrl.SUB
-        ALLOWED_IN_CSI = "".join([ctrl.BEL, ctrl.BS, ctrl.HT, ctrl.LF, ctrl.VT, ctrl.FF, ctrl.CR])
+        ALLOWED_IN_CSI = CONTROLS_IN_CSI
         OSC_TERMINATORS = {ctrl.ST_C0, ctrl.ST_C1, ctrl.BEL}
         # Intermediate bytes of a CSI sequence. ECMA-48 gives them the
         # whole range 0x20 to 0x2f. They name the sequence together with
