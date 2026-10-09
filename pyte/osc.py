@@ -27,9 +27,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from enum import StrEnum
-from typing import NamedTuple
+from typing import ClassVar, NamedTuple
 
 from .colors import DEFAULT_COLORS, PALETTE, Color, parse_color
+from .keep import Keep
 
 __all__ = [
     "COLOR_BASE",
@@ -387,6 +388,8 @@ class PointerShapes:
 
     __slots__ = ("stack",)
 
+    KEEP: ClassVar[dict[str, Keep]] = {"stack": Keep.SAVED}
+
     def __init__(self) -> None:
         self.stack: list[str] = []
 
@@ -526,6 +529,13 @@ class ColorOverrides:
     """
 
     __slots__ = ("base", "by_code", "by_index")
+
+    #: The base is the embedder's, and it pushes it again after a load.
+    KEEP: ClassVar[dict[str, Keep]] = {
+        "base": Keep.REBUILT,
+        "by_code": Keep.SAVED,
+        "by_index": Keep.SAVED,
+    }
 
     def __init__(self, base: ColorBase = COLOR_BASE) -> None:
         if len(base.palette) != len(PALETTE):

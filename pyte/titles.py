@@ -20,6 +20,9 @@ Lillecarl/pymux#129.
 
 from __future__ import annotations
 
+from typing import ClassVar
+
+from .keep import Keep
 from .parameters import TitleMode, TitlePart
 
 __all__ = ("Titles", "title_from_hex", "title_to_hex")
@@ -63,6 +66,13 @@ class Titles:
     STACK_LIMIT = 10
 
     __slots__ = ("icon", "modes", "stack", "window")
+
+    KEEP: ClassVar[dict[str, Keep]] = {
+        "icon": Keep.SAVED,
+        "modes": Keep.SAVED,
+        "stack": Keep.SAVED,
+        "window": Keep.SAVED,
+    }
 
     def __init__(self) -> None:
         #: What "OSC 2" set, and what "CSI 21 t" reports.

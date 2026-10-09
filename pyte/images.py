@@ -19,6 +19,9 @@ from __future__ import annotations
 import base64
 import zlib
 from enum import IntEnum
+from typing import ClassVar
+
+from .keep import Keep
 
 __all__ = [
     "ASSUMED_CELL_HEIGHT",
@@ -189,6 +192,16 @@ class GraphicsState:
     alternate screen each have their own instance; see
     `Screen.swap_variables`.)
     """
+
+    #: The half-received image is saved too: it is plain data, and
+    #: dropping it loses an image a program is still sending.
+    KEEP: ClassVar[dict[str, Keep]] = {
+        "images_by_id": Keep.SAVED,
+        "newest_by_number": Keep.SAVED,
+        "placements": Keep.SAVED,
+        "next_image_id": Keep.SAVED,
+        "_pending": Keep.SAVED,
+    }
 
     def __init__(self) -> None:
         self.images_by_id: dict[int, GraphicsImage] = {}
