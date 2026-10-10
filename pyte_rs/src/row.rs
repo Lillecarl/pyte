@@ -4,6 +4,7 @@
 //! apart but by speed. Lillecarl/pymux#570.
 
 use std::collections::BTreeMap;
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 use pyo3::exceptions::{PyKeyError, PyTypeError};
 use pyo3::prelude::*;
@@ -18,6 +19,36 @@ fn unwritten(py: Python<'_>) -> PyResult<&Py<PyAny>> {
     UNWRITTEN.get_or_try_init(py, || {
         Ok(py.import("pyte.cells")?.getattr("UNWRITTEN")?.unbind())
     })
+}
+
+/// `pyte.page.RowImage`: the cells of a row at one moment, alive for as
+/// long as the image is, and equal to an image of the same cell objects
+/// in the same columns.
+#[pyclass(module = "pyte_rs", frozen)]
+pub struct RowImage {
+    cells: Vec<(i64, Py<PyAny>)>,
+    hash: u64,
+}
+
+#[pymethods]
+impl RowImage {
+    fn __hash__(&self) -> u64 {
+        self.hash
+    }
+
+    fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
+        let Ok(other) = other.cast::<RowImage>() else {
+            return false;
+        };
+        let other = other.get();
+        self.hash == other.hash
+            && self.cells.len() == other.cells.len()
+            && self.cells.iter().zip(&other.cells).all(
+                |((column, cell), (other_column, other_cell))| {
+                    column == other_column && cell.as_ptr() == other_cell.as_ptr()
+                },
+            )
+    }
 }
 
 #[pyclass(module = "pyte_rs", mapping)]
@@ -199,6 +230,23 @@ impl Row {
             self.store(column, cell);
         }
         Ok(())
+    }
+
+    /// `pyte.page.Row.image`: what the row holds now.
+    fn image(&self, py: Python<'_>) -> RowImage {
+        let cells: Vec<(i64, Py<PyAny>)> = self
+            .columns()
+            .map(|(column, cell)| (column, cell.clone_ref(py)))
+            .collect();
+        let mut hasher = DefaultHasher::new();
+        for (column, cell) in &cells {
+            column.hash(&mut hasher);
+            (cell.as_ptr() as usize).hash(&mut hasher);
+        }
+        RowImage {
+            cells,
+            hash: hasher.finish(),
+        }
     }
 
     fn clear(&mut self) {

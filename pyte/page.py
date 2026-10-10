@@ -15,6 +15,7 @@ Lillecarl/pymux#129.
 from __future__ import annotations
 
 from collections import defaultdict, namedtuple
+from operator import is_
 from typing import ClassVar, NamedTuple
 
 from .cells import UNWRITTEN, Cell
@@ -106,6 +107,48 @@ class Row(dict[int, Cell]):
     def __missing__(self, column: int) -> Cell:
         "What a column nobody wrote reads as. It stays absent."
         return UNWRITTEN
+
+    def image(self) -> RowImage:
+        "What the row holds now, kept apart from what it holds later."
+        columns = tuple(sorted(self))
+        return RowImage(columns, tuple(map(self.__getitem__, columns)))
+
+
+class RowImage:
+    """
+    The cells of a row at one moment: equal to another image when both
+    hold the same cell objects in the same columns, and hashable, so a
+    reader can find where a row it drew before went.
+
+    A cell is one object per character and appearance, written or
+    erased, so equal rows hold the same objects and the test is one of
+    identity. **The image keeps its cells alive.** An address is only a
+    cell's while the cell lives, and a key of addresses that outlived
+    its cells could match a row it never saw. The wrap mark is not in
+    it: it changes nothing a row shows.
+
+    `pyte_rs.Row.image` makes the same thing in Rust. Only images of one
+    kind are compared with each other. Lillecarl/pymux#570.
+    """
+
+    __slots__ = ("_cells", "_columns", "_hash")
+
+    def __init__(self, columns: tuple[int, ...], cells: tuple[Cell, ...]) -> None:
+        self._columns = columns
+        self._cells = cells
+        # Worked out when something first asks: most images are never
+        # looked up, and a frame takes one of every row it builds.
+        self._hash: int | None = None
+
+    def __hash__(self) -> int:
+        if self._hash is None:
+            self._hash = hash((self._columns, tuple(map(id, self._cells))))
+        return self._hash
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, RowImage):
+            return NotImplemented
+        return self._columns == other._columns and all(map(is_, self._cells, other._cells))
 
 
 class LogicalLine:

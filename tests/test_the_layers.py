@@ -95,6 +95,9 @@ MAY_IMPORT = {
     "inspect",
     "itertools",
     "math",
+    # `operator.is_`, so a row image compares its cells by identity in
+    # C rather than in a Python loop. Lillecarl/pymux#570.
+    "operator",
     "re",
     "string",
     "struct",

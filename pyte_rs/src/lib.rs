@@ -7,7 +7,7 @@ mod row;
 use pyo3::intern;
 use pyo3::prelude::*;
 
-use crate::row::Row;
+use crate::row::{Row, RowImage};
 use pyo3::types::{PyDict, PyList, PyString, PyStringData, PyTuple};
 
 /// One run while it is built. `text` is the run's own characters for a
@@ -314,6 +314,7 @@ fn draw_on_row<'py>(
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<Row>()?;
+    module.add_class::<RowImage>()?;
     module.add_function(wrap_pyfunction!(runs_of, module)?)?;
     module.add_function(wrap_pyfunction!(draw_on_row, module)?)?;
     Ok(())
