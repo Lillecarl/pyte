@@ -25,7 +25,7 @@ if __name__ == "__main__":
         sys.exit("usage: %prog% command [args]")
 
     screen = pyte.Screen(80, 24)
-    stream = pyte.ByteStream(screen)
+    stream = pyte.Stream(screen)
 
     p_pid, master_fd = pty.fork()
     if p_pid == 0:  # Child.
@@ -44,7 +44,7 @@ if __name__ == "__main__":
             if not data:
                 break
 
-            stream.feed(data)
+            stream.feed(data.decode("utf-8", "replace"))
 
     os.kill(p_pid, signal.SIGTERM)
     print(*screen.display, sep="\n")

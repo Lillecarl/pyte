@@ -11,11 +11,6 @@ API reference
 
    .. autoclass:: pyte.Stream
 
-   pyte.ByteStream
-   ^^^^^^^^^^^^^^^
-
-   .. autoclass:: pyte.ByteStream
-
 .. automodule:: pyte.screens
 
    pyte.screens.Screen

@@ -22,7 +22,6 @@ typically used:
 
 from __future__ import annotations
 
-import codecs
 import inspect
 import itertools
 import re
@@ -117,12 +116,6 @@ class Stream:
     :param pyte.screen.Screen screen: a screen to dispatch events to.
     :param bool strict: check if a given screen implements all required
                         events.
-
-    .. note::
-
-       Stream only accepts text as input, but if for some reason
-       you need to feed it with bytes, consider using
-       :class:`~pyte.streams.ByteStream` instead.
 
     .. versionchanged 0.6.0::
 
@@ -299,7 +292,6 @@ class Stream:
     KEEP: ClassVar[dict[str, Keep]] = {
         "screen": Keep.REBUILT,
         "strict": Keep.REBUILT,
-        "use_utf8": Keep.SAVED,
         "_parser": Keep.DROPPED,
         "_taking_plain_text": Keep.DROPPED,
         "_pending": Keep.SAVED,
@@ -312,7 +304,6 @@ class Stream:
         """
         self.screen = screen
         self.strict = strict
-        self.use_utf8: bool = True
 
         self._taking_plain_text: bool | None = None
 
@@ -780,33 +771,3 @@ class GroundTimer:
                 self.since = now
         else:
             self.since = None
-
-
-class ByteStream(Stream):
-    """A stream which takes bytes as input.
-
-    Bytes are decoded to text using either UTF-8 (default) or the encoding
-    selected via :meth:`~pyte.Stream.select_other_charset`.
-
-    .. attribute:: use_utf8
-
-       Assume the input to :meth:`~pyte.streams.ByteStream.feed` is encoded
-       using UTF-8. Defaults to ``True``.
-    """
-
-    def __init__(self, *args: Any, **kwargs: Any):
-        super().__init__(*args, **kwargs)
-
-        self.utf8_decoder = codecs.getincrementaldecoder("utf-8")("replace")
-
-    def feed(self, data: bytes) -> None:  # type: ignore[override]
-        data_str = self.utf8_decoder.decode(data) if self.use_utf8 else "".join(map(chr, data))
-
-        super().feed(data_str)
-
-    def select_other_charset(self, code: str) -> None:
-        if code == "@":
-            self.use_utf8 = False
-            self.utf8_decoder.reset()
-        elif code in "G8":
-            self.use_utf8 = True

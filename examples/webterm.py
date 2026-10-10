@@ -46,10 +46,10 @@ class Terminal:
         self.screen = pyte.HistoryScreen(columns, lines)
         self.screen.set_mode(pyte.modes.AnsiMode.LINE_FEED_NEW_LINE)
         self.screen.write_process_input = lambda data: p_in.write(data.encode())
-        self.stream = pyte.ByteStream(self.screen)
+        self.stream = pyte.Stream(self.screen)
 
     def feed(self, data):
-        self.stream.feed(data)
+        self.stream.feed(data.decode("utf-8", "replace"))
 
     def dumps(self):
         cursor = self.screen.cursor

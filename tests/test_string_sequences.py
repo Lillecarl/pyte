@@ -10,7 +10,7 @@ from pyte.screen import Screen
 
 def display_for(data, columns=20, lines=5):
     screen = a_screen(columns, lines)
-    pyte.ByteStream(screen).feed(data)
+    pyte.Stream(screen).feed(data.decode())
     return "\n".join(display(screen))
 
 
@@ -54,7 +54,7 @@ def test_apc_is_dispatched():
             self.sequences.append(("dcs", data))
 
     screen = a_screen(20, 5, Recorder)
-    pyte.ByteStream(screen).feed(b"\x1b_Ghello\x1b\\\x1bP1;2qworld\x1b\\")
+    pyte.Stream(screen).feed("\x1b_Ghello\x1b\\\x1bP1;2qworld\x1b\\")
     # The first payload byte is part of the data: for the kitty
     # graphics protocol it is the 'G' that starts the grammar.
     assert screen.sequences == [("apc", "Ghello"), ("dcs", "1;2qworld")]
@@ -70,8 +70,8 @@ def test_fragmented_across_feeds():
             self.chunks.append(data)
 
     screen = a_screen(20, 5, Recorder)
-    stream = pyte.ByteStream(screen)
-    for part in (b"ab\x1b", b"_Gpay", b"load\x1b", b"\\cd"):
+    stream = pyte.Stream(screen)
+    for part in ("ab\x1b", "_Gpay", "load\x1b", "\\cd"):
         stream.feed(part)
     assert screen.chunks == ["Gpayload"]
     assert "abcd" in "\n".join(display(screen))
@@ -85,7 +85,7 @@ def test_can_aborts_without_dispatch():
             received.append(data)
 
     screen = a_screen(20, 5, Recorder)
-    pyte.ByteStream(screen).feed(b"\x1b_Gab\x18cd\x1b\\ef")
+    pyte.Stream(screen).feed("\x1b_Gab\x18cd\x1b\\ef")
     assert received == []
     assert "cdef" in "\n".join(display(screen))
 
@@ -98,14 +98,14 @@ def test_esc_inside_payload_does_not_terminate():
             received.append(data)
 
     screen = a_screen(20, 5, Recorder)
-    pyte.ByteStream(screen).feed(b"\x1b_Gab\x1bXcd\x1b\\after")
+    pyte.Stream(screen).feed("\x1b_Gab\x1bXcd\x1b\\after")
     assert received == ["Gab\x1bXcd"]
     assert "after" in "\n".join(display(screen))
 
 
 def test_osc_still_works():
     screen = a_screen(20, 5)
-    pyte.ByteStream(screen).feed(b"\x1b]2;my title\x07rest")
+    pyte.Stream(screen).feed("\x1b]2;my title\x07rest")
     assert screen.titles.window == "my title"
     assert "rest" in "\n".join(display(screen))
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pyte
 from pyte import keys
 from pyte.screen import Screen
 from pyte.streams import Stream
@@ -196,23 +195,6 @@ def test_apc_and_dcs_are_consumed():
     stream.feed('\x1bP$q"p\x1b\\!')
     assert row_text().startswith("beforeafter!")
     assert "$q" not in row_text()
-
-
-def test_the_byte_parser_dispatches_it_too():
-    """
-    There is one parser now.
-
-    There were two: pyte's `Stream`, which had no "u" in its table, and
-    a `BetterStream` that added one. So a sequence reached the handler
-    or did not depending on which of the two a caller picked, and
-    `ByteStream`, which is the one `python -m pyte` disassembles with,
-    picked the wrong one.
-    """
-    responses = []
-    screen = Screen(24, 80, write_process_input=responses.append)
-    stream = pyte.ByteStream(screen)
-    stream.feed(b"\x1b[>1u")
-    assert screen.kitty_keyboard_flags == 1
 
 
 # ----------------------------------------------------------------------

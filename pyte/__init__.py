@@ -46,11 +46,11 @@ from __future__ import annotations
 
 __version__ = "0.8.3.dev"
 
-__all__ = ("ByteStream", "DebugScreen", "GroundTimer", "Screen", "Stream")
+__all__ = ("DebugScreen", "GroundTimer", "Screen", "Stream")
 
 from .debug import DebugScreen
 from .screen import Screen
-from .streams import ByteStream, GroundTimer, Stream
+from .streams import GroundTimer, Stream
 
 if __debug__:
     import io
@@ -63,9 +63,9 @@ if __debug__:
         >>> dis(b"\x1b[20m")   # doctest: +NORMALIZE_WHITESPACE
         ["select_graphic_rendition", [20], {}]
         """
-        if isinstance(chars, str):
-            chars = chars.encode("utf-8")
+        if isinstance(chars, bytes):
+            chars = chars.decode("utf-8", "replace")
 
         with io.StringIO() as buf:
-            ByteStream(DebugScreen(to=buf)).feed(chars)
+            Stream(DebugScreen(to=buf)).feed(chars)
             print(buf.getvalue())

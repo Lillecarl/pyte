@@ -284,11 +284,10 @@ def test_define_charset():
     assert display(screen)[0] == " " * 3
 
 
-def test_non_utf8_shifts():
+def test_shifts():
     screen = a_screen(3, 3)
     handler = screen.shift_in = screen.shift_out = argcheck()
     stream = pyte.Stream(screen)
-    stream.use_utf8 = False
     stream.feed(ctrl.SI)
     stream.feed(ctrl.SO)
     assert handler.count == 2
@@ -382,8 +381,8 @@ def test_an_unknown_announcer_is_eaten_as_well():
 )
 def test_debug_stream(input, expected):
     output = io.StringIO()
-    stream = pyte.ByteStream(pyte.DebugScreen(to=output))
-    stream.feed(input)
+    stream = pyte.Stream(pyte.DebugScreen(to=output))
+    stream.feed(input.decode())
 
     output.seek(0)
     assert [eval(line) for line in output] == expected
@@ -409,54 +408,25 @@ def test_handler_exception():
     assert handler.count == 1
 
 
-def test_byte_stream_feed():
-    screen = a_screen(20, 1)
-    screen.draw = handler = argcheck()
-
-    stream = pyte.ByteStream(screen)
-    stream.feed("Нерусский текст".encode())
-    assert handler.count == 1
-    assert handler.args == ("Нерусский текст",)
-
-
-def test_byte_stream_define_charset_unknown():
+def test_define_charset_unknown():
     screen = a_screen(3, 3)
-    stream = pyte.ByteStream(screen)
-    stream.select_other_charset("@")
+    stream = pyte.Stream(screen)
     default_g0_charset = screen.g_charsets[0]
     # ``"!"`` names no set in any terminal, so expect a noop. It was
     # ``"Z"`` until Lillecarl/pymux#111, which made that Spanish.
     assert "!" not in cs.MAPS
-    stream.feed((ctrl.ESC + "(!").encode())
+    stream.feed(ctrl.ESC + "(!")
     assert display(screen)[0] == " " * 3
     assert screen.g_charsets[0] == default_g0_charset
 
 
 @pytest.mark.parametrize(("charset", "mapping"), cs.MAPS.items())
-def test_byte_stream_define_charset(charset, mapping):
+def test_define_charset_by_name(charset, mapping):
     screen = a_screen(3, 3)
-    stream = pyte.ByteStream(screen)
-    stream.select_other_charset("@")
-    stream.feed((ctrl.ESC + "(" + charset).encode())
+    stream = pyte.Stream(screen)
+    stream.feed(ctrl.ESC + "(" + charset)
     assert display(screen)[0] == " " * 3
     assert screen.g_charsets[0] == mapping
-
-
-def test_byte_stream_select_other_charset():
-    stream = pyte.ByteStream(a_screen(3, 3))
-    assert stream.use_utf8  # on by default.
-
-    # a) disable utf-8
-    stream.select_other_charset("@")
-    assert not stream.use_utf8
-
-    # b) unknown code -- noop
-    stream.select_other_charset("X")
-    assert not stream.use_utf8
-
-    # c) enable utf-8
-    stream.select_other_charset("G")
-    assert stream.use_utf8
 
 
 def test_too_many_params():
