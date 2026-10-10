@@ -3,6 +3,7 @@
 //! original gives, decision for decision. Lillecarl/pymux#566.
 
 mod row;
+mod stream;
 
 use pyo3::intern;
 use pyo3::prelude::*;
@@ -317,5 +318,6 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<RowImage>()?;
     module.add_function(wrap_pyfunction!(runs_of, module)?)?;
     module.add_function(wrap_pyfunction!(draw_on_row, module)?)?;
+    module.add_function(wrap_pyfunction!(stream::take_ground, module)?)?;
     Ok(())
 }
