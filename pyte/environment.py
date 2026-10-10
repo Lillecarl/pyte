@@ -154,9 +154,8 @@ def prepare(environment: MutableMapping[str, str], directory: str = DEFAULT_DATA
     """
     Say, in place, that this program runs on this screen.
 
-    Call it in the child, between the fork and the exec. The mapping is
-    `os.environ` there, and every change to it reaches the program and
-    nothing else.
+    `environment` is the program's own copy, so every change to it
+    reaches the program and nothing else.
     """
     scrub_terminal_identity(environment)
 
