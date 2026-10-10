@@ -35,6 +35,7 @@ from typing import Any, NamedTuple
 from . import page as page_module
 from .cells import (
     _CHAR_CACHE,
+    _ERASED_CACHE,
     _PROTECTED_CHAR_CACHE,
     PLAIN_APPEARANCE,
     UNWRITTEN,
@@ -292,8 +293,6 @@ class _Thawer:
         self.made: dict[int, object] = {}
         self.made_buffers: dict[str, defaultdict[int, Row]] = {}
         self.appearances = [self.appearance(*entry) for entry in frozen.appearances]
-        # One erased blank per appearance, the way a screen's erase makes one per call.
-        self.erased: dict[int, ErasedCell] = {}
 
     def appearance(self, rendition: Any, hyperlink: str, hyperlink_id: str) -> Appearance:
         return appearance_of[self.value(rendition), hyperlink, hyperlink_id]
@@ -370,11 +369,7 @@ class _Thawer:
             if kind == WRITTEN:
                 cell = _CHAR_CACHE[char, appearance]
             elif kind == ERASED:
-                cell = self.erased.get(index)
-                if cell is None:
-                    cell = self.erased[index] = ErasedCell(char, appearance)
-                elif cell.char != char:
-                    cell = ErasedCell(char, appearance)
+                cell = _ERASED_CACHE[char, appearance]
             elif kind == PLAIN:
                 cell = UNWRITTEN if char == " " and appearance is PLAIN_APPEARANCE else Cell(char, appearance)
             else:

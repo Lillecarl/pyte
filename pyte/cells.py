@@ -223,6 +223,12 @@ def protection_of(cell: Cell) -> int:
 # Cache for Cell objects.
 _CHAR_CACHE: FastDictCache[tuple[str, Appearance], Cell] = FastDictCache(WrittenCell, size=1000 * 1000)
 
+#: One erased blank per character and appearance. An erase made one of
+#: its own, so two rows blanked by two erases held equal cells that were
+#: different objects, and a row's content key, which reads cells by
+#: identity, told them apart. Lillecarl/pymux#570.
+_ERASED_CACHE: FastDictCache[tuple[str, Appearance], ErasedCell] = FastDictCache(ErasedCell, size=10 * 1000)
+
 #: The same for the cells that carry a mark. Nearly no program marks
 #: one, so this one stays small.
 _PROTECTED_CHAR_CACHE: FastDictCache[tuple[str, Appearance, int], Cell] = FastDictCache(ProtectedCell, size=10 * 1000)

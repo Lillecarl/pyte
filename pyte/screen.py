@@ -31,6 +31,7 @@ from . import keys
 from . import page as page_module
 from .cells import (
     _CHAR_CACHE,
+    _ERASED_CACHE,
     _PROTECTED_CHAR_CACHE,
     BASELINE_PARAMETERS,
     PLAIN,
@@ -2871,7 +2872,7 @@ class Screen:
         appearance = self.erase_appearance()
 
         if appearance:
-            blank = ErasedCell(" ", appearance)
+            blank = _ERASED_CACHE[" ", appearance]
             for column in range(left, right + 1):
                 row[column] = blank
         else:
@@ -3281,7 +3282,7 @@ class Screen:
         # A fresh row, so the continuation mark of whatever stood here
         # goes with the cells.
         line = page_module.Row()
-        erased = ErasedCell(" ", appearance)
+        erased = _ERASED_CACHE[" ", appearance]
         for column in range(self.columns):
             line[column] = erased
         data_buffer[row] = line
@@ -3371,7 +3372,7 @@ class Screen:
 
         appearance = self.erase_appearance()
         if appearance:
-            blank = ErasedCell(" ", appearance)
+            blank = _ERASED_CACHE[" ", appearance]
             for column in range(cursor_x, min(cursor_x + count, edge)):
                 line[column] = blank
 
@@ -3409,7 +3410,7 @@ class Screen:
 
         appearance = self.erase_appearance()
         if appearance:
-            blank = ErasedCell(" ", appearance)
+            blank = _ERASED_CACHE[" ", appearance]
             for column in range(max(cursor_x, edge - count), edge):
                 line[column] = blank
 
@@ -3754,7 +3755,7 @@ class Screen:
         self.touch(cursor_position.y)
         # ECH writes a cell even when nothing paints it: the erase has
         # to take the content away whether or not it has a colour.
-        erased = ErasedCell(" ", self.erase_appearance() or PLAIN_APPEARANCE)
+        erased = _ERASED_CACHE[" ", self.erase_appearance() or PLAIN_APPEARANCE]
 
         end = min(cursor_position.x + count, self.columns)
         for column in range(cursor_position.x, end):
@@ -3790,7 +3791,7 @@ class Screen:
         line_offset = self.line_offset
         data_buffer = self.data_buffer
         appearance = self.erase_appearance()
-        blank = ErasedCell(" ", appearance) if appearance else None
+        blank = _ERASED_CACHE[" ", appearance] if appearance else None
 
         for row in range(top, bottom + 1):
             line = data_buffer[row + line_offset]
@@ -3916,7 +3917,7 @@ class Screen:
         line = data_buffer[pt_cursor_position.y]
         self.touch(pt_cursor_position.y)
         holds = self._erase_holds
-        erased = ErasedCell(" ", appearance) if appearance else None
+        erased = _ERASED_CACHE[" ", appearance] if appearance else None
 
         for column in columns:
             cell = line.get(column)
@@ -4021,7 +4022,7 @@ class Screen:
                 return
 
             data_buffer = self.data_buffer
-            erased = ErasedCell(" ", appearance) if appearance else None
+            erased = _ERASED_CACHE[" ", appearance] if appearance else None
 
             # "CSI 2 J" takes the whole screen, marks and all. Only
             # the two that erase a part of it read the marks, and the
@@ -4237,7 +4238,7 @@ class Screen:
         top, left, bottom, right = corners
 
         appearance = self.erase_appearance()
-        erased = ErasedCell(" ", appearance) if appearance else None
+        erased = _ERASED_CACHE[" ", appearance] if appearance else None
         reads_the_marks = selective and self._protected_chars
 
         data_buffer = self.data_buffer
