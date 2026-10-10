@@ -1,0 +1,4 @@
+target/
+# The repository ignores `*.lock`. This one is what `importCargoLock`
+# builds the crates from, so it is source.
+!Cargo.lock
