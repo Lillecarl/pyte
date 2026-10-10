@@ -388,7 +388,7 @@ def _one(value: int | None) -> str:
 #: marker says whether a mode is private, the number does not, and a
 #: builder that guessed would write "CSI 1049 h" for a mode that only
 #: exists as "CSI ? 1049 h". `modes.py` names the modes a pane acts on;
-#: for any other number, write `csi(escape.SM, 2026, private="?")` and
+#: for any other number, write `csi(escape.SM, 2027, private="?")` and
 #: say the marker out loud.
 Mode = AnsiMode | PrivateMode
 

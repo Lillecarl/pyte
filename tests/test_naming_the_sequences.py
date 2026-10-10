@@ -80,10 +80,10 @@ def test_a_mode_is_a_mode_before_it_is_a_sequence():
 
 def test_a_mode_nobody_names_is_written_the_long_way():
     """
-    2026 is synchronised output, which `modes.py` does not name. The
+    2027 is grapheme clustering, which `modes.py` does not name. The
     long form says the marker out loud, so nothing is guessed.
     """
-    assert rewritten("\x1b[?2026h") == "csi(escape.SM, 2026, private='?')"
+    assert rewritten("\x1b[?2027h") == "csi(escape.SM, 2027, private='?')"
 
 
 def test_the_name_of_a_final_byte_is_the_csi_one():

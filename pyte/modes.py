@@ -183,6 +183,11 @@ class PrivateMode(IntEnum):
     #: program can tell a paste from typing.
     BRACKETED_PASTE = 2004
 
+    #: A frame is being drawn: whoever shows this screen holds the last
+    #: picture until the program resets the mode. The screen itself
+    #: changes nothing, because showing is not its job.
+    SYNCHRONIZED_OUTPUT = 2026
+
     #: Report a resize in the input of the program, instead of only
     #: through SIGWINCH.
     INBAND_RESIZE = 2048

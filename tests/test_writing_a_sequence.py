@@ -201,7 +201,7 @@ def test_a_bare_number_is_not_a_mode():
     with pytest.raises(ValueError):
         set_mode(1049)
 
-    assert csi(escape.SM, 2026, private="?") == "\x1b[?2026h"
+    assert csi(escape.SM, 2027, private="?") == "\x1b[?2027h"
 
 
 def test_no_mode_at_all_is_not_a_sequence():

@@ -506,6 +506,11 @@ class Screen:
         return PrivateMode.BRACKETED_PASTE.flag in self.mode
 
     @property
+    def draws_a_frame(self) -> bool:
+        'Is the program between the two halves of "?2026"?'
+        return PrivateMode.SYNCHRONIZED_OUTPUT.flag in self.mode
+
+    @property
     def kitty_keyboard_flags(self) -> int:
         """
         The currently effective kitty keyboard protocol flags. (The top of
@@ -4808,6 +4813,7 @@ class Screen:
             PrivateMode.SAVE_CURSOR,
             PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR,
             PrivateMode.BRACKETED_PASTE,
+            PrivateMode.SYNCHRONIZED_OUTPUT,
             PrivateMode.INBAND_RESIZE,
         ]
     )
