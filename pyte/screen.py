@@ -294,6 +294,7 @@ class Screen:
         "color_base": Keep.REBUILT,
         "cell_width": Keep.REBUILT,
         "cell_height": Keep.REBUILT,
+        "frames_drawn": Keep.SAVED,
         "keyboard_source_flags": Keep.REBUILT,
         "synthesize_key_events": Keep.REBUILT,
         "extended_keys_allowed": Keep.REBUILT,
@@ -460,6 +461,12 @@ class Screen:
         #: to answer those queries all the same.
         self.cell_width = ASSUMED_CELL_WIDTH
         self.cell_height = ASSUMED_CELL_HEIGHT
+
+        #: How many frames a program has ended with "?2026l". Only ever
+        #: grows, a reset included: a reader that holds a picture
+        #: compares it to tell that a frame ended and the next one began
+        #: within one feed.
+        self.frames_drawn = 0
 
         self.reset()
 
@@ -1949,6 +1956,9 @@ class Screen:
         # private ones.
         if kwargs.get("private"):
             modes = [mode << 5 for mode in modes]
+
+        if PrivateMode.SYNCHRONIZED_OUTPUT.flag in modes and self.draws_a_frame:
+            self.frames_drawn += 1
 
         self.mode.difference_update(modes)
 

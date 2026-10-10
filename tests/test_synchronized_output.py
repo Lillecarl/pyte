@@ -53,6 +53,16 @@ def test_the_screen_still_takes_what_is_drawn():
     assert display(screen)[0].startswith("drawn")
 
 
+def test_a_frame_that_ends_is_counted():
+    "Two frames in one feed end with the mode set, and only the count says so."
+    screen, stream, _answers = make_screen()
+    stream.feed(END + BEGIN + "one" + END + BEGIN + "two")
+    assert screen.draws_a_frame is True
+    assert screen.frames_drawn == 1
+    stream.feed(END + END)
+    assert screen.frames_drawn == 2
+
+
 def test_a_hard_reset_ends_it():
     screen, stream, _answers = make_screen()
     stream.feed(BEGIN + esc(escape.RIS))
