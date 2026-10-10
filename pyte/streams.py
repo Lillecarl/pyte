@@ -26,7 +26,6 @@ import codecs
 import inspect
 import itertools
 import re
-import warnings
 from collections import defaultdict
 from typing import TYPE_CHECKING, ClassVar
 
@@ -298,7 +297,7 @@ class Stream:
     #: sequence it was in the middle of are replayed into it.
     #: Lillecarl/pymux#399.
     KEEP: ClassVar[dict[str, Keep]] = {
-        "listener": Keep.REBUILT,
+        "screen": Keep.REBUILT,
         "strict": Keep.REBUILT,
         "use_utf8": Keep.SAVED,
         "_parser": Keep.DROPPED,
@@ -306,8 +305,12 @@ class Stream:
         "_pending": Keep.SAVED,
     }
 
-    def __init__(self, screen: Screen | None = None, strict: bool = True) -> None:
-        self.listener: Screen | None = None
+    def __init__(self, screen: Screen, strict: bool = True) -> None:
+        """
+        :param screen: the one screen this stream drives.
+        :param strict: refuse a screen that lacks a handler for an event.
+        """
+        self.screen = screen
         self.strict = strict
         self.use_utf8: bool = True
 
@@ -317,39 +320,13 @@ class Stream:
         #: the open sequence, which `replay` gives a new parser.
         self._pending = ""
 
-        if screen is not None:
-            self.attach(screen)
-
-    def attach(self, screen: Screen) -> None:
-        """Adds a given screen to the listener queue.
-
-        :param pyte.screen.Screen screen: a screen to attach to.
-        """
-        if self.listener is not None:
-            warnings.warn(
-                "As of version 0.6.0 the listener queue is "
-                "restricted to a single element. Existing "
-                f"listener {self.listener} will be replaced.",
-                DeprecationWarning,
-            )
-
-        if self.strict:
+        if strict:
             for event in self.events:
                 if not hasattr(screen, event):
                     raise TypeError(f"{screen} is missing {event}")
 
-        self.listener = screen
         self._parser: ParserGenerator | None = None
         self._initialize_parser()
-
-    def detach(self, screen: Screen) -> None:
-        """Remove a given screen from the listener queue and fails
-        silently if it's not attached.
-
-        :param pyte.screen.Screen screen: a screen to detach.
-        """
-        if screen is self.listener:
-            self.listener = None
 
     def feed(self, data: str) -> None:
         """Consume some data and advances the state as necessary.
@@ -357,10 +334,7 @@ class Stream:
         :param str data: a blob of data to feed from.
         """
         send = self._send_to_parser
-        if self.listener is None:
-            raise RuntimeError("Listener is not set")
-
-        draw = self.listener.draw
+        draw = self.screen.draw
         match_text = self._text_pattern.match
         taking_plain_text = self._taking_plain_text
 
@@ -464,10 +438,9 @@ class Stream:
         Don't change anything without profiling first.
         """
         basic = self.basic
-        assert self.listener is not None
-        listener = self.listener
-        draw = listener.draw
-        debug = listener.debug
+        screen = self.screen
+        draw = screen.draw
+        debug = screen.debug
 
         ESC, CSI_C1 = ctrl.ESC, ctrl.CSI_C1
         OSC_C1 = ctrl.OSC_C1
@@ -489,7 +462,7 @@ class Stream:
         ) -> dict[str, Callable[..., None]]:
             return defaultdict(
                 lambda: debug,
-                {event: getattr(listener, attr) for event, attr in mapping.items()},
+                {event: getattr(screen, attr) for event, attr in mapping.items()},
             )
 
         basic_dispatch = create_dispatcher(basic)
@@ -506,13 +479,13 @@ class Stream:
 
         # String sequences (APC/DCS) dispatch to optional screen
         # methods. Screens that don't implement them get ``debug``.
-        apc_dispatch = getattr(listener, "apc", debug)
-        dcs_dispatch = getattr(listener, "dcs", debug)
-        osc_dispatch = getattr(listener, "osc", debug)
+        apc_dispatch = getattr(screen, "apc", debug)
+        dcs_dispatch = getattr(screen, "dcs", debug)
+        osc_dispatch = getattr(screen, "osc", debug)
 
         while True:
             # ``True`` tells ``Screen.feed`` that it is allowed to send
-            # chunks of plain text directly to the listener, instead
+            # chunks of plain text directly to the screen, instead
             # of this generator.
             char = yield True
 
@@ -597,7 +570,7 @@ class Stream:
                         # finishes the name. Lillecarl/pymux#111.
                         if code == "%":
                             code += yield None
-                        listener.define_charset(code, mode=char)
+                        screen.define_charset(code, mode=char)
                     else:
                         escape_dispatch[char]()
                     continue  # Don't go to CSI.
@@ -732,9 +705,9 @@ class Stream:
 
                 if code in ("0", "1", "2"):
                     if code in ("0", "1"):
-                        listener.set_icon_name(param)
+                        screen.set_icon_name(param)
                     if code in ("0", "2"):
-                        listener.set_title(param)
+                        screen.set_title(param)
                 elif code:
                     # Every other code goes to the optional `osc` hook:
                     # colour control, the clipboard, notifications and

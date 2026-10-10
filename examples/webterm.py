@@ -46,8 +46,7 @@ class Terminal:
         self.screen = pyte.HistoryScreen(columns, lines)
         self.screen.set_mode(pyte.modes.AnsiMode.LINE_FEED_NEW_LINE)
         self.screen.write_process_input = lambda data: p_in.write(data.encode())
-        self.stream = pyte.ByteStream()
-        self.stream.attach(self.screen)
+        self.stream = pyte.ByteStream(self.screen)
 
     def feed(self, data):
         self.stream.feed(data)

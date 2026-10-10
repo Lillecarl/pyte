@@ -276,22 +276,6 @@ def test_set_title_icon_name(osc, st):
     assert screen.page.data_buffer[0][0].char == "➜"
 
 
-def test_compatibility_api():
-    screen = a_screen(80, 24)
-    stream = pyte.Stream()
-    stream.attach(screen)
-
-    # All of the following shouldn't raise errors.
-    # a) adding more than one listener
-    stream.attach(a_screen(80, 24))
-
-    # b) feeding text
-    stream.feed("привет")
-
-    # c) detaching an attached screen.
-    stream.detach(screen)
-
-
 def test_define_charset():
     # Should be a noop. All input is UTF8.
     screen = a_screen(3, 3)
@@ -331,9 +315,10 @@ def test_dollar_is_an_intermediate_byte():
         def request_mode(self, *args, **kwargs):
             calls.append((args, kwargs))
 
-    stream = pyte.Stream()
-    stream.csi = dict(stream.csi, **{"$p": "request_mode"})
-    stream.attach(a_screen(3, 3, Watching))
+    class Asking(pyte.Stream):
+        csi = dict(pyte.Stream.csi, **{"$p": "request_mode"})
+
+    stream = Asking(a_screen(3, 3, Watching))
 
     stream.feed(ctrl.CSI + "?2004$p")
     assert calls == [((2004,), {"private": True})]

@@ -125,7 +125,7 @@ def test_a_screen_without_a_function_consumes_the_sequence():
 
 def test_the_screen_content_survives_a_forwarded_sequence():
     stream, forwarded, _answers = make_screen()
-    screen = stream.listener
+    screen = stream.screen
     stream.feed("before" + osc(Osc.CLIPBOARD, "c", "aGVsbG8=") + "after")
     line = screen.page.data_buffer[0]
     text = "".join(line[x].char for x in range(len("beforeafter")))
