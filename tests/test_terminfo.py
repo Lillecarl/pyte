@@ -19,6 +19,7 @@ import subprocess
 
 import pytest
 
+from pyte.environment import database
 from pyte.terminfo import (
     CAPABILITIES,
     PARENT,
@@ -56,7 +57,10 @@ def described(database):
 
 
 def test_the_entry_compiles(compiled):
-    assert (compiled / TERMINAL_NAME[0] / TERMINAL_NAME).exists()
+    # Through the lookup the screen uses: ncurses files an entry under its
+    # first letter on Linux and under that letter's hex on macOS, whose
+    # file system folds case.
+    assert database(str(compiled)) == str(compiled)
 
 
 def test_every_capability_of_the_table_is_in_the_entry(compiled):
