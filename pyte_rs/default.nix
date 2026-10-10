@@ -20,11 +20,57 @@
   cargo,
   rustc,
   maturin,
+  clippy,
+  rustfmt,
 }:
 let
   fs = lib.fileset;
 
   inherit (callPackage ../nix/suite.nix { }) suite;
+
+  src = fs.toSource {
+    root = ./.;
+    fileset = fs.unions [
+      ./Cargo.toml
+      ./Cargo.lock
+      ./pyproject.toml
+      ./src
+      (fs.fileFilter (file: file.hasExt "py") ./python)
+    ];
+  };
+
+  cargoDeps = rustPlatform.importCargoLock { lockFile = ./Cargo.lock; };
+
+  # The Rust's style, held by the formatter and by clippy with every
+  # warning an error, the way `ruff` holds the Python's.
+  #
+  #     nix build --file . checks.pyte-rs-lint
+  checks.lint = suite {
+    name = "pyte-rs-lint";
+    # A compiler, for the build scripts of the crates: a `runCommand`
+    # has none of its own.
+    inputs = [
+      cargo
+      rustc
+      clippy
+      rustfmt
+      stdenv.cc
+    ];
+    setup = ''
+      cp -r ${src}/. crate
+      chmod -R +w crate
+      cd crate
+      export HOME="$TMPDIR"
+      export PYO3_PYTHON=${python.interpreter}
+      export CARGO_TARGET_DIR="$TMPDIR/target"
+      # What `cargoSetupHook` writes, which a `runCommand` never runs.
+      mkdir -p .cargo
+      printf '[source.crates-io]\nreplace-with = "vendored"\n[source.vendored]\ndirectory = "%s"\n' ${cargoDeps} > .cargo/config.toml
+    '';
+  } ''
+    cargo fmt --check
+    cargo clippy --offline --frozen -- -D warnings
+  '';
 
   # pyte with its `test` extra, and these kernels beside it.
   testEnv = mkVirtualEnv "pyte-rs-test-env" {
@@ -51,18 +97,7 @@ stdenv.mkDerivation {
   pname = "pyte_rs";
   version = "0.1.0";
 
-  src = fs.toSource {
-    root = ./.;
-    fileset = fs.unions [
-      ./Cargo.toml
-      ./Cargo.lock
-      ./pyproject.toml
-      ./src
-      (fs.fileFilter (file: file.hasExt "py") ./python)
-    ];
-  };
-
-  cargoDeps = rustPlatform.importCargoLock { lockFile = ./Cargo.lock; };
+  inherit src cargoDeps;
 
   nativeBuildInputs = [
     pyprojectHook
