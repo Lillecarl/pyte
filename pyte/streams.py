@@ -109,6 +109,57 @@ CONTROLS_IN_CSI = "".join([ctrl.BEL, ctrl.BS, ctrl.HT, ctrl.LF, ctrl.VT, ctrl.FF
 _RUN_IN_CSI = {ord(control): None for control in CONTROLS_IN_CSI}
 
 
+#: Plain text: everything the parser does not have to look at, which is
+#: everything but the controls and the starts of sequences.
+_SPECIAL = (
+    ctrl.ESC,
+    ctrl.CSI_C1,
+    ctrl.NUL,
+    ctrl.DEL,
+    ctrl.OSC_C1,
+    # The basic controls: the keys of `Stream.basic`.
+    ctrl.BEL,
+    ctrl.BS,
+    ctrl.HT,
+    ctrl.LF,
+    ctrl.VT,
+    ctrl.FF,
+    ctrl.CR,
+    ctrl.SO,
+    ctrl.SI,
+)
+_TEXT = re.compile("[^" + "".join(map(re.escape, _SPECIAL)) + "]+").match
+
+
+def _take_ground(
+    data: str,
+    offset: int,
+    draw: Callable[[str], None],
+    basic: Mapping[str, Callable[[], None]],
+    csi: Mapping[str, Callable[..., None]],
+    define_charset: Callable[..., None] | None,
+) -> int:
+    """
+    Read what the parser would read from its ground state, from `offset`,
+    and return where it stopped.
+
+    This takes one run of plain text and draws it, which is all the
+    stream needs of it. `pyte_rs` puts a compiled one in its place that
+    reads further -- the basic controls, whole CSI sequences, the charset
+    selections -- and stops wherever the parser has something to decide;
+    the parser takes over from there. It dispatches what the parser would
+    dispatch, through the same tables, in the same order. Returning
+    `offset` itself says the parser has to read the next character.
+    Lillecarl/pymux#570.
+    """
+    match = _TEXT(data, offset)
+    if match is None:
+        return offset
+    end = match.end()
+    draw(data[offset:end])
+    return end
+
+
 class Stream:
     """A stream is a state machine that parses a stream of bytes and
     dispatches events based on what it sees.
@@ -277,13 +328,6 @@ class Stream:
         )
     )
 
-    #: A regular expression pattern matching everything what can be
-    #: considered plain text.
-    _special = {ctrl.ESC, ctrl.CSI_C1, ctrl.NUL, ctrl.DEL, ctrl.OSC_C1}
-    _special.update(basic)
-    _text_pattern = re.compile("[^" + "".join(map(re.escape, _special)) + "]+")
-    del _special
-
     #: What a hot upgrade does with each attribute; `pyte.keep` says.
     #: The parser is a suspended generator, which no snapshot can hold.
     #: A load starts it on the ground state, and the bytes of a
@@ -293,6 +337,8 @@ class Stream:
         "screen": Keep.REBUILT,
         "strict": Keep.REBUILT,
         "_parser": Keep.DROPPED,
+        "_tables": Keep.DROPPED,
+        "_ground": Keep.DROPPED,
         "_taking_plain_text": Keep.DROPPED,
         "_pending": Keep.SAVED,
     }
@@ -325,8 +371,8 @@ class Stream:
         :param str data: a blob of data to feed from.
         """
         send = self._send_to_parser
-        draw = self.screen.draw
-        match_text = self._text_pattern.match
+        take = _take_ground
+        ground = self._ground
         taking_plain_text = self._taking_plain_text
 
         length = len(data)
@@ -337,11 +383,9 @@ class Stream:
         opened = 0
         while offset < length:
             if taking_plain_text:
-                match = match_text(data, offset)
-                if match:
-                    start, offset = match.span()
-                    draw(data[start:offset])
-                    opened = offset
+                taken = take(data, offset, *ground)
+                if taken != offset:
+                    offset = opened = taken
                 else:
                     taking_plain_text = False
             else:
@@ -375,9 +419,48 @@ class Stream:
             raise
 
     def _initialize_parser(self) -> None:
+        self._tables = self._dispatch_tables()
+        basic_dispatch, _sharp, _space, _escape, csi_dispatch = self._tables
+        # What `_take_ground` reads with: the same tables as the parser,
+        # so a handler a table makes for an unknown key is made once.
+        # A screen that is not strict may have no `define_charset`; the
+        # parser then meets the sequence, and fails there as it always did.
+        self._ground = (
+            self.screen.draw,
+            basic_dispatch,
+            csi_dispatch,
+            getattr(self.screen, "define_charset", None),
+        )
         self._parser = self._parser_fsm()
         self._taking_plain_text = next(self._parser)
         self._pending = ""
+
+    def _dispatch_tables(self):
+        "The handler of every event, by the key that names it, per kind of sequence."
+        screen = self.screen
+        debug = screen.debug
+
+        def create_dispatcher(
+            mapping: Mapping[str, str],
+        ) -> dict[str, Callable[..., None]]:
+            return defaultdict(
+                lambda: debug,
+                {event: getattr(screen, attr) for event, attr in mapping.items()},
+            )
+
+        # Only a CSI sequence carries parameters, so only its handlers
+        # need the count trimmed and the defaults filled in.
+        csi_dispatch = defaultdict(
+            lambda: debug,
+            {event: fit_parameters(handler) for event, handler in create_dispatcher(self.csi).items()},
+        )
+        return (
+            create_dispatcher(self.basic),
+            create_dispatcher(self.sharp),
+            create_dispatcher(self.space),
+            create_dispatcher(self.escape),
+            csi_dispatch,
+        )
 
     def replay(self) -> str:
         """
@@ -448,25 +531,8 @@ class Stream:
         # and the real final byte lands on the screen as text.
         INTERMEDIATE_IN_CSI = "".join(chr(code) for code in range(0x20, 0x30))
 
-        def create_dispatcher(
-            mapping: Mapping[str, str],
-        ) -> dict[str, Callable[..., None]]:
-            return defaultdict(
-                lambda: debug,
-                {event: getattr(screen, attr) for event, attr in mapping.items()},
-            )
-
-        basic_dispatch = create_dispatcher(basic)
-        sharp_dispatch = create_dispatcher(self.sharp)
-        space_dispatch = create_dispatcher(self.space)
+        basic_dispatch, sharp_dispatch, space_dispatch, escape_dispatch, csi_dispatch = self._tables
         escape_mapping = self.escape
-        escape_dispatch = create_dispatcher(self.escape)
-        # Only a CSI sequence carries parameters, so only its handlers
-        # need the count trimmed and the defaults filled in.
-        csi_dispatch = defaultdict(
-            lambda: debug,
-            {event: fit_parameters(handler) for event, handler in create_dispatcher(self.csi).items()},
-        )
 
         # String sequences (APC/DCS) dispatch to optional screen
         # methods. Screens that don't implement them get ``debug``.
