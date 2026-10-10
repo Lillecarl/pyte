@@ -49,6 +49,15 @@ from pathlib import Path
 
 from hypothesis import HealthCheck, settings
 
+# The whole suite again with the Rust row and kernels in place, which
+# is `checks.pyte-rs-unit`: the pure layer is held by the run without
+# it. Installed here, before any test module makes a page.
+# Lillecarl/pymux#570.
+if os.environ.get("PYTE_RS", "") not in ("", "0"):
+    import pyte_rs
+
+    assert pyte_rs.install(), "PYTE_RS asks for the kernels and PYTERM_PURE refuses them"
+
 #: The module that reads a colour with the real Xlib.
 XCMS_ORACLES = ("xlib_oracle",)
 

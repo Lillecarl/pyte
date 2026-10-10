@@ -2,8 +2,12 @@
 //! says how they are put in place; each one gives the answer its Python
 //! original gives, decision for decision. Lillecarl/pymux#566.
 
+mod row;
+
 use pyo3::intern;
 use pyo3::prelude::*;
+
+use crate::row::Row;
 use pyo3::types::{PyDict, PyList, PyString, PyStringData, PyTuple};
 
 /// One run while it is built. `text` is the run's own characters for a
@@ -33,7 +37,7 @@ fn printable_ascii(s: &str) -> bool {
 #[pyfunction]
 fn runs_of<'py>(
     py: Python<'py>,
-    row: &Bound<'py, PyDict>,
+    row: &Bound<'py, PyAny>,
     run_class: &Bound<'py, PyAny>,
     placeholder: &str,
     new_run: &Bound<'py, PyAny>,
@@ -43,20 +47,32 @@ fn runs_of<'py>(
     let written_name = intern!(py, "written");
     let width_name = intern!(py, "width");
 
-    let mut cells: Vec<(i64, Bound<'py, PyAny>)> = Vec::with_capacity(row.len());
-    let mut sorted = true;
-    let mut previous = i64::MIN;
-    for (column, cell) in row.iter() {
-        let column: i64 = column.extract()?;
-        if column < previous {
-            sorted = false;
+    // A Rust row holds its cells in column order already; a dict holds
+    // them in the order they were written.
+    let cells: Vec<(i64, Bound<'py, PyAny>)> = if let Ok(stored) = row.cast::<Row>() {
+        stored
+            .borrow()
+            .columns()
+            .map(|(column, cell)| (column, cell.bind(py).clone()))
+            .collect()
+    } else {
+        let row = row.cast::<PyDict>()?;
+        let mut cells = Vec::with_capacity(row.len());
+        let mut sorted = true;
+        let mut previous = i64::MIN;
+        for (column, cell) in row.iter() {
+            let column: i64 = column.extract()?;
+            if column < previous {
+                sorted = false;
+            }
+            previous = column;
+            cells.push((column, cell));
         }
-        previous = column;
-        cells.push((column, cell));
-    }
-    if !sorted {
-        cells.sort_by_key(|(column, _)| *column);
-    }
+        if !sorted {
+            cells.sort_by_key(|(column, _)| *column);
+        }
+        cells
+    };
 
     let mut runs: Vec<Run<'py>> = Vec::new();
     let mut start: i64 = 0;
@@ -248,7 +264,7 @@ fn key_at<'py>(
 #[pyfunction]
 fn draw_on_row<'py>(
     py: Python<'py>,
-    row: &Bound<'py, PyDict>,
+    row: &Bound<'py, PyAny>,
     mut x: i64,
     chars: &Bound<'py, PyString>,
     mut index: usize,
@@ -273,10 +289,21 @@ fn draw_on_row<'py>(
         if width != 1 {
             break;
         }
-        let same = row.get_item(x)?.is_some_and(|there| there.is(&cell));
-        if !same {
-            row.set_item(x, &cell)?;
-            changed = true;
+        if let Ok(stored) = row.cast::<Row>() {
+            let mut stored = stored.borrow_mut();
+            if !stored
+                .cell(x)
+                .is_some_and(|there| there.as_ptr() == cell.as_ptr())
+            {
+                stored.store(x, cell.unbind());
+                changed = true;
+            }
+        } else {
+            let row = row.cast::<PyDict>()?;
+            if !row.get_item(x)?.is_some_and(|there| there.is(&cell)) {
+                row.set_item(x, &cell)?;
+                changed = true;
+            }
         }
         x += 1;
         index += 1;
@@ -286,6 +313,7 @@ fn draw_on_row<'py>(
 
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_class::<Row>()?;
     module.add_function(wrap_pyfunction!(runs_of, module)?)?;
     module.add_function(wrap_pyfunction!(draw_on_row, module)?)?;
     Ok(())

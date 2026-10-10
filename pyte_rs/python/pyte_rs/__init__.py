@@ -12,12 +12,15 @@ from __future__ import annotations
 
 import os
 
-from pyte import runs, screen
+from pyte import page, runs, screen
 from pyte.placeholders import PLACEHOLDER
 
 from . import _native
 
-__all__ = ["draw_on_row", "install", "installed", "runs_of"]
+__all__ = ["Row", "draw_on_row", "install", "installed", "runs_of"]
+
+#: One row of a page, stored by column in Rust. Lillecarl/pymux#570.
+Row = _native.Row
 
 #: Set to anything but "" or "0", and `install()` installs nothing.
 PURE = "PYTERM_PURE"
@@ -52,6 +55,8 @@ def install() -> bool:
         runs.runs_of = runs_of
         _replaced["pyte.screen._draw_on_row"] = screen._draw_on_row
         screen._draw_on_row = draw_on_row
+        _replaced["pyte.page.Row"] = page.Row
+        page.Row = Row
     return True
 
 

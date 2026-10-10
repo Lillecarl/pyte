@@ -22,6 +22,7 @@
   maturin,
   clippy,
   rustfmt,
+  ncurses,
 }:
 let
   fs = lib.fileset;
@@ -77,6 +78,29 @@ let
     pyte = [ "test" ];
     pyte-rs = [ ];
   };
+
+  # pyte's whole unit suite, with the Rust row and kernels installed by
+  # `tests/conftest.py`. Every behaviour pyte has tests for, through
+  # the storage that replaces the dict. Lillecarl/pymux#570.
+  #
+  #     nix build --file . checks.pyte-rs-unit
+  checks.unit = suite {
+    name = "pyte-rs-unit";
+    inputs = [
+      testEnv
+      ncurses
+    ];
+    setup = ''
+      cp -r ${../tests} tests
+      cp -r ${../tools} tools
+      chmod -R +w .
+      export HOME="$TMPDIR"
+      export LANG=C.UTF-8
+      export PYTHONDONTWRITEBYTECODE=1
+      export PYTE_GROUP=unit
+      export PYTE_RS=1
+    '';
+  } "python -m pytest tests -q -p no:cacheprovider";
 
   # The kernels against the Python they replace.
   #
