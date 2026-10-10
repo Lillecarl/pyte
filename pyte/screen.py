@@ -187,6 +187,32 @@ class RegionCounts(NamedTuple):
     after: tuple[int, ...]
 
 
+def _draw_on_row(row: Row, x: int, chars: str, index: int, edge: int, cells: dict[str, Cell]) -> tuple[int, int, bool]:
+    """
+    Draw `chars` from `index` into `row` from column `x`, for as long as
+    each one is a cell `cells` already holds, one column wide, and left
+    of `edge`.
+
+    Returns the column after the last one drawn, the index of the first
+    character not drawn, and whether any cell changed. A cell that holds
+    the same object already is left alone. `Screen.draw` calls this for
+    the common run, and `pyte_rs` replaces it with Rust: it is the
+    reference that kernel is held to. Lillecarl/pymux#566.
+    """
+    changed = False
+    count = len(chars)
+    while index < count and x < edge:
+        cell = cells.get(chars[index])
+        if cell is None or cell.width != 1:
+            break
+        if row.get(x) is not cell:
+            row[x] = cell
+            changed = True
+        x += 1
+        index += 1
+    return x, index, changed
+
+
 class Screen:
     """
     Custom screen class. Most of the methods are called from a vt100 Pyte
@@ -2222,7 +2248,33 @@ class Screen:
         # is what narrows, and this costs it nothing.
         changed_exotic = False
 
-        for char in chars:
+        index = 0
+        count = len(chars)
+        while index < count:
+            # The common run first: characters one column wide that fit
+            # on the row the cursor is on, with nothing wide anywhere on
+            # the screen. `_draw_on_row` takes as many as it can, and
+            # the loop below draws the one it stopped at.
+            if not waiting_to_wrap and not wide_chars and not in_irm:
+                edge = right_margin + 1 if cursor_position_x <= right_margin else columns
+                started = index
+                cursor_position_x, index, wrote = _draw_on_row(
+                    data_buffer[cursor_position_y], cursor_position_x, chars, index, edge, cells_of_kind
+                )
+                if index != started:
+                    if wrote:
+                        if changed_first < 0:
+                            changed_first = changed_last = cursor_position_y
+                        elif cursor_position_y < changed_first:
+                            changed_first = cursor_position_y
+                        elif cursor_position_y > changed_last:
+                            changed_last = cursor_position_y
+                    waiting_to_wrap = cursor_position_x >= edge
+                    if index == count:
+                        break
+            char = chars[index]
+            index += 1
+
             # Create 'Cell' instance.
             try:
                 pt_char = cells_of_kind[char]
