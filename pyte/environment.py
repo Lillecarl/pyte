@@ -31,7 +31,7 @@ a cell imports it, and `tests/test_the_layers.py` says so.
 from __future__ import annotations
 
 import os
-from collections.abc import MutableMapping
+from collections.abc import Callable, MutableMapping
 
 from .terminfo import PARENT, TERMINAL_NAME
 
@@ -41,6 +41,7 @@ __all__ = [
     "TERMINAL_IDENTITY_VARIABLES",
     "database",
     "prepare",
+    "preparing",
     "scrub_terminal_identity",
     "terminal_name",
 ]
@@ -181,3 +182,20 @@ def prepare(environment: MutableMapping[str, str], directory: str = DEFAULT_DATA
     # The value that the application was started with says nothing
     # about this screen, so it is not inherited either.
     environment["COLORTERM"] = "truecolor"
+
+
+def preparing(theirs: Callable[[dict[str, str]], None] | None = None) -> Callable[[dict[str, str]], None]:
+    """
+    The edit that turns a copy of the embedder's environment into the
+    environment of a program on this screen: `prepare`, then `theirs`.
+
+    Theirs runs last, so an embedder can still say something different:
+    pymux has an option for the name. Lillecarl/pymux#125.
+    """
+
+    def edit(environment: dict[str, str]) -> None:
+        prepare(environment)
+        if theirs is not None:
+            theirs(environment)
+
+    return edit

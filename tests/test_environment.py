@@ -10,6 +10,8 @@ compiled entry is found.
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from pyte.environment import (
@@ -18,6 +20,7 @@ from pyte.environment import (
     TERMINAL_IDENTITY_VARIABLES,
     database,
     prepare,
+    preparing,
     scrub_terminal_identity,
     terminal_name,
 )
@@ -193,3 +196,27 @@ def test_the_names_are_upper_case():
     "An environment variable of a terminal is upper case, every time."
     for name in TERMINAL_IDENTITY_VARIABLES:
         assert name == name.upper()
+
+
+def test_the_hook_of_the_embedder_runs_last():
+    "An embedder can still say something different: pymux has an option for the name."
+    environment = {"TERM": "nothing"}
+
+    def theirs(environment: dict[str, str]) -> None:
+        environment["TERM"] = "theirs"
+
+    preparing(theirs)(environment)
+    assert environment["TERM"] == "theirs"
+
+
+def test_preparing_works_without_a_hook_of_their_own():
+    environment = {"TERM": "nothing"}
+    preparing()(environment)
+    assert environment["TERM"] == terminal_name()
+
+
+def test_preparing_leaves_this_process_alone():
+    "It edits the program's copy. Lillecarl/pymux#553."
+    before = dict(os.environ)
+    preparing()({"TERM": "nothing"})
+    assert dict(os.environ) == before
