@@ -32,6 +32,7 @@ from collections import defaultdict
 from enum import Enum
 from typing import Any, NamedTuple
 
+from . import page as page_module
 from .cells import (
     _CHAR_CACHE,
     _PROTECTED_CHAR_CACHE,
@@ -211,7 +212,7 @@ class _Walk:
             return {"tuple": [self.value(item) for item in value]}
         if kind is bytes:
             return {"bytes": base64.b64encode(value).decode("ascii")}
-        if kind is defaultdict and value.default_factory is Row:
+        if kind is defaultdict and value.default_factory is page_module.Row:
             return {"buffer": self.buffer(value)}
 
         number, seen = self._id(value)
@@ -329,7 +330,7 @@ class _Thawer:
             made = self.made_buffers.get(value["buffer"])
             if made is not None:
                 return made
-            buffer: defaultdict[int, Row] = defaultdict(Row)
+            buffer: defaultdict[int, Row] = defaultdict(page_module.Row)
             self.made_buffers[value["buffer"]] = buffer
             for number, wrapped, cells in self.frozen.buffers.get(value["buffer"], ()):
                 buffer[number] = self.row(wrapped, cells)
@@ -361,7 +362,7 @@ class _Thawer:
         raise ValueError("a frozen value of no known shape: %r" % (value,))
 
     def row(self, wrapped: bool, cells: list) -> Row:
-        row = Row()
+        row = page_module.Row()
         row.wrapped = wrapped
         appearances = self.appearances
         for column, char, index, kind in cells:

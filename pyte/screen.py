@@ -25,6 +25,10 @@ from typing import ClassVar, NamedTuple
 
 from . import charsets as cs
 from . import keys
+
+# `Row` is read off the module where a row is made, so that a row
+# `pyte_rs.install()` puts in its place is the one every page gets.
+from . import page as page_module
 from .cells import (
     _CHAR_CACHE,
     _PROTECTED_CHAR_CACHE,
@@ -3276,7 +3280,7 @@ class Screen:
 
         # A fresh row, so the continuation mark of whatever stood here
         # goes with the cells.
-        line = Row()
+        line = page_module.Row()
         erased = ErasedCell(" ", appearance)
         for column in range(self.columns):
             line[column] = erased
@@ -4056,7 +4060,7 @@ class Screen:
                     self._erase_row_in_place(data_buffer[line], erased, private is True)
                     continue
 
-                data_buffer[line] = Row()
+                data_buffer[line] = page_module.Row()
                 if erased is not None:
                     # A background is set, so the erased cells take it.
                     row = data_buffer[line]
