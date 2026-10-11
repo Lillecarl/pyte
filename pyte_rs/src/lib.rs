@@ -4,6 +4,7 @@
 
 mod png;
 mod row;
+mod sixel;
 mod stream;
 
 use pyo3::intern;
@@ -349,5 +350,6 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(draw_on_row, module)?)?;
     module.add_function(wrap_pyfunction!(stream::take_ground, module)?)?;
     png::register(module)?;
+    sixel::register(module)?;
     Ok(())
 }

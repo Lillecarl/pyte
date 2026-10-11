@@ -29,6 +29,9 @@ from . import keys
 # `Row` is read off the module where a row is made, so that a row
 # `pyte_rs.install()` puts in its place is the one every page gets.
 from . import page as page_module
+
+# The same for the sixel decoder, which `pyte_rs.install()` replaces.
+from . import sixel as sixel_module
 from .cells import (
     _CHAR_CACHE,
     _ERASED_CACHE,
@@ -95,7 +98,6 @@ from .parameters import (
     WindowOp,
 )
 from .placeholders import PlaceholderRun, merge_runs, runs_in_line
-from .sixel import decode_sixel
 from .terminfo import (
     CAPABILITIES,
     DEVICE_EXTENSIONS,
@@ -5669,7 +5671,7 @@ class Screen:
             self.report_capabilities(data[2:])
             return
 
-        image = decode_sixel(data)
+        image = sixel_module.decode_sixel(data)
         if image is None:
             return
         width, height, pixels = image
