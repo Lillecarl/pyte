@@ -174,6 +174,27 @@ def decode_png(data: bytes) -> tuple[int, int, bytes] | None:
     except zlib.error, ValueError:
         return None
 
+    return (width, height, _rgba_of(samples, width, height, stride, depth, colour_type, palette, transparency))
+
+
+def _rgba_of(
+    samples: bytes | bytearray,
+    width: int,
+    height: int,
+    stride: int,
+    depth: int,
+    colour_type: int,
+    palette: list[tuple[int, int, int]],
+    transparency: bytes,
+) -> bytes:
+    """
+    The RGBA bytes of unfiltered scanlines.
+
+    `decode_png` calls this, and `_unfilter` before it, through the
+    module, so an accelerated build may put compiled ones in their
+    place; these are the answers they are held to.
+    """
+    channels = _CHANNELS[colour_type]
     scale = 255 // ((1 << depth) - 1) if depth < 8 else 1
 
     out = bytearray(width * height * 4)
@@ -230,4 +251,4 @@ def decode_png(data: bytes) -> tuple[int, int, bytes] | None:
                     )
                 )
 
-    return (width, height, bytes(out))
+    return bytes(out)
