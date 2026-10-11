@@ -38,6 +38,14 @@ def test_the_version_query_takes_a_parameter():
     assert answers == ["\x1bP>|%s\x1b\\" % TERMINAL_VERSION]
 
 
+def test_the_owner_of_a_screen_names_it_at_each_query():
+    screen, stream, answers = make_screen()
+    names = iter(["first(1)", "second(2)"])
+    screen.version = lambda: next(names)
+    stream.feed("\x1b[>q\x1b[>q")
+    assert answers == ["\x1bP>|first(1)\x1b\\", "\x1bP>|second(2)\x1b\\"]
+
+
 @pytest.mark.parametrize("sequence", ["\x1b[q", "\x1b[2q", "\x1b[?q", "\x1b[ q"])
 def test_another_q_sequence_is_not_the_version_query(sequence):
     "DECLL and DECSCUSR share the final byte, and answer nothing."

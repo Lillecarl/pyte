@@ -344,6 +344,7 @@ class Screen:
         "osc_func": Keep.REBUILT,
         "resize_func": Keep.REBUILT,
         "may_resize": Keep.REBUILT,
+        "version": Keep.REBUILT,
         # Caches of what the cells say.
         "_cell_caches": Keep.REBUILT,
         "_wide_chars": Keep.REBUILT,
@@ -432,6 +433,10 @@ class Screen:
         self.osc_func = osc_func
         self.resize_func = resize_func
         self.may_resize = may_resize
+        #: What XTVERSION answers, asked at each query: whoever owns the
+        #: screen may name itself, and may name itself differently to
+        #: different programs.
+        self.version: Callable[[], str] = lambda: TERMINAL_VERSION
 
         # The colours a pane starts with, before a program sets any. The
         # embedder replaces it when it learns the theme of the terminal
@@ -4870,13 +4875,13 @@ class Screen:
         XTVERSION ("CSI > q"): the name and the version of the terminal.
 
         Programs read it to decide which extensions they may use. The
-        answer names ptterm, because ptterm draws the pane. A plain
-        "CSI Ps q" is DECLL, which loads the keyboard lights of a real
-        VT220; it is ignored.
+        answer is `version()`, which names ptterm unless the owner of
+        the screen says otherwise. A plain "CSI Ps q" is DECLL, which
+        loads the keyboard lights of a real VT220; it is ignored.
         """
         if private != ">":
             return
-        self.reply_dcs(">|%s" % TERMINAL_VERSION)
+        self.reply_dcs(">|%s" % self.version())
 
     #: The private modes that this screen acts on. DECRQM answers for
     #: these; every other mode is reported as not recognised, so that a
