@@ -4,7 +4,6 @@
 //! apart but by speed. Lillecarl/pymux#570.
 
 use std::collections::BTreeMap;
-use std::hash::{DefaultHasher, Hash, Hasher};
 
 use pyo3::exceptions::{PyKeyError, PyTypeError};
 use pyo3::prelude::*;
@@ -238,15 +237,16 @@ impl Row {
             .columns()
             .map(|(column, cell)| (column, cell.clone_ref(py)))
             .collect();
-        let mut hasher = DefaultHasher::new();
+        // FxHash's step, not SipHash: the hash only spreads images over
+        // buckets, equality still compares every cell, and SipHash over
+        // two words a cell was a third of the image's cost.
+        const SEED: u64 = 0x51_7c_c1_b7_27_22_0a_95;
+        let mut hash: u64 = 0;
         for (column, cell) in &cells {
-            column.hash(&mut hasher);
-            (cell.as_ptr() as usize).hash(&mut hasher);
+            hash = (hash.rotate_left(5) ^ (*column as u64)).wrapping_mul(SEED);
+            hash = (hash.rotate_left(5) ^ (cell.as_ptr() as u64)).wrapping_mul(SEED);
         }
-        RowImage {
-            cells,
-            hash: hasher.finish(),
-        }
+        RowImage { cells, hash }
     }
 
     fn clear(&mut self) {
