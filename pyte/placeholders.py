@@ -23,14 +23,17 @@ numbers.
 
 from __future__ import annotations
 
+import re
 from typing import NamedTuple
 
 __all__ = [
     "PLACEHOLDER",
     "PlaceholderRun",
+    "blanked",
     "foreground_id",
     "merge_runs",
     "runs_in_line",
+    "spelled",
 ]
 
 #: The character that stands for a cell of an image.
@@ -365,6 +368,30 @@ class PlaceholderRun(NamedTuple):
     image_row: int
     image_column: int
     rows: int = 1
+
+
+#: A placeholder cell: the character and whatever marks follow it.
+_CELL_RE = re.compile("%s[%s]*" % (PLACEHOLDER, "".join(chr(code) for code in DIACRITICS)))
+
+
+def spelled(image_row: int, image_column: int) -> str:
+    """
+    A placeholder cell that names its row and column, or "" when one
+    of them is past the last number the table holds.
+
+    It carries no third mark, so the id is the 24 bits of the colour.
+    Both marks are always there: a cell that leaves one out takes it
+    from the cell to its left, and a pane that is cut or scrolled
+    sideways does not show that cell.
+    """
+    if image_row >= len(DIACRITICS) or image_column >= len(DIACRITICS):
+        return ""
+    return PLACEHOLDER + chr(DIACRITICS[image_row]) + chr(DIACRITICS[image_column])
+
+
+def blanked(text: str) -> str:
+    "`text` with every placeholder cell drawn as the one space it takes."
+    return _CELL_RE.sub(" ", text)
 
 
 def foreground_id(color) -> int:
