@@ -42,6 +42,7 @@ from .cells import (
     Cell,
     ErasedCell,
     Protection,
+    Rendition,
     WrittenCell,
     appearance_of,
     protection_of,
@@ -216,6 +217,11 @@ def _draw_on_row(row: Row, x: int, chars: str, index: int, edge: int, cells: dic
         x += 1
         index += 1
     return x, index, changed
+
+
+#: `Screen._after_sgr`'s answers, by the rendition before and the
+#: parameters. Shared by every screen: the answer depends on nothing else.
+_SGR_RESULTS: dict[tuple[Rendition, tuple[int, ...]], Rendition] = {}
 
 
 class Screen:
@@ -4500,6 +4506,24 @@ class Screen:
         if private:
             return
 
+        key = (self._rendition, attrs_tuple)
+        try:
+            rendition = _SGR_RESULTS[key]
+        except KeyError:
+            if len(_SGR_RESULTS) > 4096:
+                _SGR_RESULTS.clear()
+            rendition = _SGR_RESULTS[key] = self._after_sgr(self._rendition, attrs_tuple)
+        self._rendition = rendition
+        self._rebuild_appearance()
+
+    @staticmethod
+    def _after_sgr(rendition: Rendition, attrs_tuple: tuple[int, ...]) -> Rendition:
+        """
+        The rendition an SGR with these parameters leaves, from this one.
+
+        It reads nothing else, so `select_graphic_rendition` keeps the
+        answers: a program repaints with the same few sequences.
+        """
         replace: dict[str, object] = {}
 
         attrs = [0] if not attrs_tuple else list(attrs_tuple[::-1])
@@ -4577,7 +4601,7 @@ class Screen:
                 replace["reverse"] = False
             elif not attr:
                 replace = {}
-                self._rendition = PLAIN
+                rendition = PLAIN
 
             elif attr == 59:
                 replace["underline_color"] = None
@@ -4596,8 +4620,7 @@ class Screen:
                     parameters.append(attrs.pop())
                 replace["underline_color"] = sgr_color(parameters)
 
-        self._rendition = self._rendition._replace(**replace)  # type:ignore
-        self._rebuild_appearance()
+        return rendition._replace(**replace)  # type:ignore
 
     def write_mark(self) -> int:
         "This moment, for `changes_since`. (`pyte.freeze.Freezer` asks.)"
