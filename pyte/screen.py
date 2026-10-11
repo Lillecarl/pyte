@@ -30,7 +30,7 @@ from . import keys
 # `pyte_rs.install()` puts in its place is the one every page gets.
 from . import page as page_module
 
-# The same for the sixel decoder, which `pyte_rs.install()` replaces.
+# The same for the sixel size, which `pyte_rs.install()` replaces.
 from . import sixel as sixel_module
 from .cells import (
     _CHAR_CACHE,
@@ -5655,9 +5655,10 @@ class Screen:
         """
         DCS string sequence (``ESC P ... ST``).
 
-        A sixel image arrives here. It is decoded and stored in the
-        graphics state, next to the images of the kitty graphics
-        protocol, so that one renderer draws both.
+        A sixel image arrives here. Its size is read and its payload
+        stored in the graphics state, next to the images of the kitty
+        graphics protocol, so that one renderer draws both. The
+        renderer decodes it.
 
         A DECRQSS request ("DCS $ q <name> ST") also arrives here, and
         is answered. Every other DCS sequence is consumed without
@@ -5671,11 +5672,11 @@ class Screen:
             self.report_capabilities(data[2:])
             return
 
-        image = sixel_module.decode_sixel(data)
-        if image is None:
+        size = sixel_module.sixel_size(data)
+        if size is None:
             return
-        width, height, pixels = image
-        self.graphics.add_sixel(width, height, pixels, self)
+        width, height = size
+        self.graphics.add_sixel(width, height, data, self)
 
     def charset_default(self, *a, **kw):
         "Not implemented."

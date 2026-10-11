@@ -66,11 +66,40 @@ def test_the_same_image_is_decoded(start, pieces):
     assert found == expected
 
 
+PURE_SIZE = sixel.sixel_size
+
+
+def _answer(function, payload):
+    try:
+        return ("ok", function(payload))
+    except Exception as error:
+        return (type(error).__name__, str(error))
+
+
+@given(head, st.lists(piece, max_size=40))
+@settings(max_examples=3000, deadline=None, suppress_health_check=[HealthCheck.too_slow])
+def test_the_size_is_the_decoded_size(start, pieces):
+    "Both sizes are the decoder's: the Python's walk and the kernel's."
+    payload = start + "".join(pieces)
+    decoded = _answer(PURE, payload)
+    if decoded[0] == "ok" and decoded[1] is not None:
+        decoded = ("ok", decoded[1][:2])
+    assert _answer(PURE_SIZE, payload) == decoded
+    assert _answer(pyte_rs.sixel_size, payload) == decoded
+
+
+def test_a_run_of_data_past_the_widest_row_is_sized_the_same():
+    "The kernel sizes a run of data characters in one step; the edge is where it could slip."
+    payload = "0;1q!16380~" + "~" * 10 + "-" + "~" * 20
+    assert _answer(pyte_rs._native.sixel_size, payload) == _answer(PURE_SIZE, payload)
+
+
 def test_an_ordinary_image_is_answered_in_rust():
     "Not handed back to the Python: the payloads programs send are ASCII."
     payload = '0;1;0q"1;1;4;6#1;2;100;0;0#1~~~~-'
     assert sixel_answer(payload) is not False
     assert pyte_rs.decode_sixel(payload) == PURE(payload)
+    assert pyte_rs._native.sixel_size(payload) == (4, 6)
 
 
 def sixel_answer(payload):

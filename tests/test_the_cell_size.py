@@ -82,14 +82,14 @@ def test_an_image_covers_the_cells_of_the_size_it_was_told():
     """
     screen, _stream, _replies, _asks = _screen()
     screen.set_cell_size(*REAL_CELL)
-    screen.graphics.add_sixel(120, 114, b"\x00" * (120 * 114 * 4), screen)
+    screen.graphics.add_sixel(120, 114, "", screen)
     (placement,) = screen.graphics.placements
     assert (placement.columns, placement.rows) == (12, 6)
 
 
 def test_the_assumed_cell_reserves_a_row_more_for_the_same_image():
     screen, _stream, _replies, _asks = _screen()
-    screen.graphics.add_sixel(120, 114, b"\x00" * (120 * 114 * 4), screen)
+    screen.graphics.add_sixel(120, 114, "", screen)
     (placement,) = screen.graphics.placements
     assert (placement.columns, placement.rows) == (12, 6)
     # Six rows of twenty is 120 pixels for a 114 pixel image: the same
@@ -105,7 +105,7 @@ def test_a_new_cell_size_counts_the_cells_again():
     one, so the two disagree and the recount has to show.
     """
     screen, _stream, _replies, _asks = _screen()
-    screen.graphics.add_sixel(120, 120, b"\x00" * (120 * 120 * 4), screen)
+    screen.graphics.add_sixel(120, 120, "", screen)
     (placement,) = screen.graphics.placements
     assert placement.rows == 6  # ceil(120 / 20)
 
@@ -122,7 +122,7 @@ def test_the_picture_survives_the_first_report():
     picture.
     """
     screen, _stream, _replies, _asks = _screen()
-    image_id = screen.graphics.add_sixel(120, 114, b"\x00" * (120 * 114 * 4), screen)
+    image_id = screen.graphics.add_sixel(120, 114, "", screen)
 
     screen.set_cell_size(*REAL_CELL)
     assert image_id in screen.graphics.images_by_id
@@ -143,7 +143,7 @@ def test_a_box_the_program_asked_for_is_left_alone():
 def test_the_same_cell_size_again_changes_nothing():
     screen, _stream, _replies, _asks = _screen()
     screen.set_cell_size(*REAL_CELL)
-    screen.graphics.add_sixel(120, 114, b"\x00" * (120 * 114 * 4), screen)
+    screen.graphics.add_sixel(120, 114, "", screen)
     screen.set_cell_size(*REAL_CELL)
     assert len(screen.graphics.placements) == 1
 
@@ -156,7 +156,7 @@ def test_a_sixel_names_no_box():
     the image at its own size.
     """
     screen, _stream, _replies, _asks = _screen()
-    screen.graphics.add_sixel(120, 114, b"\x00" * (120 * 114 * 4), screen)
+    screen.graphics.add_sixel(120, 114, "", screen)
     (placement,) = screen.graphics.placements
     assert placement.asked_for_the_box is False
 

@@ -1,4 +1,5 @@
-//! `pyte.sixel.decode_sixel`, for the payloads it can answer exactly: ASCII,
+//! `pyte.sixel.decode_sixel` and `sixel_size`, for the payloads they can
+//! answer exactly: ASCII,
 //! with no number past 18 digits. Anything else answers `False` and the
 //! Python decodes it, because Python reads Unicode digits, keeps numbers of
 //! any size, and raises on one too big for a float. It runs with the GIL
@@ -138,14 +139,24 @@ impl Reader<'_> {
 }
 
 /// `pyte.sixel._Canvas`: register plus one per pixel, zero for unwritten.
-#[derive(Default)]
+/// One that does not `paint` keeps the size only.
 struct Canvas {
     rows: Vec<Vec<u16>>,
     width: i64,
     height: i64,
+    paint: bool,
 }
 
 impl Canvas {
+    fn new(paint: bool) -> Self {
+        Self {
+            rows: Vec::new(),
+            width: 0,
+            height: 0,
+            paint,
+        }
+    }
+
     fn write(&mut self, band: i64, x: i64, count: i64, bits: u8, register: usize) -> i64 {
         let count = count.min(MAX_WIDTH - x);
         if count <= 0 || band >= MAX_HEIGHT {
@@ -153,6 +164,9 @@ impl Canvas {
         }
         self.width = self.width.max(x + count);
         self.height = self.height.max((band + 6).min(MAX_HEIGHT));
+        if !self.paint {
+            return count;
+        }
         let value = register as u16 + 1;
         let (start, end) = (x as usize, (x + count) as usize);
         for offset in 0..6 {
@@ -205,9 +219,22 @@ impl Canvas {
     }
 }
 
-type Image = Option<(i64, i64, Vec<u8>)>;
+/// What `walk` read: the size, the palette, and whether the pixels the
+/// body never wrote stay clear.
+type Walked = Option<(i64, i64, Vec<(u8, u8, u8)>, bool)>;
 
-fn decode(payload: &[u8]) -> Result<Image, Unanswerable> {
+fn decode(payload: &[u8]) -> Result<Option<(i64, i64, Vec<u8>)>, Unanswerable> {
+    let mut canvas = Canvas::new(true);
+    let Some((width, height, palette, transparent)) = walk(payload, &mut canvas)? else {
+        return Ok(None);
+    };
+    let background = (!transparent).then(|| palette[0]);
+    let pixels = canvas.to_rgba(&palette[..], width as usize, height as usize, background);
+    Ok(Some((width, height, pixels)))
+}
+
+/// `pyte.sixel._walk`.
+fn walk(payload: &[u8], canvas: &mut Canvas) -> Result<Walked, Unanswerable> {
     // The head: "^([\d;]*)q".
     let head_end = payload
         .iter()
@@ -236,7 +263,6 @@ fn decode(payload: &[u8]) -> Result<Image, Unanswerable> {
         .collect();
     palette.resize(MAX_REGISTERS, (0, 0, 0));
 
-    let mut canvas = Canvas::default();
     let mut register = 0usize;
     let mut x: i64 = 0;
     let mut band: i64 = 0;
@@ -251,8 +277,18 @@ fn decode(payload: &[u8]) -> Result<Image, Unanswerable> {
     while let Some(char) = reader.peek() {
         match char {
             _ if data(char) => {
-                x += canvas.write(band, x, 1, char - 0x3f, register);
-                reader.index += 1;
+                // Without pixels a run of data characters is one write
+                // of its length: the bits are all that differ.
+                let run = if canvas.paint {
+                    1
+                } else {
+                    reader.body[reader.index..]
+                        .iter()
+                        .take_while(|&&byte| data(byte))
+                        .count()
+                };
+                x += canvas.write(band, x, run as i64, char - 0x3f, register);
+                reader.index += run;
             }
             b'!' => {
                 reader.index += 1;
@@ -318,9 +354,11 @@ fn decode(payload: &[u8]) -> Result<Image, Unanswerable> {
     if width <= 0 || height <= 0 || width * height > MAX_PIXELS {
         return Ok(None);
     }
-    let background = (!transparent).then(|| palette[0]);
-    let pixels = canvas.to_rgba(&palette[..], width as usize, height as usize, background);
-    Ok(Some((width, height, pixels)))
+    Ok(Some((width, height, palette, transparent)))
+}
+
+fn unanswerable(py: Python<'_>) -> PyResult<Py<PyAny>> {
+    Ok(false.into_pyobject(py)?.to_owned().into_any().unbind())
 }
 
 /// `pyte.sixel.decode_sixel`, or `False` for a payload only the Python
@@ -328,10 +366,10 @@ fn decode(payload: &[u8]) -> Result<Image, Unanswerable> {
 #[pyfunction]
 fn decode_sixel(py: Python<'_>, payload: PyBackedStr) -> PyResult<Py<PyAny>> {
     if !payload.is_ascii() {
-        return Ok(false.into_pyobject(py)?.to_owned().into_any().unbind());
+        return unanswerable(py);
     }
     match py.detach(|| decode(payload.as_bytes())) {
-        Err(Unanswerable) => Ok(false.into_pyobject(py)?.to_owned().into_any().unbind()),
+        Err(Unanswerable) => unanswerable(py),
         Ok(None) => Ok(py.None()),
         Ok(Some((width, height, pixels))) => Ok((width, height, PyBytes::new(py, &pixels))
             .into_pyobject(py)?
@@ -340,7 +378,24 @@ fn decode_sixel(py: Python<'_>, payload: PyBackedStr) -> PyResult<Py<PyAny>> {
     }
 }
 
+/// `pyte.sixel.sixel_size`, or `False` where `decode_sixel` answers it.
+#[pyfunction]
+fn sixel_size(py: Python<'_>, payload: PyBackedStr) -> PyResult<Py<PyAny>> {
+    if !payload.is_ascii() {
+        return unanswerable(py);
+    }
+    let walked = py.detach(|| walk(payload.as_bytes(), &mut Canvas::new(false)));
+    match walked {
+        Err(Unanswerable) => unanswerable(py),
+        Ok(None) => Ok(py.None()),
+        Ok(Some((width, height, _, _))) => {
+            Ok((width, height).into_pyobject(py)?.into_any().unbind())
+        }
+    }
+}
+
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(decode_sixel, module)?)?;
+    module.add_function(wrap_pyfunction!(sixel_size, module)?)?;
     Ok(())
 }

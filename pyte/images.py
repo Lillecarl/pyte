@@ -21,6 +21,7 @@ import zlib
 from enum import IntEnum
 from typing import ClassVar
 
+from . import sixel as sixel_module
 from .keep import Keep
 
 __all__ = [
@@ -55,6 +56,12 @@ class PixelFormat(IntEnum):
 
     #: A whole PNG file, which carries its own size and depth.
     PNG = 100
+
+    #: Not kitty's: the payload of a sixel DCS sequence, stored by
+    #: `sixel.store_payload` and decoded by whoever draws it. No "f" key
+    #: can name it, because `_transmit` takes only the three above.
+    #: Lillecarl/pymux#575.
+    SIXEL = -6
 
 
 # The cell size a screen carries until somebody tells it one. A
@@ -609,19 +616,23 @@ class GraphicsState:
     # ------------------------------------------------------------------
     # Sixel.
 
-    def add_sixel(self, width: int, height: int, data: bytes, screen) -> int | None:
+    def add_sixel(self, width: int, height: int, payload: str, screen) -> int | None:
         """
-        Store a decoded sixel image and place it at the cursor.
+        Store a sixel image and place it at the cursor. `width` and
+        `height` are what `sixel.sixel_size` read from `payload`, which
+        is stored undecoded: the cells are reserved now, and the pixels
+        are the drawer's work.
 
         Sixel has no image ids: every image is new, and the terminal
         names it. The cursor ends at the left of the row below the
         image, the way xterm leaves it.
         """
+        data = sixel_module.store_payload(payload)
         if self._total_image_data() + len(data) > MAX_TOTAL_IMAGE_DATA:
             return None
 
         image_id = self._new_image_id()
-        self.images_by_id[image_id] = GraphicsImage(32, width, height, data)
+        self.images_by_id[image_id] = GraphicsImage(PixelFormat.SIXEL, width, height, data)
 
         columns = max(1, -(-width // screen.cell_width))
         rows = max(1, -(-height // screen.cell_height))

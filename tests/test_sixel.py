@@ -6,9 +6,11 @@ stores.
 from __future__ import annotations
 
 from pyte import escape
+from pyte import sixel as sixel_module
+from pyte.images import PixelFormat
 from pyte.screen import Screen
 from pyte.sequences import apc, csi, decrqss
-from pyte.sixel import DEFAULT_PALETTE, decode_sixel
+from pyte.sixel import DEFAULT_PALETTE, decode_sixel, stored_payload
 from pyte.streams import Stream
 
 RED = (255, 0, 0)
@@ -204,8 +206,28 @@ def test_a_sixel_image_becomes_a_placement():
     assert (placement.columns, placement.rows) == (3, 1)
 
     image = screen.graphics.images_by_id[placement.image_id]
-    assert (image.format, image.width, image.height) == (32, 30, 12)
-    assert len(image.data) == 30 * 12 * 4
+    assert (image.format, image.width, image.height) == (PixelFormat.SIXEL, 30, 12)
+    width, height, pixels = decode_sixel(stored_payload(image.data))
+    assert (width, height, len(pixels)) == (30, 12, 30 * 12 * 4)
+
+
+def test_the_screen_reserves_the_cells_without_decoding(monkeypatch):
+    "The size is read; the pixels wait for whoever draws them. Lillecarl/pymux#575."
+
+    def refuse(payload):
+        raise AssertionError("the screen decoded a sixel image")
+
+    monkeypatch.setattr(sixel_module, "decode_sixel", refuse)
+    screen, stream, _ = make_screen()
+    stream.feed(sixel('"1;1;30;12' + DEFINE_RED + RED_ + "!30~-!30~"))
+    (placement,) = screen.graphics.placements
+    assert (placement.columns, placement.rows) == (3, 1)
+
+
+def test_a_stored_payload_comes_back_whole():
+    "A program may send a lone surrogate, and Unicode digits are digits to the decoder."
+    payload = "0;1q\ud800#٣~"
+    assert stored_payload(sixel_module.store_payload(payload)) == payload
 
 
 def test_the_cursor_lands_below_the_image():

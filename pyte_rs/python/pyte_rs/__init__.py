@@ -25,6 +25,7 @@ __all__ = [
     "installed",
     "rgba_of",
     "runs_of",
+    "sixel_size",
     "take_ground",
     "unfilter",
 ]
@@ -81,6 +82,17 @@ def decode_sixel(payload: str):
     return answer
 
 
+_pure_sixel_size = sixel.sixel_size
+
+
+def sixel_size(payload: str):
+    "`pyte.sixel.sixel_size`, in Rust, handing back what `decode_sixel` does."
+    answer = _native.sixel_size(payload)
+    if answer is False:
+        return _pure_sixel_size(payload)
+    return answer
+
+
 def install() -> bool:
     "Put every kernel in place, unless `PYTERM_PURE` says not to."
     if os.environ.get(PURE, "") not in ("", "0"):
@@ -100,6 +112,8 @@ def install() -> bool:
         png._rgba_of = rgba_of
         _replaced["pyte.sixel.decode_sixel"] = sixel.decode_sixel
         sixel.decode_sixel = decode_sixel
+        _replaced["pyte.sixel.sixel_size"] = sixel.sixel_size
+        sixel.sixel_size = sixel_size
     return True
 
 

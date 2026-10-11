@@ -5,9 +5,10 @@ A program inside a pane draws a sixel image with a DCS string
 sequence: ``ESC P P1;P2;P3 q <body> ST``. The body carries the pixels
 in bands of six rows, one character per column per band.
 
-The decoder turns such a body into RGBA pixels. `Screen.dcs`
-stores the result in the graphics state of the pane, next to the images
-of the kitty graphics protocol, so that one renderer can draw both.
+The decoder turns such a body into RGBA pixels. `Screen.dcs` reads
+only its size, and stores the payload in the graphics state of the
+pane, next to the images of the kitty graphics protocol, so that one
+renderer can draw both. The renderer decodes it, off the parser.
 
 Not implemented: the pixel aspect ratio of the raster attributes (the
 `Pan`/`Pad` pair), and the "print" and "cursor" DCS sequences that
@@ -24,6 +25,9 @@ from array import array
 __all__ = [
     "DEFAULT_PALETTE",
     "decode_sixel",
+    "sixel_size",
+    "store_payload",
+    "stored_payload",
 ]
 
 # The head of a sixel sequence: "P1;P2;P3 q".
@@ -108,12 +112,16 @@ class _Canvas:
     A band is always six pixels tall, also when the body only lights
     some of its rows. The height therefore follows the bands, not the
     lit pixels.
+
+    A canvas that does not `paint` keeps the size and no pixels, so
+    `sixel_size` walks the body exactly as `decode_sixel` does.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, paint: bool = True) -> None:
         self._rows: list[array] = []
         self.width = 0
         self.height = 0
+        self.paint = paint
 
     def _row(self, y: int) -> array:
         while len(self._rows) <= y:
@@ -133,6 +141,8 @@ class _Canvas:
         # The band exists even where no pixel is lit.
         self.width = max(self.width, x + count)
         self.height = max(self.height, min(band + 6, MAX_HEIGHT))
+        if not self.paint:
+            return count
 
         value = array("H", [register + 1]) * count
         for offset in range(6):
@@ -182,6 +192,41 @@ def decode_sixel(payload: str) -> tuple[int, int, bytes] | None:
     (width, height, RGBA bytes), or None when the payload is not a
     sixel image or holds no pixels.
     """
+    canvas = _Canvas()
+    walked = _walk(payload, canvas)
+    if walked is None:
+        return None
+    width, height, palette, transparent = walked
+    background = None if transparent else palette[0]
+    return (width, height, canvas.to_rgba(palette, width, height, background))
+
+
+def sixel_size(payload: str) -> tuple[int, int] | None:
+    """
+    The width and height `decode_sixel` gives `payload`, or None where it
+    gives None, without building a pixel. A screen reserves the cells of
+    an image with it, and leaves the decoding to whoever draws the
+    image. Lillecarl/pymux#575.
+    """
+    walked = _walk(payload, _Canvas(paint=False))
+    if walked is None:
+        return None
+    return (walked[0], walked[1])
+
+
+def store_payload(payload: str) -> bytes:
+    "A payload as the bytes a `GraphicsImage` holds. `stored_payload` reverses it."
+    # A program can send any code point, a lone surrogate too.
+    return payload.encode("utf-8", "surrogatepass")
+
+
+def stored_payload(data: bytes) -> str:
+    "The payload `store_payload` stored."
+    return data.decode("utf-8", "surrogatepass")
+
+
+def _walk(payload: str, canvas: _Canvas) -> tuple[int, int, list[tuple[int, int, int]], bool] | None:
+    "Write the body of `payload` to `canvas`: its size, palette and transparency."
     header = _HEADER_RE.match(payload)
     if header is None:
         return None
@@ -195,7 +240,6 @@ def decode_sixel(payload: str) -> tuple[int, int, bytes] | None:
     body = payload[header.end() :]
     palette = list(DEFAULT_PALETTE) + [(0, 0, 0)] * (MAX_REGISTERS - len(DEFAULT_PALETTE))
 
-    canvas = _Canvas()
     register = 0
     x = 0
     band = 0
@@ -275,9 +319,7 @@ def decode_sixel(payload: str) -> tuple[int, int, bytes] | None:
         height = raster_height
     if width <= 0 or height <= 0 or width * height > MAX_PIXELS:
         return None
-
-    background = None if transparent else palette[0]
-    return (width, height, canvas.to_rgba(palette, width, height, background))
+    return (width, height, palette, transparent)
 
 
 def _define_color(values: list[int]) -> tuple[int, int, int]:
