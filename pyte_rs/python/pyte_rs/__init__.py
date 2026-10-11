@@ -12,12 +12,12 @@ from __future__ import annotations
 
 import os
 
-from pyte import page, runs, screen, streams
+from pyte import page, png, runs, screen, streams
 from pyte.placeholders import PLACEHOLDER
 
 from . import _native
 
-__all__ = ["Row", "draw_on_row", "install", "installed", "runs_of", "take_ground"]
+__all__ = ["Row", "draw_on_row", "install", "installed", "rgba_of", "runs_of", "take_ground", "unfilter"]
 
 #: One row of a page, stored by column in Rust. Lillecarl/pymux#570.
 Row = _native.Row
@@ -48,6 +48,11 @@ draw_on_row = _native.draw_on_row
 #: `pyte.streams._take_ground`, in Rust.
 take_ground = _native.take_ground
 
+#: `pyte.png._unfilter` and `pyte.png._rgba_of`, in Rust, with the GIL
+#: released while they work. Lillecarl/pymux#574.
+unfilter = _native.unfilter
+rgba_of = _native.rgba_of
+
 
 def install() -> bool:
     "Put every kernel in place, unless `PYTERM_PURE` says not to."
@@ -62,6 +67,10 @@ def install() -> bool:
         page.Row = Row
         _replaced["pyte.streams._take_ground"] = streams._take_ground
         streams._take_ground = take_ground
+        _replaced["pyte.png._unfilter"] = png._unfilter
+        png._unfilter = unfilter
+        _replaced["pyte.png._rgba_of"] = png._rgba_of
+        png._rgba_of = rgba_of
     return True
 
 

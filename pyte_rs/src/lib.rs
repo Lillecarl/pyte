@@ -2,6 +2,7 @@
 //! says how they are put in place; each one gives the answer its Python
 //! original gives, decision for decision. Lillecarl/pymux#566.
 
+mod png;
 mod row;
 mod stream;
 
@@ -347,5 +348,6 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(runs_of, module)?)?;
     module.add_function(wrap_pyfunction!(draw_on_row, module)?)?;
     module.add_function(wrap_pyfunction!(stream::take_ground, module)?)?;
+    png::register(module)?;
     Ok(())
 }
