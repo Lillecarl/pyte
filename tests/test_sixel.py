@@ -5,6 +5,8 @@ stores.
 
 from __future__ import annotations
 
+import pytest
+
 from pyte import escape
 from pyte import sixel as sixel_module
 from pyte.images import PixelFormat
@@ -246,6 +248,93 @@ def test_the_image_covers_its_cells():
     stream.feed(sixel('"1;1;30;12' + DEFINE_RED + RED_ + "~"))
     row = screen.page.data_buffer[0]
     assert "".join(row[i].char for i in range(6)) == "   def"
+
+
+#: Three columns by three rows, with a 10x20 cell.
+THREE_BY_THREE = sixel('"1;1;30;60' + DEFINE_RED + RED_ + "~")
+
+
+def pieces(screen):
+    return sorted((p.x, p.y, p.columns, p.rows, p.crop) for p in screen.graphics.placements)
+
+
+def test_text_over_a_sixel_image_cuts_it_around_the_cell():
+    "Lillecarl/pymux#598."
+    screen, stream, _ = make_screen()
+    stream.feed(THREE_BY_THREE)
+    stream.feed("\x1b[2;2Hx")
+    assert pieces(screen) == [
+        (0, 0, 3, 1, (0, 0, 3, 3)),
+        (0, 1, 1, 1, (0, 1, 3, 3)),
+        (0, 2, 3, 1, (0, 2, 3, 3)),
+        (2, 1, 1, 1, (2, 1, 3, 3)),
+    ]
+
+
+def test_a_piece_cut_again_keeps_its_place_in_the_image():
+    screen, stream, _ = make_screen()
+    stream.feed(THREE_BY_THREE)
+    stream.feed("\x1b[1;1Hx")
+    stream.feed("\x1b[3;3Hx")
+    assert pieces(screen) == [
+        (0, 1, 3, 1, (0, 1, 3, 3)),
+        (0, 2, 2, 1, (0, 2, 3, 3)),
+        (1, 0, 2, 1, (1, 0, 3, 3)),
+    ]
+
+
+def test_spaces_over_every_row_take_the_image_away():
+    "yazi takes a sixel preview away like this."
+    screen, stream, _ = make_screen()
+    stream.feed(THREE_BY_THREE)
+    stream.feed("\x1b[1;1H   \x1b[2;1H   \x1b[3;1H   ")
+    assert screen.graphics.placements == []
+
+
+def test_a_run_that_wraps_cuts_every_row_it_drew_on():
+    screen, stream, _ = make_screen()
+    stream.feed(THREE_BY_THREE)
+    stream.feed("\x1b[1;1H" + "x" * 163)
+    assert screen.graphics.placements == []
+
+
+@pytest.mark.parametrize(
+    "erase",
+    [
+        pytest.param("\x1b[2;1H\x1b[K", id="EL 0"),
+        pytest.param("\x1b[2;3H\x1b[1K", id="EL 1"),
+        pytest.param("\x1b[2;1H\x1b[2K", id="EL 2"),
+        pytest.param("\x1b[2;1H\x1b[3X", id="ECH"),
+    ],
+)
+def test_an_erase_of_a_row_cuts_the_image(erase):
+    screen, stream, _ = make_screen()
+    stream.feed(THREE_BY_THREE)
+    stream.feed(erase)
+    assert pieces(screen) == [(0, 0, 3, 1, (0, 0, 3, 3)), (0, 2, 3, 1, (0, 2, 3, 3))]
+
+
+@pytest.mark.parametrize("erase", ["\x1b[1;1H\x1b[J", "\x1b[3;3H\x1b[1J"], ids=["ED 0", "ED 1"])
+def test_an_erase_of_the_display_takes_the_image(erase):
+    screen, stream, _ = make_screen()
+    stream.feed(THREE_BY_THREE)
+    stream.feed(erase)
+    assert screen.graphics.placements == []
+
+
+def test_text_beside_a_sixel_image_leaves_it_whole():
+    screen, stream, _ = make_screen()
+    stream.feed(THREE_BY_THREE)
+    stream.feed("\x1b[2;4Hbeside")
+    assert pieces(screen) == [(0, 0, 3, 3, None)]
+
+
+def test_text_over_a_kitty_image_leaves_it():
+    "A kitty placement lies above the text."
+    screen, stream, _ = make_screen()
+    stream.feed(apc("Ga=T,f=24,s=1,v=1,i=1,c=3,r=3;/wAA"))
+    stream.feed("\x1b[2;2Hx")
+    assert [(p.columns, p.rows, p.crop) for p in screen.graphics.placements] == [(3, 3, None)]
 
 
 def test_a_sixel_image_does_not_take_a_kitty_image_id():

@@ -149,6 +149,31 @@ def test_a_thawed_screen_keeps_its_image(screens):
     assert len(parked.placements) == 1
 
 
+def _drop_field(value, kind: str, field: str):
+    if isinstance(value, dict):
+        if value.get("object", "").endswith(kind):
+            value["fields"].pop(field)
+        for item in value.values():
+            _drop_field(item, kind, field)
+    elif isinstance(value, list):
+        for item in value:
+            _drop_field(item, kind, field)
+
+
+def test_a_placement_from_before_pieces_thaws_whole():
+    "A snapshot of a pymux without sixel pieces carries no crop. Lillecarl/pymux#598."
+    screen = a_screen(80, 24)
+    Stream(screen).feed(ESC + "Pq" + '"1;1;30;60#1~' + ST)
+    frozen = json.loads(json.dumps(freeze(screen)))
+    _drop_field(frozen, ".GraphicsPlacement", "crop")
+    thawed = a_screen(80, 24)
+    thaw(Frozen(*frozen), thawed)
+    (placement,) = thawed.graphics.placements
+    assert placement.crop is None
+    Stream(thawed).feed(CSI + "2;2Hx")
+    assert len(thawed.graphics.placements) == 4
+
+
 def test_the_parked_page_and_its_buffer_stay_one_object(screens):
     screen, thawed, _ = screens
     assert screen._original_screen_vars["data_buffer"] is screen._original_screen.data_buffer

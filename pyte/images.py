@@ -118,6 +118,7 @@ class GraphicsPlacement:
     __slots__ = (
         "asked_for_the_box",
         "columns",
+        "crop",
         "image_id",
         "placement_id",
         "rows",
@@ -140,6 +141,7 @@ class GraphicsPlacement:
         z: int = 0,
         virtual: bool = False,
         asked_for_the_box: bool = True,
+        crop: tuple[int, int, int, int] | None = None,
     ) -> None:
         self.image_id = image_id
         self.placement_id = placement_id
@@ -162,6 +164,32 @@ class GraphicsPlacement:
         #:
         #: Sixel never names a box, so `add_sixel` clears this.
         self.asked_for_the_box = asked_for_the_box
+
+        #: A piece of a placement shows part of the image: (column, row,
+        #: columns, rows) says which cell of the whole box it starts at,
+        #: and how many cells the whole box has. None shows the whole.
+        self.crop = crop
+
+    def after_thaw(self) -> None:
+        # A snapshot from a pymux that had no pieces carries no crop.
+        if not hasattr(self, "crop"):
+            self.crop = None
+
+    def piece(self, x: int, y: int, columns: int, rows: int) -> GraphicsPlacement:
+        "The part of this placement on the `columns` by `rows` cells from (x, y)."
+        column, row, box_columns, box_rows = self.crop or (0, 0, self.columns, self.rows)
+        return GraphicsPlacement(
+            self.image_id,
+            self.placement_id,
+            x,
+            y,
+            columns,
+            rows,
+            self.z,
+            self.virtual,
+            self.asked_for_the_box,
+            (column + x - self.x, row + y - self.y, box_columns, box_rows),
+        )
 
 
 def parse_control_data(data: str) -> tuple[dict[str, str], str]:
@@ -675,7 +703,8 @@ class GraphicsState:
         says why this counts again rather than dropping.
         """
         for placement in self.placements:
-            if placement.asked_for_the_box:
+            # A piece has a box that text cut, not one the pixels give.
+            if placement.asked_for_the_box or placement.crop is not None:
                 continue
             image = self.images_by_id.get(placement.image_id)
             if image is None or not image.width or not image.height:
@@ -692,6 +721,50 @@ class GraphicsState:
                 # The box may have grown, and the cells it reaches now
                 # still hold whatever was under them.
                 self._clear_cells(screen, placement.x, placement.y, columns, rows)
+
+    def cover(self, top: int, bottom: int, left: int, right: int) -> None:
+        """
+        Text or an erase took the cells from column `left` up to
+        `right`, on the rows from `top` to `bottom` (both included).
+
+        A sixel image is part of the cells it lies on, so the part under
+        them goes, and what is left is up to four pieces around the
+        hole. foot cuts it this way (`sixel_overwrite_by_rectangle`),
+        and xterm draws sixel into its cells. yazi takes a preview away
+        by writing spaces over it. Lillecarl/pymux#598.
+
+        A kitty placement lies above the text, and stays.
+        """
+        kept: list[GraphicsPlacement] = []
+        for placement in self.placements:
+            x, y = placement.x, placement.y
+            x_end, y_end = x + placement.columns, y + placement.rows
+            image = self.images_by_id.get(placement.image_id)
+            if (
+                placement.virtual
+                or right <= x
+                or left >= x_end
+                or bottom < y
+                or top >= y_end
+                or image is None
+                or image.format != PixelFormat.SIXEL
+            ):
+                kept.append(placement)
+                continue
+
+            hole_top, hole_bottom = max(top, y), min(bottom + 1, y_end)
+            hole_left, hole_right = max(left, x), min(right, x_end)
+            for piece_left, piece_top, piece_right, piece_bottom in (
+                (x, y, x_end, hole_top),
+                (x, hole_bottom, x_end, y_end),
+                (x, hole_top, hole_left, hole_bottom),
+                (hole_right, hole_top, x_end, hole_bottom),
+            ):
+                if piece_right > piece_left and piece_bottom > piece_top:
+                    kept.append(
+                        placement.piece(piece_left, piece_top, piece_right - piece_left, piece_bottom - piece_top)
+                    )
+        self.placements = kept
 
     @property
     def has_virtual_placements(self) -> bool:

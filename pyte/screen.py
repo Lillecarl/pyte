@@ -2251,6 +2251,7 @@ class Screen:
         # keeps the loop itself, which runs once per character, exactly
         # as it was. Lillecarl/pymux#126.
         first_row = cursor_position_y
+        first_column = cursor_position_x
 
         # The rows this run changed, for the version count below. A
         # run that writes what is already there changes nothing, and
@@ -2451,6 +2452,8 @@ class Screen:
         # changed no row either.
         if chars:
             self.pending_wrap = waiting_to_wrap
+            if self.graphics.placements:
+                self._cover_the_run(first_row, first_column, cursor_position_y, cursor_position_x)
             if in_irm or changed_exotic:
                 # Nearly every run stays on one row, so that case is
                 # written out rather than called. A run that began with the
@@ -2471,6 +2474,17 @@ class Screen:
                     self.written_at[changed_first] = self.writes
                 else:
                     self.touch_rows(range(changed_first, changed_last + 1))
+
+    def _cover_the_run(self, first_row: int, first_column: int, last_row: int, last_column: int) -> None:
+        "Tell the images which cells a run of text drew over."
+        cover = self.graphics.cover
+        if first_row == last_row:
+            cover(first_row, first_row, first_column, last_column)
+            return
+        cover(first_row, first_row, first_column, self.columns)
+        if last_row > first_row + 1:
+            cover(first_row + 1, last_row - 1, 0, self.columns)
+        cover(last_row, last_row, 0, last_column)
 
     def _leave_the_pending_wrap(self) -> None:
         """
@@ -3780,6 +3794,8 @@ class Screen:
 
         self.repair_wide_char(row, cursor_position.x)
         self.repair_wide_char(row, end)
+        if self.graphics.placements:
+            self.graphics.cover(cursor_position.y, cursor_position.y, cursor_position.x, end)
 
     def _move_columns(self, top: int, bottom: int, left: int, right: int, amount: int) -> None:
         """
@@ -3929,6 +3945,8 @@ class Screen:
 
         line = data_buffer[pt_cursor_position.y]
         self.touch(pt_cursor_position.y)
+        if self.graphics.placements:
+            self.graphics.cover(pt_cursor_position.y, pt_cursor_position.y, columns.start, columns.stop)
         holds = self._erase_holds
         erased = _ERASED_CACHE[" ", appearance] if appearance else None
 
@@ -4066,6 +4084,11 @@ class Screen:
                 self.set_wrapped(interval.stop, False)
 
             self.touch_rows(interval)
+            if self.graphics.placements:
+                # An image reaches rows that hold no cell, which the
+                # interval stops above.
+                bottom = max(interval.stop, line_offset + self.lines) if type_of == 0 else interval.stop
+                self.graphics.cover(interval.start, bottom - 1, 0, self.columns)
 
             for line in interval:
                 if reads_the_marks:
