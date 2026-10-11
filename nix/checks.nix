@@ -60,7 +60,6 @@ let
     chmod -R +w .
     export HOME="$TMPDIR"
     export LANG=C.UTF-8
-    export PYTHONDONTWRITEBYTECODE=1
   '';
 
   # What the `ruff` check reads beside the tests: the package, its
@@ -91,6 +90,17 @@ let
   '';
 
   runPytest = "python -m pytest $selection -q -p no:cacheprovider";
+
+  # The unit group over four workers. One collection first writes the
+  # rewritten test modules to __pycache__, which each worker would
+  # otherwise rewrite again. Measured, wall and CPU seconds: serial 55
+  # and 30, four workers 13 and 32, sixteen 13 and 56. Lillecarl/pymux#579.
+  runPytestSpread = ''
+    cores="''${NIX_BUILD_CORES:-0}"
+    if [ "$cores" = 0 ] || [ "$cores" -gt 4 ]; then cores=4; fi
+    ${runPytest} --collect-only > /dev/null || true
+    ${runPytest} -n "$cores" --dist worksteal
+  '';
 in
 {
   # Everything that needs nothing but python. `tests/conftest.py` says how
@@ -107,7 +117,7 @@ in
     setup = prepare + ''
       export PYTE_GROUP=unit
     '';
-  } runPytest;
+  } runPytestSpread;
 
   # The property tests again, drawing examples nobody has seen.
   #

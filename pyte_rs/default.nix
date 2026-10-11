@@ -96,11 +96,16 @@ let
       chmod -R +w .
       export HOME="$TMPDIR"
       export LANG=C.UTF-8
-      export PYTHONDONTWRITEBYTECODE=1
       export PYTE_GROUP=unit
       export PYTE_RS=1
     '';
-  } "python -m pytest tests -q -p no:cacheprovider";
+  } ''
+    # Four workers, as pyte's own unit check says why.
+    cores="''${NIX_BUILD_CORES:-0}"
+    if [ "$cores" = 0 ] || [ "$cores" -gt 4 ]; then cores=4; fi
+    python -m pytest tests -q -p no:cacheprovider --collect-only > /dev/null || true
+    python -m pytest tests -q -p no:cacheprovider -n "$cores" --dist worksteal
+  '';
 
   # The kernels against the Python they replace.
   #
