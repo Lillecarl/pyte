@@ -64,6 +64,7 @@ dependencies = [
 # Lillecarl/pymux#319.
 test = [
     "pytest",
+    "pytest-xdist",
     "hypothesis",
 ]
 

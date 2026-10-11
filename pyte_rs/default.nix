@@ -104,6 +104,11 @@ let
 
   # The kernels against the Python they replace.
   #
+  # Spread over four workers: each property test draws thousands of
+  # examples, and one after another they were the gate's longest wall,
+  # 107 s for 57 CPU seconds. Four took 17 s and 38, sixteen 11 s and
+  # 61. Lillecarl/pymux#579.
+  #
   #     nix build --file . checks.pyte-rs-parity
   checks.parity = suite {
     name = "pyte-rs-parity";
@@ -113,9 +118,12 @@ let
       chmod -R +w tests
       export HOME="$TMPDIR"
       export LANG=C.UTF-8
-      export PYTHONDONTWRITEBYTECODE=1
     '';
-  } "python -m pytest tests -q -p no:cacheprovider";
+  } ''
+    cores="''${NIX_BUILD_CORES:-0}"
+    if [ "$cores" = 0 ] || [ "$cores" -gt 4 ]; then cores=4; fi
+    python -m pytest tests -q -p no:cacheprovider -n "$cores" --dist worksteal --durations=10
+  '';
 in
 stdenv.mkDerivation {
   pname = "pyte_rs";
