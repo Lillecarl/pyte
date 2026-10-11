@@ -276,34 +276,62 @@ fn draw_on_row<'py>(
     // immutable once made, so its storage stays where it is.
     let data = unsafe { chars.data()? };
     let width_name = intern!(py, "width");
+    let row = match row.cast::<Row>() {
+        Ok(row) => Ok(row),
+        Err(_) => Err(row.cast::<PyDict>()?),
+    };
     let mut changed = false;
     let mut buffer = [0u8; 4];
+    // The one-cell answer for each ASCII code point this call met: a line
+    // repeats a few dozen characters, and each lookup builds a key, hashes
+    // it and reads `width` through Python. `cells` cannot change during
+    // the call, because nothing here runs Python that writes to it.
+    let mut ascii: [Option<Bound<'py, PyAny>>; 128] = [const { None }; 128];
     while x < edge {
         let Some(point) = point_at(&data, index) else {
             break;
         };
-        let key = key_at(py, chars, index, point, &mut buffer)?;
-        let Some(cell) = cells.get_item(&key)? else {
-            break;
-        };
-        let width: i64 = cell.getattr(width_name)?.extract()?;
-        if width != 1 {
-            break;
-        }
-        if let Ok(stored) = row.cast::<Row>() {
-            let mut stored = stored.borrow_mut();
-            if !stored
-                .cell(x)
-                .is_some_and(|there| there.as_ptr() == cell.as_ptr())
-            {
-                stored.store(x, cell.unbind());
-                changed = true;
+        let cached = usize::try_from(point)
+            .ok()
+            .and_then(|point| ascii.get(point))
+            .and_then(Option::as_ref)
+            .cloned();
+        let cell = match cached {
+            Some(cell) => cell,
+            None => {
+                let key = key_at(py, chars, index, point, &mut buffer)?;
+                let Some(cell) = cells.get_item(&key)? else {
+                    break;
+                };
+                let width: i64 = cell.getattr(width_name)?.extract()?;
+                if width != 1 {
+                    break;
+                }
+                if let Some(slot) = usize::try_from(point)
+                    .ok()
+                    .and_then(|point| ascii.get_mut(point))
+                {
+                    *slot = Some(cell.clone());
+                }
+                cell
             }
-        } else {
-            let row = row.cast::<PyDict>()?;
-            if !row.get_item(x)?.is_some_and(|there| there.is(&cell)) {
-                row.set_item(x, &cell)?;
-                changed = true;
+        };
+        match row {
+            Ok(stored) => {
+                let mut stored = stored.borrow_mut();
+                if !stored
+                    .cell(x)
+                    .is_some_and(|there| there.as_ptr() == cell.as_ptr())
+                {
+                    stored.store(x, cell.unbind());
+                    changed = true;
+                }
+            }
+            Err(row) => {
+                if !row.get_item(x)?.is_some_and(|there| there.is(&cell)) {
+                    row.set_item(x, &cell)?;
+                    changed = true;
+                }
             }
         }
         x += 1;
