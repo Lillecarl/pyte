@@ -45,6 +45,7 @@ PURE = {
     "images",
     "keep",
     "keys",
+    "links",
     "modes",
     "osc",
     "page",
