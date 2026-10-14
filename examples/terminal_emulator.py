@@ -6,7 +6,8 @@ An example showing how to use :mod:`pyte` to implement a basic
 terminal emulator using Textual.
 To exit the application, hit Ctrl-C.
 
-.. note:: This example requires the ``textual`` library, at least v0.6.0.
+.. note:: This example requires the ``textual`` library,
+          in the Nix development environment.
 
 :copyright: (c) 2022 by pyte authors and contributors,
             see AUTHORS for details.
@@ -52,7 +53,7 @@ class Terminal(Widget, can_focus=True):
         self.nrow = nrow
         self.ncol = ncol
         self._display = PyteDisplay([Text()])
-        self._screen = pyte.Screen(self.ncol, self.nrow)
+        self._screen = pyte.Screen(self.nrow, self.ncol, write_process_input=self.answer)
         self.stream = pyte.Stream(self._screen)
         asyncio.create_task(self.recv())
         super().__init__()
@@ -60,6 +61,10 @@ class Terminal(Widget, can_focus=True):
 
     def render(self):
         return self._display
+
+    def answer(self, data: str) -> None:
+        """What the screen answers the program: cursor reports and the like."""
+        self.send_queue.put_nowait(["stdin", data])
 
     async def on_key(self, event: events.Key) -> None:
         char = self.ctrl_keys.get(event.key) or event.character
@@ -74,17 +79,16 @@ class Terminal(Widget, can_focus=True):
             elif cmd == "stdout":
                 chars = message[1]
                 self.stream.feed(chars)
+                screen = self._screen
+                cursor = screen.pt_cursor_position
                 lines = []
-                for i, line in enumerate(self._screen.display):
-                    text = Text.from_ansi(line)
-                    x = self._screen.cursor.x
-                    if i == self._screen.cursor.y and x < len(text):
-                        cursor = text[x]
-                        cursor.stylize("reverse")
-                        new_text = text[:x]
-                        new_text.append(cursor)
-                        new_text.append(text[x + 1 :])
-                        text = new_text
+                for i in range(screen.lines):
+                    line = screen.page.data_buffer.get(screen.line_offset + i, {})
+                    text = Text(
+                        "".join(line[x].char if x in line else " " for x in range(screen.columns))
+                    )
+                    if i == cursor.y - screen.line_offset and 0 <= cursor.x < len(text.plain):
+                        text.stylize("reverse", cursor.x, cursor.x + 1)
                     lines.append(text)
                 self._display = PyteDisplay(lines)
                 self.refresh()

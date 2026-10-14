@@ -3,9 +3,9 @@ debug
 ~~~~~
 
 ... what if I need to debug a bunch of escape sequences? Just use
-:class:`~pyte.streams.DebugStream` instead of the usual
-:class:`~pyte.streams.Stream`. Note though, that it requires
-:func:`bytes` as input.
+:class:`~pyte.debug.DebugScreen` with the usual
+:class:`~pyte.streams.Stream`. Note though, that the stream takes
+:func:`str`, so decode :func:`bytes` first.
 
 :copyright: (c) 2011-2013 by Selectel, see AUTHORS for details.
 :license: LGPL, see LICENSE for more details.

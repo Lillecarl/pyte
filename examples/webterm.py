@@ -6,9 +6,11 @@ An example showing how to use :mod:`pyte` to implement a basic
 single-user web terminal.
 
 Client-side ``webterm.js`` supports
-* incremental rendering via :data:`~pyte.screens.DiffScreen.dirty`,
-* most of the common keyboard events,
-* pagination on Meta + P/Meta + A.
+* incremental rendering: only rows changed since the last frame,
+* most of the common keyboard events.
+
+Scrollback stays on the server: rows above the page live in the
+buffer and a client that wants them reads those rows.
 
 .. note:: This example requires Python >=3.14 and version 3.0 of the
           ``aiohttp`` library, in the Nix development environment.
@@ -42,27 +44,42 @@ import pyte
 
 
 class Terminal:
-    def __init__(self, columns, lines, p_in):
-        self.screen = pyte.HistoryScreen(columns, lines)
+    def __init__(self, columns: int, lines: int, p_in) -> None:
+        self.screen = pyte.Screen(
+            lines, columns, write_process_input=lambda data: p_in.write(data.encode())
+        )
         self.screen.set_mode(pyte.modes.AnsiMode.LINE_FEED_NEW_LINE)
-        self.screen.write_process_input = lambda data: p_in.write(data.encode())
         self.stream = pyte.Stream(self.screen)
+        # The write count up to which rows were already sent.
+        self.seen = 0
 
-    def feed(self, data):
+    def feed(self, data: bytes) -> None:
         self.stream.feed(data.decode("utf-8", "replace"))
 
-    def dumps(self):
-        cursor = self.screen.cursor
-        lines = []
-        for y in self.screen.dirty:
-            line = self.screen.buffer[y]
-            data = [
-                (char.data, char.reverse, char.fg, char.bg) for char in (line[x] for x in range(self.screen.columns))
-            ]
-            lines.append((y, data))
+    @staticmethod
+    def _css(color) -> str:
+        return "default" if color is None else str(color)
 
-        self.screen.dirty.clear()
-        return json.dumps({"c": (cursor.x, cursor.y), "lines": lines})
+    def dumps(self) -> str:
+        screen = self.screen
+        cursor = screen.pt_cursor_position
+        lines = []
+        for y, written in sorted(screen.written_at.items()):
+            if written > self.seen and y >= screen.line_offset:
+                line = screen.page.data_buffer.get(y, {})
+                data = [
+                    (
+                        line[x].char if x in line else " ",
+                        line[x].appearance.rendition.reverse if x in line else False,
+                        self._css(line[x].appearance.rendition.color) if x in line else "default",
+                        self._css(line[x].appearance.rendition.bgcolor) if x in line else "default",
+                    )
+                    for x in range(screen.columns)
+                ]
+                lines.append((y - screen.line_offset, data))
+
+        self.seen = screen.writes
+        return json.dumps({"c": (cursor.x, cursor.y - screen.line_offset), "lines": lines})
 
 
 def open_terminal(command="bash", columns=80, lines=24):
@@ -95,17 +112,10 @@ async def websocket_handler(request):
     try:
         async for msg in ws:
             if msg.type == aiohttp.WSMsgType.TEXT:
-                if msg.data == pyte.control.ESC + "N":
-                    terminal.screen.next_page()
-                    ws.send_str(terminal.dumps())
-                elif msg.data == pyte.control.ESC + "P":
-                    terminal.screen.prev_page()
-                    ws.send_str(terminal.dumps())
-                else:
-                    p_out.write(msg.data.encode())
+                p_out.write(msg.data.encode())
             elif msg.type == aiohttp.WSMsgType.ERROR:
                 raise ws.exception()
-    except asyncio.CancelledError, OSError:  # Process died?
+    except (asyncio.CancelledError, OSError):  # Process died?
         pass
     finally:
         loop.remove_reader(p_out)
