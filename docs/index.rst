@@ -37,4 +37,3 @@ into the :ref:`api`; ``pyte`` also has a couple of examples in the
 
    tutorial
    api
-   changelog
