@@ -24,7 +24,7 @@ from functools import partial
 try:
     from pyperf import Runner
 except ImportError:
-    sys.exit("``perf`` not found. Try installing it via ``pip install perf``.")
+    sys.exit("``pyperf`` not found. It comes with the Nix development environment.")
 
 import pyte
 

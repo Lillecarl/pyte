@@ -76,7 +76,7 @@ let
 
         meta = rendered.meta // {
           description = "Simple VTXXX-compatible terminal emulator";
-          homepage = "https://github.com/selectel/pyte";
+          homepage = "https://github.com/Lillecarl/pyte";
           license = lib.licenses.lgpl3Only;
         };
       };

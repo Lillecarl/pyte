@@ -10,8 +10,8 @@ Client-side ``webterm.js`` supports
 * most of the common keyboard events,
 * pagination on Meta + P/Meta + A.
 
-.. note:: This example requires at least Python 3.7 and version 3.0 of the
-          ``aiohttp`` library.
+.. note:: This example requires Python >=3.14 and version 3.0 of the
+          ``aiohttp`` library, in the Nix development environment.
 
 .. seealso::
 
