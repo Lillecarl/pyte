@@ -1,6 +1,6 @@
 # The Rust kernels of pyte, as a package of its own.
 #
-# It is a project inside this repository and not a source of the umbrella,
+# It is a project inside pyte and not a source of pyterm of its own,
 # the way libpymux is inside pymux: the kernels judge themselves against the
 # Python they replace, and that Python is here.
 #
