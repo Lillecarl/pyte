@@ -1,9 +1,10 @@
 [project]
 name = "pyte"
 dynamic = ["version"]
-description = "Simple VTXXX-compatible terminal emulator."
+description = "Simple VT102-compatible terminal emulator."
 readme = "README.md"
 license = "LGPL-3.0-only"
+license-files = ["LICENSE"]
 requires-python = ">=3.14"
 authors = [
     { name = "Sergei Lebedev", email = "superbobry@gmail.com" },
@@ -14,12 +15,11 @@ keywords = [
     "vte",
 ]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 4 - Beta",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: Implementation :: CPython",
-    "Programming Language :: Python :: Implementation :: PyPy",
     "Programming Language :: Python :: 3.14",
     "Topic :: Terminals :: Terminal Emulators/X Terminals",
 ]

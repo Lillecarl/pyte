@@ -9,18 +9,18 @@ dispatches an event for each command, and
 events draw.
 
 **It answers as a VT520 and honours DECSCL down to a VT100.**
-`ConformanceLevel` in `parameters.py` names the five, and the private
-modes a later terminal brought go away when a program asks for an
-earlier one: the left and right margin arrived on the VT400, and
-DECNCSM on the VT500. DA2 names the VT520 family. Nothing between
-VT100 and VT520 is skipped, and esctest2's `DECSCLTests` is what
-says so.
+`ConformanceLevel` in `parameters.py` names the five levels from VT100
+to VT500, and the private modes a later terminal brought go away when
+a program asks for an earlier one: the left and right margin arrived
+on the VT400, and DECNCSM on the VT500. DA2 names the VT520 family.
+Nothing between VT100 and VT500 is skipped, and esctest2's
+`DECSCLTests` is what says so.
 
 **The DEC line attributes are the one exception.** "ESC # 3",
 "ESC # 4", "ESC # 5" and "ESC # 6" draw a line at twice the width or
-twice the height on a VT100. This screen reads each of them and
-draws the line the plain way, the way kitty, Ghostty and Alacritty
-do. Lillecarl/pymux#141 holds the reasons and the vote.
+twice the height on a VT100. This screen reads each of them and holds
+the line the plain way, the way kitty, Ghostty and Alacritty do.
+Lillecarl/pymux#141 holds the reasons and the vote.
 
 On top of that are the things no DEC terminal had: 256 colours,
 truecolour, the kitty keyboard and graphics protocols, sixels,
