@@ -1,3 +1,11 @@
+.. note::
+
+   This repository is a copy. Work on pyte happens in
+   `pyterm <https://github.com/Lillecarl/pyterm>`_, which exports its
+   ``pyte/`` directory here on every push. Send changes there, and issues to
+   `Lillecarl/pymux <https://github.com/Lillecarl/pymux/issues>`_.
+   ``nix build github:Lillecarl/pyte`` builds it from this repository alone.
+
 ::
 
                        _
