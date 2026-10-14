@@ -44,7 +44,11 @@ test = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/selectel/pyte"
+Homepage = "https://github.com/Lillecarl/pyte"
+Documentation = "https://lillecarl.github.io/pyte/"
+# Work happens in the monorepo this repository is exported from.
+Source = "https://github.com/Lillecarl/pyterm"
+Issues = "https://github.com/Lillecarl/pymux/issues"
 
 [build-system]
 requires = ["hatchling"]
