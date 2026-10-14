@@ -113,7 +113,6 @@ let
       ./pyproject.toml
       ./examples
       ./benchmark.py
-      ./docs/conf.py
     ];
   };
 

@@ -25,4 +25,5 @@ in
   inherit (pyterm) pyte shell;
   default = pyterm.pyte;
   checks = pyterm.pyte.checks;
+  pages = pyterm.pages.pyte;
 }

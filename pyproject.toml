@@ -52,6 +52,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# What the docs site builds with: Sphinx, MyST for the markdown, and
+# the theme. pyterm's `nix/docs/` reads it.
+docs = ["sphinx", "myst-parser", "furo"]
 # What a check installs, beside what pyte itself needs. hypothesis
 # generates the sequences that `test_row_versions.py` puts through a
 # screen: a recording holds what one program happened to write, and the

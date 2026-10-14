@@ -70,8 +70,6 @@ let
   lintSources = ''
     cp -r ${testSources}/pyte ${testSources}/examples .
     cp ${testSources}/benchmark.py ${testSources}/pyproject.toml .
-    mkdir -p docs
-    cp ${testSources}/docs/conf.py docs/
   '';
 
   # `-displayfd` makes the server say which display it took, once it is
@@ -201,9 +199,9 @@ in
     setup = prepare + lintSources;
   } ''
     export RUFF_CACHE_DIR="$TMPDIR/ruff"
-    ruff check pyte tests tools examples benchmark.py docs
-    ruff format --check pyte tests tools examples benchmark.py docs
-    missing=$(grep -rL '^from __future__ import annotations' --include='*.py' --exclude-dir='.*' --exclude-dir='__pycache__' pyte tests tools examples benchmark.py docs || true)
+    ruff check pyte tests tools examples benchmark.py
+    ruff format --check pyte tests tools examples benchmark.py
+    missing=$(grep -rL '^from __future__ import annotations' --include='*.py' --exclude-dir='.*' --exclude-dir='__pycache__' pyte tests tools examples benchmark.py || true)
     if [ -n "$missing" ]; then
       echo "files without the future import:"
       echo "$missing"
