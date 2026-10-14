@@ -35,6 +35,7 @@ let
       ./Cargo.toml
       ./Cargo.lock
       ./pyproject.toml
+      ./LICENSE
       ./src
       (fs.fileFilter (file: file.hasExt "py") ./python)
     ];
