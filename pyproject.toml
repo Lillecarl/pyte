@@ -2,7 +2,7 @@
 name = "pyte"
 dynamic = ["version"]
 description = "Simple VTXXX-compatible terminal emulator."
-readme = "README.rst"
+readme = "README.md"
 license = "LGPL-3.0-only"
 requires-python = ">=3.14"
 authors = [
