@@ -1,27 +1,3 @@
-[build-system]
-requires = ["flit_core"]
-build-backend = "flit_core.buildapi"
-
-[tool.flit.sdist]
-include = ["docs/*.rst", "docs/*.py", "examples/", "tests/", "AUTHORS*", "CHANGES*", "LICENSE*"]
-exclude = ["**/__pycache__/", "**/.*/", "*.lock"]
-
-[tool.mypy]
-show_error_codes = true
-strict = true
-
-[tool.pytest.ini_options]
-testpaths = [
-    "tests",
-]
-
-[dependency-groups]
-dev = [
-    "pytest",
-    "pyperf==1.7.1",
-    "mypy==1.14.1",
-]
-
 [project]
 name = "pyte"
 dynamic = ["version"]
@@ -60,11 +36,7 @@ docs = ["sphinx", "myst-parser", "furo"]
 # screen: a recording holds what one program happened to write, and the
 # paths that move whole ranges of rows are the ones a recording is least
 # likely to reach.
-#
-# `[dependency-groups] dev` above is upstream's list and says nearly the
-# same thing. It is not this: a group is for a person with `uv`, and an
-# extra is what an installer resolves. `nix/checks.nix` reads this one.
-# Lillecarl/pymux#319.
+# `nix/checks.nix` reads this. Lillecarl/pymux#319.
 test = [
     "pytest",
     "pytest-xdist",
@@ -73,6 +45,22 @@ test = [
 
 [project.urls]
 Homepage = "https://github.com/selectel/pyte"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# The version is the one `pyte/__init__.py` names.
+[tool.hatch.version]
+path = "pyte/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["pyte"]
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests",
+]
 
 [tool.ruff]
 # Mirror of the `ruff.toml` in the pyterm root: the build sandbox
