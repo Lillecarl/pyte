@@ -17,6 +17,8 @@ Lillecarl/pymux#169.
 
 from __future__ import annotations
 
+import pytest
+
 import pyte
 from pyte.keys import (
     FormatOtherKeys,
@@ -59,6 +61,35 @@ def test_alt_and_meta_is_the_first_level():
     assert screen.encode_key("\x1b\t") == "\x1b[27;3;9~"
     assert screen.encode_key("\x01") == "\x01"
     assert screen.encode_key("A") == "A"
+
+
+@pytest.mark.parametrize(
+    ("key", "sent"),
+    [
+        ("\x1b[49;5u", "\x1b[27;5;49~"),
+        ("\x1b[45;5u", "\x1b[27;5;45~"),
+        ("\x1b[9;5u", "\x1b[27;5;9~"),
+        ("\x1b[13;2u", "\x1b[27;2;13~"),
+        ("\x1b[13;5u", "\x1b[27;5;13~"),
+        ("\x1b[27;5u", "\x1b"),
+        ("\x1b[9;2u", "\x1b[Z"),
+        ("\x1b[27;2u", "\x1b"),
+        ("\x1b[127;5u", "\x08"),
+        ("\x1b[97;5u", "\x01"),
+        ("\x1b[32;5u", "\x00"),
+        ("\x1b[91;5u", "\x1b"),
+    ],
+)
+def test_the_first_level_takes_what_ctrl_and_shift_cannot_say(key, sent):
+    """
+    xterm writes the escape form at level 1 where ctrl or shift has no
+    legacy form: ctrl on a key with no control code, and Enter or Tab
+    with either. WezTerm agrees. Lillecarl/pymux#701.
+    """
+    screen, stream, _ = a_screen()
+    stream.feed("\x1b[>4;1m")
+
+    assert screen.encode_key(key) == sent
 
 
 def test_every_modifier_is_the_second_level():

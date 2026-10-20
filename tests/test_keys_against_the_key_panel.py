@@ -96,15 +96,6 @@ EXTENDED_DEVIATIONS = [
         _press("KP_0", 57399, 0, Modifier.NUM_LOCK, ModifyOtherKeys.EVERY_KEY),
     ),
     ExtendedDeviation(
-        "level 1 writes the escape form for alt alone",
-        "Lillecarl/pymux#701",
-        lambda case: (
-            case.request.other_keys == ModifyOtherKeys.ALT_AND_META
-            and bool(case.request.mods & (Modifier.CTRL | Modifier.SHIFT))
-        ),
-        _press("'1'", 49, 33, Modifier.CTRL, ModifyOtherKeys.ALT_AND_META),
-    ),
-    ExtendedDeviation(
         "ctrl on a shifted key from 0x60 to 0x7F has no control code",
         "Lillecarl/pymux#704",
         # ctrl+shift+[: pyte and kitty "{", xterm ESC, Ghostty CSI u.

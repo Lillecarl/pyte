@@ -401,8 +401,32 @@ def _wants_the_escape_form(level: int, code: int, typed: int, mods: int, text: s
             return False
         return 0x40 <= typed <= 0x7F or not _has_a_shifted_character(code, text)
     if level == ModifyOtherKeys.ALT_AND_META:
-        return bool(mods & Modifier.ALT)
+        return bool(mods & Modifier.ALT) or _ctrl_or_shift_has_no_legacy_form(code, typed, mods)
     return False
+
+
+def _ctrl_or_shift_has_no_legacy_form(code: int, typed: int, mods: int) -> bool:
+    """
+    Whether ctrl or shift on this key has nothing to say in the legacy
+    encoding, which is when level 1 writes the escape form.
+
+    xterm's rule (`ModifyOtherKeys`, case `mokUser`, and
+    `allowedCharModifiers`, `input.c`): Enter and Tab take the escape
+    form with either, but shift+Tab is the back tab. Escape and Backspace
+    never do: a control alias loses ctrl and shift before the test.
+    Elsewhere ctrl takes it on a key with
+    no control code, so ctrl+1 is "CSI 27 ; 5 ; 49 ~" and ctrl+a is still
+    0x01, and shift alone never does: the character carries it.
+    Lillecarl/pymux#701.
+    """
+    ctrl_or_shift = mods & (Modifier.CTRL | Modifier.SHIFT)
+    if code in (KeyCode.ENTER, KeyCode.TAB):
+        return bool(ctrl_or_shift) and not (code == KeyCode.TAB and ctrl_or_shift == Modifier.SHIFT)
+    if code in (KeyCode.ESCAPE, KeyCode.BACKSPACE):
+        return False
+    if not mods & Modifier.CTRL:
+        return False
+    return not _has_a_control_code(ord(chr(typed).lower()) if chr(typed).isalpha() else typed)
 
 
 def _legacy_mode(flags: int) -> bool:
