@@ -1146,7 +1146,10 @@ def _encode_event(
     if mods == 0 and kind == EventType.PRESS and not embedded:
         # The SS3 form belongs to a pane that pushed no flag at all.
         if _legacy_mode(flags):
-            if application_mode and final in "ABCD":
+            # DECCKM moves Home, End and keypad Begin with the arrows:
+            # kitty's `encode_function_key` lists all seven, and xterm
+            # does the same. Lillecarl/pymux#687.
+            if application_mode and final in "ABCDEFH":
                 return "\x1bO" + final
             if final in "PQRS":
                 return "\x1bO" + final

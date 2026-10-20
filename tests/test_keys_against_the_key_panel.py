@@ -39,7 +39,6 @@ VOTES = {
     "ctrl and Enter is a line feed": ((), ("kitty", "ghostty", "wezterm")),
     "ctrl and shift on a letter is the control code": (("wezterm",), ("kitty", "ghostty")),
     "shift with ctrl or alt on a key that is not a letter is lost": ((), ("kitty", "ghostty", "wezterm")),
-    "Home, End and Begin ignore the cursor key mode": ((), ("kitty", "ghostty", "wezterm")),
     "a modifier key reaches a pane that did not ask for every key": ((), ("kitty", "ghostty")),
     "shift on Enter or Backspace is lost": ((), ("kitty", "ghostty", "wezterm")),
 }
@@ -81,11 +80,6 @@ EXTENDED_DEVIATIONS = [
         # Ghostty writes super as xterm's meta, "CSI 27 ; 9 ; 97 ~", and
         # WezTerm as no modifier at all, "CSI 27 ; 1 ; 97 ~".
         lambda case: bool(case.request.mods & Modifier.SUPER),
-    ),
-    ExtendedDeviation(
-        "Home, End and Begin ignore the cursor key mode",
-        "Lillecarl/pymux#687",
-        lambda case: case.request.cursor_key_mode and set(case.answers.values()) & {"\x1bOH", "\x1bOF", "\x1bOE"},
     ),
     # The rest wait for xterm, whose mode this is: the two judges and
     # pyte give three answers, or the two agree against pyte's reading

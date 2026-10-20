@@ -117,6 +117,29 @@ def test_application_cursor_mode():
     assert translate_key_data("\x1bOD", flags=0, application_mode=True) == "\x1bOD"
 
 
+#: A key, what it sends without and with DECCKM, then ctrl on it, and
+#: what that sends in either mode.
+HOME_END_AND_BEGIN = [
+    ("\x1b[H", "\x1b[H", "\x1bOH", "\x1b[1;5H", "\x1b[1;5H"),
+    ("\x1b[F", "\x1b[F", "\x1bOF", "\x1b[1;5F", "\x1b[1;5F"),
+    ("\x1b[E", "\x1b[E", "\x1bOE", "\x1b[1;5E", "\x1b[1;5E"),
+    ("\x1b[57423u", "\x1b[H", "\x1bOH", "\x1b[57423;5u", "\x1b[1;5H"),
+    ("\x1b[57424u", "\x1b[F", "\x1bOF", "\x1b[57424;5u", "\x1b[1;5F"),
+]
+
+
+@pytest.mark.parametrize(("key", "normal", "application", "ctrl", "with_ctrl"), HOME_END_AND_BEGIN)
+def test_home_end_and_begin_follow_the_cursor_key_mode(key, normal, application, ctrl, with_ctrl):
+    """
+    kitty, Ghostty and WezTerm move Home, End and keypad Begin to SS3
+    with the arrows, and so does xterm. A modifier keeps the CSI form,
+    as it does for an arrow. Lillecarl/pymux#687.
+    """
+    assert translate_key_data(key, flags=0) == normal
+    assert translate_key_data(key, flags=0, application_mode=True) == application
+    assert translate_key_data(ctrl, flags=0, application_mode=True) == with_ctrl
+
+
 def test_text_from_reported_text():
     # "shift+1 with text '!'" translates to '!' in legacy mode.
     assert translate_key_data("\x1b[49;2;33u", flags=0) == "!"

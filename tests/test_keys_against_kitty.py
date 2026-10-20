@@ -134,12 +134,6 @@ DEVIATIONS = [
         ("'1'", Modifier.ALT | Modifier.SHIFT, "press", 0),
     ),
     Deviation(
-        "Home, End and Begin ignore the cursor key mode",
-        "Lillecarl/pymux#687",
-        lambda case: case.flags == 0 and case.cursor_key_mode and case.kitty in ("\x1bOH", "\x1bOF", "\x1bOE"),
-        ("HOME", 0, "press", 0, True),
-    ),
-    Deviation(
         "a modifier key reaches a pane that did not ask for every key",
         "Lillecarl/pymux#688",
         # kitty sends a modifier key only with REPORT_ALL_KEYS
