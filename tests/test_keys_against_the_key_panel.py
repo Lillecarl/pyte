@@ -34,10 +34,10 @@ VOTES = {
     "a mode that no program pushes": ((), ("kitty", "ghostty", "wezterm")),
     "kitty folds keypad 0 and 9 and no digit between": (("ghostty", "wezterm"), ("kitty",)),
     "a key with no legacy form is dropped": (("ghostty",), ("kitty", "wezterm")),
-    "super on a key a legacy pane reads is dropped": (("ghostty", "wezterm"), ("kitty",)),
-    "a modified F3 takes the cursor report form": (("wezterm",), ("kitty", "ghostty")),
-    "ctrl and Enter is a line feed": ((), ("kitty", "ghostty", "wezterm")),
-    "ctrl and shift on a letter is the control code": (("wezterm",), ("kitty", "ghostty")),
+    "super on a key a legacy pane reads is dropped": (("ghostty", "wezterm", "xterm"), ("kitty",)),
+    "a modified F3 takes the cursor report form": (("wezterm", "xterm"), ("kitty", "ghostty")),
+    "ctrl and Enter is a line feed": ((), ("kitty", "ghostty", "wezterm", "xterm")),
+    "ctrl and shift on a letter is the control code": (("wezterm", "xterm"), ("kitty", "ghostty")),
     "shift with ctrl or alt on a key with no shifted key is dropped": (("ghostty", "wezterm"), ("kitty",)),
 }
 
@@ -69,71 +69,104 @@ class ExtendedDeviation(NamedTuple):
     name: str
     issue: str
     matches: Callable[[ExtendedCase], bool]
+    #: A key the panel still says pyte sends wrong this way.
+    example: Request
+
+
+def _press(key: str, code: int, shifted: int, mods: int, other_keys: int, keypad: bool = False) -> Request:
+    return Request(key, code, shifted, mods, "press", 0, False, other_keys, keypad)
 
 
 EXTENDED_DEVIATIONS = [
     ExtendedDeviation(
-        "super is dropped",
+        "super is written and dropped by turns",
         "Lillecarl/pymux#693",
-        # Ghostty writes super as xterm's meta, "CSI 27 ; 9 ; 97 ~", and
-        # WezTerm as no modifier at all, "CSI 27 ; 1 ; 97 ~".
+        # pyte drops super where a character is written and keeps it in a
+        # CSI form: super+Delete is "CSI 3 ; 9 ~", where xterm and WezTerm
+        # drop it, "CSI 3 ~". Ghostty writes it as xterm's meta.
         lambda case: bool(case.request.mods & Modifier.SUPER),
-    ),
-    # The rest wait for xterm, whose mode this is: the two judges and
-    # pyte give three answers, or the two agree against pyte's reading
-    # of xterm's own rule.
-    ExtendedDeviation(
-        "alt and Escape is an escape code",
-        "Lillecarl/pymux#698",
-        # Ghostty and WezTerm write "ESC ESC"; pyte "CSI 27 ; 3 ; 27 ~".
-        lambda case: case.request.key == "ESCAPE" and bool(case.request.mods & Modifier.ALT),
+        _press("DELETE", 57349, 0, Modifier.SUPER, ModifyOtherKeys.ALT_AND_META),
     ),
     ExtendedDeviation(
-        "ctrl and Backspace",
-        "Lillecarl/pymux#698",
-        # pyte "CSI 27 ; 5 ; 127 ~", Ghostty BS, WezTerm "CSI 27 ; 5 ; 8 ~".
-        lambda case: case.request.key == "BACKSPACE" and bool(case.request.mods & Modifier.CTRL),
+        "the keypad is xterm's own",
+        "Lillecarl/pymux#700",
+        # Not an "other key" at any level, num lock wins over DECKPAM, and
+        # a modified key keeps the SS3 form: three rules of xterm's keypad.
+        lambda case: case.request.key.startswith("KP_"),
+        _press("KP_0", 57399, 0, Modifier.NUM_LOCK, ModifyOtherKeys.EVERY_KEY),
     ),
     ExtendedDeviation(
-        "a shifted key is written by its unshifted code",
-        "Lillecarl/pymux#698",
-        # alt+shift+minus: pyte "CSI 27 ; 4 ; 45 ~", Ghostty "CSI 27 ; 4 ;
-        # 95 ~", WezTerm "ESC _". Caps lock on a letter splits the same way.
-        # Space has no shifted character, so it is not one of these.
+        "level 1 writes the escape form for alt alone",
+        "Lillecarl/pymux#701",
+        lambda case: (
+            case.request.other_keys == ModifyOtherKeys.ALT_AND_META
+            and bool(case.request.mods & (Modifier.CTRL | Modifier.SHIFT))
+        ),
+        _press("'1'", 49, 33, Modifier.CTRL, ModifyOtherKeys.ALT_AND_META),
+    ),
+    ExtendedDeviation(
+        "level 2 writes a shifted key by its unshifted code",
+        "Lillecarl/pymux#702",
+        # alt+shift+minus: pyte "CSI 27 ; 4 ; 45 ~", xterm and Ghostty
+        # "CSI 27 ; 4 ; 95 ~". Space has no shifted character.
         lambda case: (
             case.request.key.startswith("'")
             and bool(case.request.shifted)
             and bool(case.request.mods & (Modifier.SHIFT | Modifier.CAPS_LOCK))
         ),
+        _press("'-'", 45, 95, Modifier.ALT | Modifier.SHIFT, ModifyOtherKeys.EVERY_MODIFIER),
     ),
     ExtendedDeviation(
-        "alt and keypad Enter",
-        "Lillecarl/pymux#698",
-        # pyte "CSI 27 ; 3 ; 13 ~", Ghostty CR, WezTerm "ESC CR".
-        lambda case: case.request.key == "KP_ENTER" and bool(case.request.mods & Modifier.ALT),
+        "ctrl and Backspace is BS",
+        "Lillecarl/pymux#703",
+        lambda case: case.request.key == "BACKSPACE" and bool(case.request.mods & Modifier.CTRL),
+        _press("BACKSPACE", 57347, 0, Modifier.CTRL, ModifyOtherKeys.EVERY_MODIFIER),
+    ),
+    ExtendedDeviation(
+        "ctrl and Enter is a line feed",
+        "Lillecarl/pymux#694",
+        lambda case: case.request.key == "ENTER" and bool(case.request.mods & Modifier.CTRL),
+        _press("ENTER", 57345, 0, Modifier.CTRL, ModifyOtherKeys.OFF, keypad=True),
     ),
 ]
 
 
+def _pyte_reads(request: Request) -> str:
+    "What pyte sends for this request, from what the terminal of the person sends."
+    source = kitty_encodes(
+        request.code, request.shifted, request.mods, request.action, SOURCE_FLAGS, request.cursor_key_mode
+    )
+    return translate_key_data(
+        source,
+        flags=0,
+        application_mode=request.cursor_key_mode,
+        source_flags=SOURCE_FLAGS,
+        synthesize=False,
+        modify_other_keys=request.other_keys,
+        application_keypad=request.keypad,
+    )
+
+
 def _extended_cases(other_keys: int, keypad: bool) -> list[ExtendedCase]:
-    requests, pytes = [], []
-    for key, code, shifted, mods, action, cursor_key_mode in keyboard():
-        if action != "press":
-            continue
-        requests.append(Request(key, code, shifted, mods, action, 0, cursor_key_mode, other_keys, keypad))
-        source = kitty_encodes(code, shifted, mods, action, SOURCE_FLAGS, cursor_key_mode)
-        pytes.append(
-            translate_key_data(
-                source,
-                flags=0,
-                application_mode=cursor_key_mode,
-                source_flags=SOURCE_FLAGS,
-                synthesize=False,
-                modify_other_keys=other_keys,
-                application_keypad=keypad,
-            )
-        )
+    requests = [
+        Request(key, code, shifted, mods, action, 0, cursor_key_mode, other_keys, keypad)
+        for key, code, shifted, mods, action, cursor_key_mode in keyboard()
+        if action == "press"
+    ]
+    pytes = [_pyte_reads(request) for request in requests]
     return [ExtendedCase(*fields) for fields in zip(requests, pytes, ask(requests), strict=True)]
+
+
+@pytest.mark.parametrize("deviation", EXTENDED_DEVIATIONS, ids=lambda deviation: deviation.name)
+def test_the_extended_deviation_is_still_there(deviation):
+    case = ExtendedCase(deviation.example, _pyte_reads(deviation.example), ask([deviation.example])[0])
+    vote = verdict(case.pyte, case.answers)
+    assert vote.verdict in ("pyte-wrong", "pyte-alone"), "%s is gone: take it off (%s) %r" % (
+        deviation.name,
+        deviation.issue,
+        vote,
+    )
+    assert deviation.matches(case), case
 
 
 #: Every mode kitty cannot judge. modifyOtherKeys off with the normal
@@ -162,5 +195,5 @@ def test_an_arrow_with_num_lock_is_judged_by_the_whole_panel():
     """
     case = judged("LEFT", Modifier.NUM_LOCK, "press", 0)
     answers = ask([_request(case)])[0]
-    assert answers == {"kitty": "\x1b[D", "ghostty": "\x1b[D", "wezterm": "\x1b[D"}
+    assert answers == {"kitty": "\x1b[D", "ghostty": "\x1b[D", "wezterm": "\x1b[D", "xterm": "\x1b[D"}
     assert verdict("\x1b[1;129D", answers).verdict == "pyte-wrong"

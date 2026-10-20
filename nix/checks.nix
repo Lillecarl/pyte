@@ -28,6 +28,8 @@
   # The other two key judges, `nix/key-judges.nix`.
   rustPlatform,
   libghostty-vt,
+  # How `tests/xterm_keys.py` presses a key into xterm.
+  libxtst,
   testSources,
   # The linter and formatter that the `ruff` check runs.
   ruff,
@@ -193,32 +195,40 @@ in
   } runPytest;
 
   # The key encoder, judged against kitty's and voted on by kitty,
-  # Ghostty and WezTerm. `pyte/keys.py` is a port of
+  # Ghostty, WezTerm and xterm. `pyte/keys.py` is a port of
   # `kitty/key_encoding.c`, and #684 was a line of it the port missed: a
   # lock reached bash as "CSI 1 ; 129 D". The same argument as `xcms`.
   #
   # A judge that will not load or answers wrong fails the build here,
   # rather than skipping every test in the suite. ctrl+a is a control code
   # in each, so a judge that read the modifier bits wrong says so now.
+  #
+  # One worker, not four: xterm takes keys through the focus of the X
+  # display, and two xterms on one display take it from each other.
   key-panel = suite {
     name = "pyte-key-panel";
-    inputs = [ testEnv ];
+    inputs = [
+      testEnv
+      xorg-server
+    ];
     env = { inherit selection; };
-    setup = prepare + ''
+    setup = prepare + display + ''
       export PYTE_KITTY=${kitty}/lib/kitty
       export PYTE_GHOSTTY_KEYS=${keyJudges.ghostty}/bin/ghostty-keys
       export PYTE_WEZTERM_KEYS=${keyJudges.wezterm}/bin/wezterm-keys
+      export PYTE_XTERM=${xterm}/bin/xterm
+      export PYTE_LIBXTST=${libxtst}/lib/libXtst.so
       python - <<'EOF'
       import sys
       sys.path.insert(0, "tests")
       import key_panel
       assert key_panel.judges_are_available()
       ctrl_a = key_panel.Request("'a'", 97, 65, 4, "press", 0, False)
-      assert key_panel.ask([ctrl_a]) == [{"kitty": "\x01", "ghostty": "\x01", "wezterm": "\x01"}]
+      assert key_panel.ask([ctrl_a]) == [{"kitty": "\x01", "ghostty": "\x01", "wezterm": "\x01", "xterm": "\x01"}]
       EOF
       export PYTE_GROUP=keys
     '';
-  } runPytestSpread;
+  } runPytest;
 
   # The style of pyte, held by the linter and the formatter rather
   # than by a run.

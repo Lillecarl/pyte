@@ -7,7 +7,11 @@ among encoders that other people wrote:
 - kitty, in C, through its python extension (`kitty_keys.py`);
 - Ghostty, in Zig, through libghostty-vt (`key-judges/ghostty_keys.c`);
 - WezTerm, in Rust, through termwiz and wezterm-input-types
-  (`key-judges/wezterm`).
+  (`key-judges/wezterm`);
+- xterm, in C, the program itself, with keys pressed into it on an X
+  display (`xterm_keys.py`). It speaks no kitty protocol, so it votes
+  only for a pane that pushed no flag, and there it is the authority on
+  modifyOtherKeys and DECKPAM, which are its own.
 
 `ptterm/tests/panel.py` does the same for a screen, and the verdicts
 are the same three, with one more:
@@ -27,7 +31,8 @@ and no DECKPAM, Ghostty has one level of modifyOtherKeys and no hyper or
 meta, and WezTerm reads a modifier key from a raw event this program
 does not have. An abstention is not a vote either way.
 
-`PYTE_GHOSTTY_KEYS` and `PYTE_WEZTERM_KEYS` name the two programs.
+`PYTE_GHOSTTY_KEYS` and `PYTE_WEZTERM_KEYS` name the two programs, and
+`xterm_keys.py` says what xterm needs.
 """
 
 from __future__ import annotations
@@ -39,6 +44,7 @@ from collections.abc import Iterable, Sequence
 from typing import NamedTuple
 
 from kitty_keys import kitty_encodes, kitty_keys_are_available, typed
+from xterm_keys import xterm_keys
 
 __all__ = [
     "JUDGES",
@@ -50,7 +56,7 @@ __all__ = [
 ]
 
 #: The judges, in the order a vote lists them.
-JUDGES = ("kitty", "ghostty", "wezterm")
+JUDGES = ("kitty", "ghostty", "wezterm", "xterm")
 
 _PROGRAMS = {"ghostty": "PYTE_GHOSTTY_KEYS", "wezterm": "PYTE_WEZTERM_KEYS"}
 
@@ -118,8 +124,8 @@ _programs: dict[str, _Program] = {}
 
 
 def judges_are_available() -> bool:
-    "True when kitty loads and both programs are named."
-    if not kitty_keys_are_available():
+    "True when kitty loads, both programs are named and xterm is there."
+    if not kitty_keys_are_available() or xterm_keys() is None:
         return False
     for judge, variable in _PROGRAMS.items():
         path = os.environ.get(variable)
@@ -138,13 +144,37 @@ def _kitty(request: Request) -> str | None:
     )
 
 
+def _xterm(request: Request) -> str | None:
+    if request.flags:
+        return None
+    if request.action == "release":
+        # The legacy encoding has no release, and xterm sends nothing.
+        return ""
+    xterm = xterm_keys()
+    assert xterm is not None
+    own = chr(request.code) if request.key.startswith("'") else ""
+    # X repeats a key by pressing it again, so a repeat is a press.
+    return xterm.press(
+        "CHAR" if own else request.key,
+        own,
+        request.mods,
+        request.cursor_key_mode,
+        request.other_keys,
+        request.keypad,
+    )
+
+
 def ask(requests: Iterable[Request]) -> list[dict[str, str | None]]:
     "What each judge sends for each request: bytes as a str, or None."
     requests = list(requests)
     lines = [request.line() for request in requests]
     answers = {judge: program.ask(lines) for judge, program in _programs.items()}
     return [
-        {"kitty": _kitty(request), **{judge: answers[judge][i] for judge in _programs}}
+        {
+            "kitty": _kitty(request),
+            **{judge: answers[judge][i] for judge in _programs},
+            "xterm": _xterm(request),
+        }
         for i, request in enumerate(requests)
     ]
 
