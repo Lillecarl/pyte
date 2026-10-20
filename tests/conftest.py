@@ -16,6 +16,7 @@ Run as one derivation, a change to any test pays for all of it. So
     unit    nothing but python, and ncurses for the terminfo entry
     xcms    Xvfb and libX11, for the colour specs
     xterm   xterm's own source, for the character set tables
+    kitty   kitty's python extension, for its key encoder
 
 **A file is not listed anywhere.** A list would be forgotten the first
 time somebody adds a test. The group comes from what the file imports:
@@ -65,11 +66,15 @@ XCMS_ORACLES = ("xlib_oracle",)
 #: source. It needs that source unpacked, which only its check has.
 XTERM_ORACLES = ("xterm_tables",)
 
+#: The module that asks kitty's own key encoder, which only the check
+#: that carries kitty can load.
+KITTY_ORACLES = ("kitty_keys",)
+
 #: Which group this run is. Empty means every group, which is what a
 #: run outside the build does.
 GROUP = os.environ.get("PYTE_GROUP", "")
 
-GROUPS = ("unit", "xcms", "xterm")
+GROUPS = ("unit", "xcms", "xterm", "kitty")
 
 
 # ----------------------------------------------------------------------
@@ -132,6 +137,8 @@ def group_of(path: Path) -> str:
         return "xcms"
     if _imports(source, XTERM_ORACLES):
         return "xterm"
+    if _imports(source, KITTY_ORACLES):
+        return "kitty"
     return "unit"
 
 

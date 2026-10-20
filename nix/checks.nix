@@ -22,6 +22,9 @@
   # character set tables out of `charsets.h`, because that file is the
   # only published list of the DEC national sets there is.
   xterm,
+  # `tests/kitty_keys.py` asks kitty's own key encoder, which kitty
+  # carries in its python extension.
+  kitty,
   testSources,
   # The linter and formatter that the `ruff` check runs.
   ruff,
@@ -182,6 +185,23 @@ in
       export PYTE_GROUP=xterm
     '';
   } runPytest;
+
+  # The key encoder, judged against kitty's. `pyte/keys.py` is a port of
+  # `kitty/key_encoding.c`, and #684 was a line of it the port missed:
+  # a lock reached bash as "CSI 1 ; 129 D". The same argument as `xcms`.
+  #
+  # An oracle that will not load fails the build here, rather than
+  # skipping every test in the suite. Lillecarl/pymux#684.
+  kitty-keys = suite {
+    name = "pyte-kitty-keys";
+    inputs = [ testEnv ];
+    env = { inherit selection; };
+    setup = prepare + ''
+      export PYTE_KITTY=${kitty}/lib/kitty
+      python -c "import sys; sys.path.insert(0, 'tests'); import kitty_keys; assert kitty_keys.kitty_keys_are_available()"
+      export PYTE_GROUP=kitty
+    '';
+  } runPytestSpread;
 
   # The style of pyte, held by the linter and the formatter rather
   # than by a run.
