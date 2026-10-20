@@ -273,6 +273,32 @@ _CTRL_TAKES_OFF_A_LETTER = ord("a") - 1
 #: and ctrl+backslash is 28.
 _CTRL_TAKES_OFF_A_SYMBOL = ord("\\") - 28
 
+#: The control code that ctrl gives a key that is not a letter.
+#:
+#: The VT220 put NUL, ESC to US and DEL on the row of digits as well,
+#: and xterm and kitty keep it: kitty's `ctrled_key`
+#: (`kitty/key_encoding.c`) is this table. A key that is not here has
+#: no control code, so ctrl on it is lost. Lillecarl/pymux#686.
+_CONTROL_CODE_OF = {
+    ord(" "): 0,
+    ord("2"): 0,
+    ord("@"): 0,
+    ord("3"): 27,
+    ord("["): 27,
+    ord("4"): 28,
+    ord("\\"): 28,
+    ord("5"): 29,
+    ord("]"): 29,
+    ord("6"): 30,
+    ord("^"): 30,
+    ord("~"): 30,
+    ord("7"): 31,
+    ord("/"): 31,
+    ord("_"): 31,
+    ord("8"): 127,
+    ord("?"): 127,
+}
+
 #: What shift and Tab send in the legacy encoding, after the escape.
 #: CBT by its other name.
 BACK_TAB = "[Z"
@@ -1087,10 +1113,8 @@ def _encode_event(
                     result += "\x08"
                 elif ord("a") <= code <= ord("z"):
                     result += chr(code - _CTRL_TAKES_OFF_A_LETTER)
-                elif code == ord("@"):
-                    result += "\x00"
-                elif ord("\\") <= code <= ord("_"):
-                    result += chr(code - _CTRL_TAKES_OFF_A_SYMBOL)
+                elif code in _CONTROL_CODE_OF:
+                    result += chr(_CONTROL_CODE_OF[code])
                 elif code == KeyCode.ESCAPE:
                     result += "\x1b"
                 else:
@@ -1274,6 +1298,15 @@ class Unhearable(ValueError):
         )
 
 
+def _has_a_control_code(code: int) -> bool:
+    "Whether ctrl on this key writes a control code in the legacy encoding."
+    return (
+        ord("a") <= code <= ord("z")
+        or code in _CONTROL_CODE_OF
+        or code in (KeyCode.ENTER, KeyCode.TAB, KeyCode.BACKSPACE, KeyCode.ESCAPE)
+    )
+
+
 def _carries_the_number(flags: int) -> bool:
     "Every modifier fits when it does: the form has a field for them."
     return bool(
@@ -1307,7 +1340,12 @@ def the_modifiers_a_pane_cannot_read(event: KeyEvent, flags: int) -> int:
     if event.mods & Modifier.CTRL:
         # ctrl+a and ctrl+shift+a are one control code.
         # Lillecarl/pymux#168.
-        return lost | (event.mods & Modifier.SHIFT)
+        lost |= event.mods & Modifier.SHIFT
+        folded = _folded(event, flags)
+        if folded is not None and not _has_a_control_code(folded.code):
+            # ctrl+1 is "1". Lillecarl/pymux#686.
+            lost |= Modifier.CTRL
+        return lost
     if event.mods & Modifier.SHIFT and not chr(event.code).isalpha():
         # Shift is carried by the capital, and "1" has none. A keyboard
         # answers with the text it reports; a name has no text.

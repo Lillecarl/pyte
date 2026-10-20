@@ -16,6 +16,7 @@ from pyte.keys import (
     KeyEvent,
     Modifier,
     ModifyOtherKeys,
+    Unhearable,
     parse_key_data,
     translate_key_data,
     translate_key_event,
@@ -695,6 +696,56 @@ def test_the_extended_mode_writes_no_lock(locked, level, tilde, csi_u):
     assert translate_key_data(locked, flags=0, modify_other_keys=level) == tilde
     csi_u_form = FormatOtherKeys.CSI_U
     assert translate_key_data(locked, flags=0, modify_other_keys=level, format_other_keys=csi_u_form) == csi_u
+
+
+#: Ctrl on a key that is not a letter, and the control code a legacy
+#: pane reads: kitty's `ctrled_key`, which is the VT220's and xterm's.
+CTRL_ON_A_SYMBOL = [
+    (" ", "\x00"),
+    ("2", "\x00"),
+    ("@", "\x00"),
+    ("3", "\x1b"),
+    ("[", "\x1b"),
+    ("4", "\x1c"),
+    ("\\", "\x1c"),
+    ("5", "\x1d"),
+    ("]", "\x1d"),
+    ("6", "\x1e"),
+    ("^", "\x1e"),
+    ("~", "\x1e"),
+    ("7", "\x1f"),
+    ("/", "\x1f"),
+    ("_", "\x1f"),
+    ("8", "\x7f"),
+    ("?", "\x7f"),
+]
+
+
+@pytest.mark.parametrize(("key", "control"), CTRL_ON_A_SYMBOL)
+def test_ctrl_on_a_symbol_is_its_control_code(key, control):
+    """
+    ctrl+space reached a legacy pane as a space, and Emacs never saw
+    set-mark. Lillecarl/pymux#686.
+    """
+    assert translate_key_data("\x1b[%d;5u" % ord(key), flags=0) == control
+    assert translate_key_data("\x1b[%d;7u" % ord(key), flags=0) == "\x1b" + control
+    event = KeyEvent(ord(key), Modifier.CTRL, "u")
+    assert translate_key_event(event, flags=0, exactly=True) == control
+
+
+def test_ctrl_on_the_keypad_slash_is_the_control_code_of_slash():
+    "The keypad folds onto the main keys first, as in kitty."
+    assert translate_key_data("\x1b[57410;5u", flags=0) == "\x1f"
+    assert translate_key_event(KeyEvent(57410, Modifier.CTRL, "u"), flags=0, exactly=True) == "\x1f"
+
+
+def test_ctrl_on_a_key_with_no_control_code_is_lost():
+    'ctrl+1 is "1", and the pane is told it lost the ctrl.'
+    assert translate_key_data("\x1b[49;5u", flags=0) == "1"
+    with pytest.raises(Unhearable) as caught:
+        translate_key_event(KeyEvent(ord("1"), Modifier.CTRL, "u"), flags=0, exactly=True)
+    assert caught.value.lost == Modifier.CTRL
+    assert caught.value.encoded == "1"
 
 
 #: A key that writes text, the flags of the pane, and what it reads:

@@ -110,15 +110,6 @@ DEVIATIONS = [
         ("ENTER", Modifier.CTRL, "press", 0),
     ),
     Deviation(
-        "ctrl on space, slash or a bracket writes no control code",
-        "Lillecarl/pymux#686",
-        # kitty's `ctrled_key` gives NUL, 0x1f and ESC.
-        lambda case: (
-            case.flags == 0 and bool(case.mods & Modifier.CTRL) and case.key in ("' '", "'/'", "'['", "KP_DIVIDE")
-        ),
-        ("' '", Modifier.CTRL, "press", 0),
-    ),
-    Deviation(
         "ctrl and shift on a letter is the control code",
         "Lillecarl/pymux#168",
         # kitty finds no legacy form and writes "CSI 97 ; 6 u".
