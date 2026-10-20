@@ -1,0 +1,14 @@
+[package]
+name = "wezterm-keys"
+version = "0.1.0"
+edition = "2024"
+description = "Ask WezTerm's key encoders what a key sends, to judge pyte.keys"
+license = "MIT"
+
+# The revision `ptterm/tests/judges` pins, so both judges read one WezTerm.
+[dependencies]
+termwiz = { git = "https://github.com/wezterm/wezterm", rev = "4fbd6b8e90e2326b8e25c589768f98bd71ddd047" }
+wezterm-input-types = { git = "https://github.com/wezterm/wezterm", rev = "4fbd6b8e90e2326b8e25c589768f98bd71ddd047" }
+
+[profile.release]
+debug = false

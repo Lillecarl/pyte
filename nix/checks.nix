@@ -25,12 +25,18 @@
   # `tests/kitty_keys.py` asks kitty's own key encoder, which kitty
   # carries in its python extension.
   kitty,
+  # The other two key judges, `nix/key-judges.nix`.
+  rustPlatform,
+  libghostty-vt,
   testSources,
   # The linter and formatter that the `ruff` check runs.
   ruff,
 }:
 let
   inherit (callPackage ./suite.nix { }) suite;
+
+  # Ghostty's and WezTerm's key encoders, the other two judges beside kitty.
+  keyJudges = callPackage ./key-judges.nix { };
 
   # Narrow a run to one file or one test while hunting:
   #
@@ -186,20 +192,31 @@ in
     '';
   } runPytest;
 
-  # The key encoder, judged against kitty's. `pyte/keys.py` is a port of
-  # `kitty/key_encoding.c`, and #684 was a line of it the port missed:
-  # a lock reached bash as "CSI 1 ; 129 D". The same argument as `xcms`.
+  # The key encoder, judged against kitty's and voted on by kitty,
+  # Ghostty and WezTerm. `pyte/keys.py` is a port of
+  # `kitty/key_encoding.c`, and #684 was a line of it the port missed: a
+  # lock reached bash as "CSI 1 ; 129 D". The same argument as `xcms`.
   #
-  # An oracle that will not load fails the build here, rather than
-  # skipping every test in the suite. Lillecarl/pymux#684.
-  kitty-keys = suite {
-    name = "pyte-kitty-keys";
+  # A judge that will not load or answers wrong fails the build here,
+  # rather than skipping every test in the suite. ctrl+a is a control code
+  # in each, so a judge that read the modifier bits wrong says so now.
+  key-panel = suite {
+    name = "pyte-key-panel";
     inputs = [ testEnv ];
     env = { inherit selection; };
     setup = prepare + ''
       export PYTE_KITTY=${kitty}/lib/kitty
-      python -c "import sys; sys.path.insert(0, 'tests'); import kitty_keys; assert kitty_keys.kitty_keys_are_available()"
-      export PYTE_GROUP=kitty
+      export PYTE_GHOSTTY_KEYS=${keyJudges.ghostty}/bin/ghostty-keys
+      export PYTE_WEZTERM_KEYS=${keyJudges.wezterm}/bin/wezterm-keys
+      python - <<'EOF'
+      import sys
+      sys.path.insert(0, "tests")
+      import key_panel
+      assert key_panel.judges_are_available()
+      ctrl_a = key_panel.Request("'a'", 97, 65, 4, "press", 0, False)
+      assert key_panel.ask([ctrl_a]) == [{"kitty": "\x01", "ghostty": "\x01", "wezterm": "\x01"}]
+      EOF
+      export PYTE_GROUP=keys
     '';
   } runPytestSpread;
 

@@ -61,19 +61,18 @@ DEVIATIONS = [
         # that says how to write a key. kitty keeps the locks there and
         # folds the keypad by a rule of its own.
         lambda case: bool(case.flags) and not _reads_the_number(case.flags),
-        ("KP_0", 0, "press", KeyboardFlag.REPORT_ASSOCIATED_TEXT),
+        ("KP_0", Modifier.ALT | Modifier.NUM_LOCK, "press", KeyboardFlag.REPORT_ALTERNATE_KEYS),
     ),
     Deviation(
         "kitty folds keypad 0 and 9 and no digit between",
         "kitty's own",
         # `convert_kp_key_to_normal_key` has "case GLFW_FKEY_KP_0: case
-        # GLFW_FKEY_KP_9:" where a range is meant, so keypad 1 to 8 reach
-        # a legacy pane as "CSI 57400 u". A keyboard rarely sends one:
-        # xkb gives KP_End without num lock, and text with it.
+        # GLFW_FKEY_KP_9:" where a range is meant, so a modified keypad 1
+        # to 8 reaches a legacy pane as "CSI 57400 ; 3 u".
         lambda case: (
             case.flags == 0 and case.key in {"KP_%d" % n for n in range(1, 9)} and case.kitty.startswith("\x1b[574")
         ),
-        ("KP_1", 0, "press", 0),
+        ("KP_1", Modifier.ALT | Modifier.NUM_LOCK, "press", 0),
     ),
     Deviation(
         "a key with no legacy form is dropped",

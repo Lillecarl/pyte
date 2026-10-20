@@ -40,8 +40,10 @@ __all__ = [
     "Case",
     "disagreements",
     "judged",
+    "keyboard",
     "kitty_encodes",
     "kitty_keys_are_available",
+    "typed",
 ]
 
 #: What pymux pushes to the terminal of the person: every flag.
@@ -80,6 +82,7 @@ class Case(NamedTuple):
 
     key: str  # the name kitty gives it, or the character
     code: int
+    shifted: int  # the code point shift gives the key, or 0
     mods: int
     action: str  # "press", "repeat" or "release"
     flags: int
@@ -93,7 +96,7 @@ _kitty = None
 
 
 def kitty_keys_are_available() -> bool:
-    global _kitty
+    global _kitty, _KEYPAD_WITHOUT_NUM_LOCK
     path = os.environ.get("PYTE_KITTY")
     if not path:
         return False
@@ -104,6 +107,9 @@ def kitty_keys_are_available() -> bool:
     except Exception:
         return False
     _kitty = fast_data_types
+    _KEYPAD_WITHOUT_NUM_LOCK = frozenset(
+        getattr(_kitty, "GLFW_FKEY_" + name) for name in _KEYPAD_NAMES_WITHOUT_NUM_LOCK
+    )
     return True
 
 
@@ -116,6 +122,22 @@ def _keys():
         yield repr(char), ord(char), ord(shifted) if shifted != char else 0
 
 
+_KEYPAD_NAMES_WITHOUT_NUM_LOCK = (
+    "KP_INSERT",
+    "KP_END",
+    "KP_DOWN",
+    "KP_PAGE_DOWN",
+    "KP_LEFT",
+    "KP_BEGIN",
+    "KP_RIGHT",
+    "KP_HOME",
+    "KP_UP",
+    "KP_PAGE_UP",
+    "KP_DELETE",
+)
+_KEYPAD_WITHOUT_NUM_LOCK: frozenset[int] = frozenset()
+
+
 def _actions():
     return {"press": _kitty.GLFW_PRESS, "repeat": _kitty.GLFW_REPEAT, "release": _kitty.GLFW_RELEASE}
 
@@ -124,6 +146,17 @@ def text_of(code: int, shifted: int, mods: int, action: str) -> str:
     "The text xkb gives this key, as near as a US layout says."
     if action == "release" or mods & _NO_TEXT:
         return ""
+    return typed(code, shifted, mods)
+
+
+def typed(code: int, shifted: int, mods: int) -> str:
+    """
+    The character this key types before ctrl or alt change it.
+
+    kitty has no text with ctrl held, and Ghostty asks for this one
+    anyway: "the unmodified character before any Ctrl/Meta
+    transformations" (`ghostty/vt/key/event.h`).
+    """
     if _kitty.GLFW_FKEY_KP_0 <= code <= _kitty.GLFW_FKEY_KP_9:
         # Num lock makes a digit of a keypad key, and only then does it
         # write one (`glfw/xkb_glfw.c`, under `GLFW_MOD_NUM_LOCK`).
@@ -154,7 +187,7 @@ def _judged(key: str, code: int, shifted: int, mods: int, action: str, flags: in
     pyte = translate_key_data(
         source, flags=flags, application_mode=cursor_key_mode, source_flags=SOURCE_FLAGS, synthesize=False
     )
-    return Case(key, code, mods, action, flags, cursor_key_mode, source, kitty, pyte)
+    return Case(key, code, shifted, mods, action, flags, cursor_key_mode, source, kitty, pyte)
 
 
 def judged(key: str, mods: int, action: str, flags: int, cursor_key_mode: bool = False) -> Case:
@@ -165,11 +198,33 @@ def judged(key: str, mods: int, action: str, flags: int, cursor_key_mode: bool =
     raise KeyError(key)
 
 
-def disagreements(flags: int):
-    "Every key, modifier set and event where pyte and kitty differ."
+def _on_this_keyboard(code: int, mods: int) -> bool:
+    """
+    Whether xkb gives this key with these modifiers.
+
+    A keypad key is two keys, and num lock picks which one: KP_0 with
+    it, KP_INSERT without. So a digit without num lock is no key at
+    all, and neither is KP_INSERT with it.
+    """
+    if _kitty.GLFW_FKEY_KP_0 <= code <= _kitty.GLFW_FKEY_KP_9:
+        return bool(mods & Modifier.NUM_LOCK)
+    if code in _KEYPAD_WITHOUT_NUM_LOCK:
+        return not mods & Modifier.NUM_LOCK
+    return True
+
+
+def keyboard():
+    "Every key, modifier set, event and cursor key mode the sweep tries."
     for (key, code, shifted), mods, action, cursor_key_mode in itertools.product(
         list(_keys()), MODIFIER_SETS, _actions(), (False, True)
     ):
+        if _on_this_keyboard(code, mods):
+            yield key, code, shifted, mods, action, cursor_key_mode
+
+
+def disagreements(flags: int):
+    "Every key, modifier set and event where pyte and kitty differ."
+    for key, code, shifted, mods, action, cursor_key_mode in keyboard():
         case = _judged(key, code, shifted, mods, action, flags, cursor_key_mode)
         if case.pyte != case.kitty:
             yield case
