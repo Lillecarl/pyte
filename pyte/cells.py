@@ -31,6 +31,7 @@ __all__ = (
     "UNDERLINE_PARAMETERS",
     "UNDERLINE_SHAPES",
     "UNWRITTEN",
+    "VS16",
     "Appearance",
     "Cell",
     "ErasedCell",
@@ -41,6 +42,7 @@ __all__ = (
     "appearance_of",
     "character_width",
     "protection_of",
+    "without_widening_selectors",
 )
 
 
@@ -87,6 +89,30 @@ def character_width(text: str) -> int:
     if len(text) == 1:
         return max(0, wcwidth(text))
     return sum(character_width(character) for character in text)
+
+
+#: VARIATION SELECTOR-16: draw the character before it as an emoji.
+VS16 = "️"
+
+
+def without_widening_selectors(text: str) -> str:
+    """
+    `text` with each U+FE0F after a one-column character taken out.
+
+    A screen holds such a pair one column wide, as `character_width`
+    sums it and six emulators of seven agree. kitty draws it two wide
+    and over the next cell, so a terminal like it is given the
+    character alone. A selector after a wide character stays: that
+    emoji is two columns everywhere. Lillecarl/pymux#539.
+    """
+    parts = text.split(VS16)
+    kept = [parts[0]]
+    for part in parts[1:]:
+        before = kept[-1][-1:]
+        if not before or character_width(before) != 1:
+            kept.append(VS16)
+        kept.append(part)
+    return "".join(kept)
 
 
 class Cell:
