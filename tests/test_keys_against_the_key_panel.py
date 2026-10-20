@@ -87,13 +87,6 @@ EXTENDED_DEVIATIONS = [
         "Lillecarl/pymux#687",
         lambda case: case.request.cursor_key_mode and set(case.answers.values()) & {"\x1bOH", "\x1bOF", "\x1bOE"},
     ),
-    ExtendedDeviation(
-        "shift on space is lost",
-        "Lillecarl/pymux#699",
-        # Space has no shifted character, so shift counts at level 2, as
-        # it does on Tab: "CSI 27 ; 2 ; 32 ~" in both judges.
-        lambda case: case.request.key == "' '" and bool(case.request.mods & Modifier.SHIFT),
-    ),
     # The rest wait for xterm, whose mode this is: the two judges and
     # pyte give three answers, or the two agree against pyte's reading
     # of xterm's own rule.
@@ -114,8 +107,11 @@ EXTENDED_DEVIATIONS = [
         "Lillecarl/pymux#698",
         # alt+shift+minus: pyte "CSI 27 ; 4 ; 45 ~", Ghostty "CSI 27 ; 4 ;
         # 95 ~", WezTerm "ESC _". Caps lock on a letter splits the same way.
+        # Space has no shifted character, so it is not one of these.
         lambda case: (
-            case.request.key.startswith("'") and bool(case.request.mods & (Modifier.SHIFT | Modifier.CAPS_LOCK))
+            case.request.key.startswith("'")
+            and bool(case.request.shifted)
+            and bool(case.request.mods & (Modifier.SHIFT | Modifier.CAPS_LOCK))
         ),
     ),
     ExtendedDeviation(

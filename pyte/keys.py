@@ -350,10 +350,12 @@ def _has_a_shifted_character(code: int, text: str) -> bool:
     Shift on a letter gives the capital, and a terminal sends that
     character rather than saying "shift and a letter". Shift on Tab
     gives nothing, which is why shift+Tab is the example xterm uses
-    for the level where all the modifiers apply.
+    for the level where all the modifiers apply. Space is the same: it
+    writes itself with shift held, so shift+space is "CSI 27 ; 2 ; 32 ~",
+    as Ghostty and WezTerm send it. Lillecarl/pymux#699.
     """
     if text:
-        return True
+        return text != chr(code)
     character = chr(code)
     return character.isprintable() and character.upper() != character
 

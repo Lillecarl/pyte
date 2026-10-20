@@ -86,6 +86,19 @@ def test_a_capital_letter_is_still_a_capital_letter():
     assert screen.encode_key("a") == "a"
 
 
+def test_shift_on_space_counts_at_the_second_level():
+    """
+    Space writes itself with shift held, so it has no shifted
+    character, and shift counts the way it does on Tab. Ghostty and
+    WezTerm both send "CSI 27 ; 2 ; 32 ~". Lillecarl/pymux#699.
+    """
+    screen, stream, _ = a_screen()
+    stream.feed("\x1b[>4;2m")
+
+    assert screen.encode_key("\x1b[32;2;32u") == "\x1b[27;2;32~"
+    assert screen.encode_key("\x1b[49:33;2;33u") == "!"
+
+
 def test_every_key_is_the_third_level():
     '"unmodified keys also are sent as escape sequences. space sends CSI 27 ; 1 ; 32 ~"'
     screen, stream, _ = a_screen()
