@@ -99,6 +99,25 @@ def test_shift_on_space_counts_at_the_second_level():
     assert screen.encode_key("\x1b[49:33;2;33u") == "!"
 
 
+def test_ctrl_on_backspace_is_the_back_arrow_toggle():
+    """
+    xterm's `IsBackarrowToggle`: ctrl flips Backspace between DEL and
+    BS, and it is no modifier to the second level. So ctrl+Backspace is
+    BS, as xterm and Ghostty send it, and another modifier beside it
+    takes the escape form with BS in it. Lillecarl/pymux#703.
+    """
+    screen, stream, _ = a_screen()
+    stream.feed("\x1b[>4;2m")
+
+    assert screen.encode_key("\x1b[127;5u") == "\x08"
+    assert screen.encode_key("\x1b[127;6u") == "\x1b[27;6;8~"
+    assert screen.encode_key("\x1b[127;2u") == "\x1b[27;2;127~"
+    assert screen.encode_key("\x1b[127;3u") == "\x1b[27;3;127~"
+
+    stream.feed("\x1b[>4;3m")
+    assert screen.encode_key("\x1b[127;5u") == "\x1b[27;5;8~"
+
+
 def test_every_key_is_the_third_level():
     '"unmodified keys also are sent as escape sequences. space sends CSI 27 ; 1 ; 32 ~"'
     screen, stream, _ = a_screen()

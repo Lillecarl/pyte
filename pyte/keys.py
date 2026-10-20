@@ -1146,10 +1146,21 @@ def _encode_event(
         # not with the flag stack. A pane in one of the kitty modes
         # never gets here, because every branch above answers first.
         # Lillecarl/pymux#169.
-        if _wants_the_escape_form(modify_other_keys, code, mods, text):
+        escape_code = code
+        if code == KeyCode.BACKSPACE and modify_other_keys >= ModifyOtherKeys.EVERY_MODIFIER:
+            # xterm's back-arrow toggle (`IsBackarrowToggle`, `input.c`):
+            # ctrl flips which of BS and DEL the key writes, and is no
+            # modifier to the level-2 test. So ctrl+Backspace stays BS, and
+            # ctrl+shift+Backspace is "CSI 27 ; 6 ; 8 ~". Lillecarl/pymux#703.
+            ctrl = bool(mods & Modifier.CTRL)
+            escape_code = 0x7F if (not backarrow_sends_backspace) != ctrl else 0x08
+            wants_it = modify_other_keys == ModifyOtherKeys.EVERY_KEY or bool(mods & ~(Modifier.CTRL | _LOCK_MODIFIERS))
+        else:
+            wants_it = _wants_the_escape_form(modify_other_keys, code, mods, text)
+        if wants_it:
             if format_other_keys == FormatOtherKeys.CSI_U:
-                return "%s%d;%du" % (CSI, code, mods_value)
-            return "%s27;%d;%d~" % (CSI, mods_value, code)
+                return "%s%d;%du" % (CSI, escape_code, mods_value)
+            return "%s27;%d;%d~" % (CSI, mods_value, escape_code)
 
         # Legacy form.
         if back_tab:

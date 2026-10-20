@@ -117,12 +117,6 @@ EXTENDED_DEVIATIONS = [
         _press("'-'", 45, 95, Modifier.ALT | Modifier.SHIFT, ModifyOtherKeys.EVERY_MODIFIER),
     ),
     ExtendedDeviation(
-        "ctrl and Backspace is BS",
-        "Lillecarl/pymux#703",
-        lambda case: case.request.key == "BACKSPACE" and bool(case.request.mods & Modifier.CTRL),
-        _press("BACKSPACE", 57347, 0, Modifier.CTRL, ModifyOtherKeys.EVERY_MODIFIER),
-    ),
-    ExtendedDeviation(
         "ctrl and Enter is a line feed",
         "Lillecarl/pymux#694",
         lambda case: case.request.key == "ENTER" and bool(case.request.mods & Modifier.CTRL),
