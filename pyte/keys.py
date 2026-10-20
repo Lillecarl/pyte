@@ -1005,22 +1005,43 @@ _KEYPAD_APPLICATION = {
 }
 
 
-def _application_keypad_form(event: KeyEvent, flags: int) -> str | None:
-    """
-    What this key sends to a pane that turned the application keypad
-    on, or None when the mode does not reach it.
+#: The character each keypad key types, xterm's `kypd_num`: the digit,
+#: the operator, CR for Enter, and a comma for the separator.
+_KEYPAD_CHARACTER = {
+    **{key: chr(code) for key, (code, final) in _KEYPAD_TO_NORMAL.items() if final == "u"},
+    FunctionalKey.KP_SEPARATOR: ",",
+}
 
-    It belongs to the legacy mode, the way the SS3 form of an arrow
-    does: a pane that pushed a kitty flag reads the number of the key.
-    A modifier takes it out too, because xterm gives a modified keypad
-    key to `modifyKeypadKeys` and this screen has no such resource.
+
+def _xterm_keypad_form(
+    event: KeyEvent, flags: int, application_keypad: bool, num_lock: bool, modify_other_keys: int
+) -> str | None:
     """
-    if not _legacy_mode(flags):
-        return None
-    if event.mods or event.event != EventType.PRESS or event.final != "u":
+    What a keypad key sends in the modes that are xterm's own, DECKPAM
+    and modifyOtherKeys, or None to fold it as the legacy encoding does.
+
+    xterm's `Input()` (`input.c`) takes a keypad key before it looks at
+    modifyOtherKeys, so that never reaches one. With DECKPAM on and num
+    lock off, the key is its SS3 form, with the modifiers in it: shift on
+    keypad plus is "SS3 2 k". Num lock turns DECKPAM off for a key that
+    types a character (`real_NumLock`), and then, as at any level of
+    modifyOtherKeys, the key is that character and nothing else.
+    Lillecarl/pymux#700.
+
+    Only a pane in the legacy mode: one that pushed a kitty flag reads
+    the number of the key.
+    """
+    if not _legacy_mode(flags) or event.final != "u" or event.event == EventType.RELEASE:
         return None
     final = _KEYPAD_APPLICATION.get(event.code)
-    return None if final is None else SS3 + final
+    if final is None:
+        return None
+    if application_keypad and not num_lock:
+        mods = event.mods & (Modifier.SHIFT | Modifier.ALT | Modifier.CTRL)
+        return SS3 + ("%d" % (mods + 1) if mods else "") + final
+    if application_keypad or modify_other_keys:
+        return _KEYPAD_CHARACTER[event.code]
+    return None
 
 
 def _folded(event: KeyEvent, flags: int) -> KeyEvent | None:
@@ -1111,10 +1132,11 @@ def _encode_event(
     # The legacy forms write no lock, but caps lock still picks the
     # character a letter types, which the extended mode writes.
     caps_lock = bool(event.mods & Modifier.CAPS_LOCK)
+    num_lock = bool(event.mods & Modifier.NUM_LOCK)
     if not flags and event.mods & _LOCK_MODIFIERS:
         event = event._replace(mods=event.mods & ~_LOCK_MODIFIERS)
-    if application_keypad:
-        keypad = _application_keypad_form(event, flags)
+    if application_keypad or modify_other_keys:
+        keypad = _xterm_keypad_form(event, flags, application_keypad, num_lock, modify_other_keys)
         if keypad is not None:
             return keypad
     plain = _folded(event, flags)

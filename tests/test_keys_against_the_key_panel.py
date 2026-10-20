@@ -88,12 +88,16 @@ EXTENDED_DEVIATIONS = [
         _press("DELETE", 57349, 0, Modifier.SUPER, ModifyOtherKeys.ALT_AND_META),
     ),
     ExtendedDeviation(
-        "the keypad is xterm's own",
+        "caps lock on keypad Begin at level 3",
         "Lillecarl/pymux#700",
-        # Not an "other key" at any level, num lock wins over DECKPAM, and
-        # a modified key keeps the SS3 form: three rules of xterm's keypad.
-        lambda case: case.request.key.startswith("KP_"),
-        _press("KP_0", 57399, 0, Modifier.NUM_LOCK, ModifyOtherKeys.EVERY_KEY),
+        # xterm "CSI 1 ; 1 E", WezTerm "CSI E", pyte "SS3 E" with DECCKM:
+        # three answers, and only a lock to tell them apart.
+        lambda case: (
+            case.request.key == "KP_BEGIN"
+            and bool(case.request.mods & Modifier.CAPS_LOCK)
+            and case.request.other_keys == ModifyOtherKeys.EVERY_KEY
+        ),
+        Request("KP_BEGIN", 57427, 0, Modifier.CAPS_LOCK, "press", 0, True, ModifyOtherKeys.EVERY_KEY, False),
     ),
     ExtendedDeviation(
         "ctrl on a shifted key from 0x60 to 0x7F has no control code",

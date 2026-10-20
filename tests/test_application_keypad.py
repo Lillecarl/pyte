@@ -136,15 +136,43 @@ def test_a_keypad_arrow_follows_the_cursor_keys_and_not_the_keypad():
     assert screen.encode_key(sent_for(FunctionalKey.KP_UP)) == "\x1bOA"
 
 
-def test_a_modified_keypad_key_is_not_in_this_mode():
+def test_a_modified_keypad_key_keeps_its_ss3_form():
     """
-    xterm gives a modified keypad key to `modifyKeypadKeys`, and this
-    screen has no such resource, so the key folds as it did.
+    xterm writes the modifiers into the SS3 form, as it does for F1:
+    shift on keypad plus is "SS3 2 k". Lillecarl/pymux#700.
     """
     screen, stream = a_screen()
     stream.feed("\x1b=")
 
-    assert screen.encode_key("\x1b[%d;5u" % FunctionalKey.KP_0) == "0"
+    assert screen.encode_key("\x1b[%d;5u" % FunctionalKey.KP_0) == "\x1bO5p"
+    assert screen.encode_key("\x1b[%d;2u" % FunctionalKey.KP_ADD) == "\x1bO2k"
+
+
+def test_num_lock_puts_the_digits_back():
+    """
+    xterm's `numLock`: with num lock on, a keypad key that types a
+    character types it, whatever DECKPAM says. Ghostty agrees.
+    Lillecarl/pymux#700.
+    """
+    screen, stream = a_screen()
+    stream.feed("\x1b=")
+
+    assert screen.encode_key("\x1b[%d;129u" % FunctionalKey.KP_0) == "0"
+    assert screen.encode_key("\x1b[%d;129u" % FunctionalKey.KP_ENTER) == "\r"
+    assert screen.encode_key("\x1b[%d;133u" % FunctionalKey.KP_2) == "2"
+
+
+def test_modify_other_keys_never_reaches_the_keypad():
+    """
+    xterm takes a keypad key before it looks at modifyOtherKeys, so at
+    every level it is the character it types. Lillecarl/pymux#700.
+    """
+    screen, stream = a_screen()
+    stream.feed("\x1b[>4;3m")
+
+    assert screen.encode_key("\x1b[%d;129u" % FunctionalKey.KP_0) == "0"
+    assert screen.encode_key("\x1b[%du" % FunctionalKey.KP_ENTER) == "\r"
+    assert screen.encode_key("\x1b[%d;2u" % FunctionalKey.KP_ADD) == "+"
 
 
 def test_a_pane_that_asked_for_more_reads_the_number_of_the_key():

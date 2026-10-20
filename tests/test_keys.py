@@ -717,11 +717,18 @@ def test_a_pane_that_pushed_no_flag_reads_no_lock(name, locked, plain):
         assert translate_key_data(locked, flags=0, application_mode=application_mode) == expected, name
 
 
-def test_a_lock_leaves_the_application_keypad_alone():
-    "DECKPAM writes a keypad key with no modifier, and a lock is none."
-    assert translate_key_data("\x1b[57399;129u", flags=0, application_keypad=True) == translate_key_data(
-        "\x1b[57399u", flags=0, application_keypad=True
-    )
+def test_caps_lock_leaves_the_application_keypad_alone():
+    "DECKPAM writes a keypad key with no modifier, and caps lock is none."
+    assert translate_key_data("\x1b[57399;65u", flags=0, application_keypad=True) == "\x1bOp"
+
+
+def test_num_lock_takes_the_application_keypad_off():
+    """
+    The one lock that changes a keypad key: with num lock on, xterm
+    sends the digit whatever DECKPAM says (`real_NumLock`), and Ghostty
+    agrees. Lillecarl/pymux#700.
+    """
+    assert translate_key_data("\x1b[57399;129u", flags=0, application_keypad=True) == "0"
 
 
 #: A key with a lock on, the level of modifyOtherKeys, and what each of
