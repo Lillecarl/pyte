@@ -772,7 +772,7 @@ def test_num_lock_takes_the_application_keypad_off():
 WITH_A_LOCK_IN_THE_EXTENDED_MODE = [
     ("\x1b[97;133u", ModifyOtherKeys.EVERY_MODIFIER, "\x1b[27;5;97~", "\x1b[97;5u"),
     ("\x1b[97;135u", ModifyOtherKeys.ALT_AND_META, "\x1b[27;7;97~", "\x1b[97;7u"),
-    ("\x1b[9;66u", ModifyOtherKeys.EVERY_MODIFIER, "\x1b[27;2;9~", "\x1b[9;2u"),
+    ("\x1b[9;70u", ModifyOtherKeys.EVERY_MODIFIER, "\x1b[27;6;9~", "\x1b[9;6u"),
     ("\x1b[13;129u", ModifyOtherKeys.EVERY_KEY, "\x1b[27;1;13~", "\x1b[13;1u"),
 ]
 

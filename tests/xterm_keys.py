@@ -271,6 +271,10 @@ class XtermKeys:
             # Below level 2 alt is `metaSendsEscape`, a setting no
             # program can ask for, and not the mode under test.
             return None
+        if key in ("PAGE_UP", "PAGE_DOWN") and mods & Modifier.SHIFT:
+            # xterm's own translations scroll its scrollback on these, and
+            # nothing reaches the pty.
+            return None
         if key in _TO_THE_SERVER and mods & Modifier.CTRL and mods & Modifier.ALT:
             # The evdev keymap gives ctrl+alt on these to the X server:
             # XF86Switch_VT_3, XF86Next_VMode, Terminate_Server. No key

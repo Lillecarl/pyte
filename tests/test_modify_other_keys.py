@@ -24,7 +24,34 @@ from pyte.keys import (
     FormatOtherKeys,
     KeyModifierResource,
     ModifyOtherKeys,
+    translate_key_data,
 )
+
+#: What xterm 390 sends in its own mode where the other terminals split,
+#: from the key panel: the sequence the terminal of the person sends,
+#: the level, DECKPAM, and xterm's answer. Lillecarl/pymux#693,
+#: Lillecarl/pymux#700.
+XTERMS_ANSWERS = [
+    ("caps lock and Delete", "\x1b[3;65~", ModifyOtherKeys.EVERY_KEY, False, "\x1b[3;1~"),
+    ("caps lock and Left", "\x1b[1;65D", ModifyOtherKeys.EVERY_KEY, False, "\x1b[1;1D"),
+    ("super and F1", "\x1b[1;9P", ModifyOtherKeys.EVERY_KEY, False, "\x1b[1;1P"),
+    ("caps lock and keypad +", "\x1b[57413;65u", ModifyOtherKeys.EVERY_KEY, True, "\x1bO1k"),
+    ("super and Delete", "\x1b[3;9~", ModifyOtherKeys.ALT_AND_META, False, "\x1b[3~"),
+    ("ctrl, shift and [", "\x1b[91:123;6u", ModifyOtherKeys.ALT_AND_META, False, "\x1b"),
+    ("ctrl, shift and /", "\x1b[47:63;6u", ModifyOtherKeys.ALT_AND_META, False, "\x1b[27;6;63~"),
+    ("ctrl, shift and Tab", "\x1b[9;6u", ModifyOtherKeys.ALT_AND_META, False, "\x1b[Z"),
+    ("super, shift and 1", "\x1b[49:33;10u", ModifyOtherKeys.EVERY_MODIFIER, False, "!"),
+    ("super and a under caps lock", "\x1b[97;73u", ModifyOtherKeys.EVERY_MODIFIER, False, "A"),
+    ("super, shift and a under caps lock", "\x1b[97:65;74u", ModifyOtherKeys.ALT_AND_META, False, "a"),
+]
+
+
+@pytest.mark.parametrize(
+    ("name", "sent", "level", "keypad", "xterm"), XTERMS_ANSWERS, ids=[row[0] for row in XTERMS_ANSWERS]
+)
+def test_xterm_decides_its_own_mode(name, sent, level, keypad, xterm):
+    "modifyOtherKeys is xterm's, so its answer wins over a split among the others."
+    assert translate_key_data(sent, flags=0, modify_other_keys=level, application_keypad=keypad) == xterm
 
 
 def a_screen():
@@ -94,13 +121,17 @@ def test_the_first_level_takes_what_ctrl_and_shift_cannot_say(key, sent):
 
 def test_every_modifier_is_the_second_level():
     """
-    "all of the modifiers apply. For example, shift-Tab sends
-    CSI 27 ; 2 ; 9 ~ rather than CSI Z"
+    "all of the modifiers apply", says xterm's manual, and gives
+    shift-Tab as "CSI 27 ; 2 ; 9 ~". xterm 390 itself sends "CSI Z":
+    shift and Tab arrive as the keysym ISO_Left_Tab, which it writes as
+    the back tab first. It is xterm's mode, so xterm decides.
+    Lillecarl/pymux#693.
     """
     screen, stream, _ = a_screen()
     stream.feed("\x1b[>4;2m")
 
-    assert screen.encode_key("\x1b[9;2u") == "\x1b[27;2;9~"
+    assert screen.encode_key("\x1b[9;2u") == "\x1b[Z"
+    assert screen.encode_key("\x1b[9;6u") == "\x1b[27;6;9~"
     assert screen.encode_key("\x01") == "\x1b[27;5;97~"
 
 

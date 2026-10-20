@@ -404,7 +404,13 @@ def _wants_the_escape_form(level: int, code: int, typed: int, mods: int, text: s
             return True
         if not mods & Modifier.SHIFT:
             return False
-        return 0x40 <= typed <= 0x7F or not _has_a_shifted_character(code, text)
+        if code == KeyCode.TAB:
+            # The back tab, "CSI Z", which is what xterm sends, and not
+            # the "CSI 27 ; 2 ; 9 ~" of its own manual. Lillecarl/pymux#693.
+            return False
+        # A key with no text, which is what super leaves, still has a
+        # shifted one when the terminal named it: super+shift+1 is "!".
+        return 0x40 <= typed <= 0x7F or not (typed != code or _has_a_shifted_character(code, text))
     if level == ModifyOtherKeys.ALT_AND_META:
         return bool(mods & Modifier.ALT) or _ctrl_or_shift_has_no_legacy_form(code, typed, mods)
     return False
@@ -425,12 +431,23 @@ def _ctrl_or_shift_has_no_legacy_form(code: int, typed: int, mods: int) -> bool:
     Lillecarl/pymux#701.
     """
     ctrl_or_shift = mods & (Modifier.CTRL | Modifier.SHIFT)
-    if code in (KeyCode.ENTER, KeyCode.TAB):
-        return bool(ctrl_or_shift) and not (code == KeyCode.TAB and ctrl_or_shift == Modifier.SHIFT)
+    if code == KeyCode.ENTER:
+        return bool(ctrl_or_shift)
+    if code == KeyCode.TAB:
+        # Shift makes it the back tab, ctrl or not: xterm sends "CSI Z"
+        # for ctrl+shift+Tab here. Lillecarl/pymux#693.
+        return ctrl_or_shift == Modifier.CTRL
     if code in (KeyCode.ESCAPE, KeyCode.BACKSPACE):
         return False
     if not mods & Modifier.CTRL:
         return False
+    # Nor where the key under the shifted one has a control code:
+    # ctrl+shift+[ is ESC in xterm, as ctrl+[ is. Lillecarl/pymux#704.
+    # Where shift made another key, xterm's own test decides, which is
+    # `IsControlInput`, 0x40 to 0x7F: ctrl+shift+/ still takes the
+    # escape form, because "?" is below it.
+    if typed != code:
+        return not any(0x40 <= key <= 0x7F and _has_a_control_code(key) for key in (typed, code))
     return not _has_a_control_code(ord(chr(typed).lower()) if chr(typed).isalpha() else typed)
 
 
@@ -1113,7 +1130,7 @@ _KEYPAD_CHARACTER = {
 
 
 def _xterm_keypad_form(
-    event: KeyEvent, flags: int, application_keypad: bool, num_lock: bool, modify_other_keys: int
+    event: KeyEvent, flags: int, application_keypad: bool, num_lock: bool, modify_other_keys: int, bare: bool = False
 ) -> str | None:
     """
     What a keypad key sends in the modes that are xterm's own, DECKPAM
@@ -1137,7 +1154,7 @@ def _xterm_keypad_form(
         return None
     if application_keypad and not num_lock:
         mods = event.mods & (Modifier.SHIFT | Modifier.ALT | Modifier.CTRL)
-        return SS3 + ("%d" % (mods + 1) if mods else "") + final
+        return SS3 + ("%d" % (mods + 1) if mods or bare else "") + final
     if application_keypad or modify_other_keys:
         return _KEYPAD_CHARACTER[event.code]
     return None
@@ -1247,12 +1264,22 @@ def _encode_event(
     # character a letter types, which the extended mode writes.
     caps_lock = bool(event.mods & Modifier.CAPS_LOCK)
     num_lock = bool(event.mods & Modifier.NUM_LOCK)
+    # At level 3 xterm writes the modifier field for a key held with only
+    # a lock or super, which it counts and does not name: caps lock on
+    # Delete is "CSI 3 ; 1 ~", and on keypad + under DECKPAM "SS3 1 k".
+    # Lillecarl/pymux#700.
+    bare = (
+        modify_other_keys == ModifyOtherKeys.EVERY_KEY
+        and not flags
+        and bool(event.mods & _MODIFIERS_NO_LEGACY_FORM_TAKES)
+        and not event.mods & (Modifier.SHIFT | Modifier.ALT | Modifier.CTRL)
+    )
     if not flags and event.mods & _LOCK_MODIFIERS:
         event = event._replace(mods=event.mods & ~_LOCK_MODIFIERS)
     if not flags and not profile.writes_super and event.mods & _MODIFIERS_THE_LEGACY_ENCODING_DROPS:
         event = event._replace(mods=event.mods & ~_MODIFIERS_THE_LEGACY_ENCODING_DROPS)
     if application_keypad or modify_other_keys:
-        keypad = _xterm_keypad_form(event, flags, application_keypad, num_lock, modify_other_keys)
+        keypad = _xterm_keypad_form(event, flags, application_keypad, num_lock, modify_other_keys, bare)
         if keypad is not None:
             return keypad
     plain = _folded(event, flags, profile)
@@ -1412,9 +1439,15 @@ def _encode_event(
                     char = char.upper()
                 result += char
             return result
-        char = chr(code)
-        if mods & Modifier.SHIFT and char.isalpha():
+        # A key with no text of its own, which is what super leaves: shift
+        # takes the shifted key and caps lock turns a letter over, as
+        # xterm and Ghostty write super+shift+[ as "{" and super+a under
+        # caps lock as "A". Lillecarl/pymux#693.
+        char = chr(shifted) if mods & Modifier.SHIFT and shifted is not None else chr(code)
+        if mods & Modifier.SHIFT and shifted is None and char.isalpha():
             char = char.upper()
+        if caps_lock and char.isalpha():
+            char = char.swapcase()
         return char
 
     if final == "R" and (not _legacy_mode(flags) or (flags and mods)):
@@ -1425,6 +1458,9 @@ def _encode_event(
         # one: kitty, Ghostty and WezTerm send "CSI 13 ; 2 ~" to a pane
         # that pushed only the other keys. Lillecarl/pymux#695.
         code, final = TildeKey.F3, "~"
+
+    if bare and mods == 0:
+        return "%s%d;1%s" % (CSI, code, final)
 
     if final == "~":
         return _serialize(code, mods_value, "~", (), kind, embedded)

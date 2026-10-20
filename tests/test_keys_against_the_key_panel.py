@@ -79,30 +79,18 @@ def _press(key: str, code: int, shifted: int, mods: int, other_keys: int, keypad
 
 EXTENDED_DEVIATIONS = [
     ExtendedDeviation(
-        "super is dropped, and the panel writes it by turns",
-        "Lillecarl/pymux#693",
-        # Under modifyOtherKeys pyte drops super, as xterm's profile says.
-        # xterm and WezTerm still write it at level 3 as "CSI 1 ; 1 P" for
-        # F1, and Ghostty writes it as xterm's meta.
-        lambda case: bool(case.request.mods & Modifier.SUPER),
-        _press("F1", 57364, 0, Modifier.SUPER, ModifyOtherKeys.EVERY_KEY),
+        "kitty's profile writes super under DECKPAM",
+        "Lillecarl/pymux#706",
+        # With only DECKPAM on, super+F3 is "CSI 1 ; 9 R" in the default
+        # profile, xterm drops super and Ghostty writes kitty's F3.
+        lambda case: bool(case.request.mods & Modifier.SUPER) and case.request.other_keys == ModifyOtherKeys.OFF,
+        _press("F3", 57366, 0, Modifier.SUPER, ModifyOtherKeys.OFF, keypad=True),
     ),
     ExtendedDeviation(
-        "caps lock on keypad Begin at level 3",
-        "Lillecarl/pymux#700",
-        # xterm "CSI 1 ; 1 E", WezTerm "CSI E", pyte "SS3 E" with DECCKM:
-        # three answers, and only a lock to tell them apart.
-        lambda case: (
-            case.request.key == "KP_BEGIN"
-            and bool(case.request.mods & Modifier.CAPS_LOCK)
-            and case.request.other_keys == ModifyOtherKeys.EVERY_KEY
-        ),
-        Request("KP_BEGIN", 57427, 0, Modifier.CAPS_LOCK, "press", 0, True, ModifyOtherKeys.EVERY_KEY, False),
-    ),
-    ExtendedDeviation(
-        "ctrl on a shifted key from 0x60 to 0x7F has no control code",
-        "Lillecarl/pymux#704",
-        # ctrl+shift+[: pyte and kitty "{", xterm ESC, Ghostty CSI u.
+        "kitty's profile keeps the shifted key under DECKPAM",
+        "Lillecarl/pymux#706",
+        # ctrl+shift+[ with only DECKPAM on, which is not xterm's own mode:
+        # the default profile writes kitty's "{", xterm ESC, Ghostty CSI u.
         lambda case: (
             case.request.key.startswith("'")
             and 0x60 <= case.request.shifted <= 0x7F
@@ -209,6 +197,30 @@ def test_each_profile_sends_what_its_terminal_sends(judge):
         if not _is_a_legacy_form(pyte) or (_is_a_legacy_form(answer) and answer != pyte):
             wrong.append((request.key, request.mods, pyte, answer))
     assert not wrong
+
+
+#: The levels of modifyOtherKeys, which xterm made and so decides.
+XTERMS_OWN_MODES = [(level, keypad) for level in ModifyOtherKeys if level for keypad in (False, True)]
+
+
+@pytest.mark.parametrize(
+    ("other_keys", "keypad"),
+    XTERMS_OWN_MODES,
+    ids=["%s%s" % (level.name, ", DECKPAM" if keypad else "") for level, keypad in XTERMS_OWN_MODES],
+)
+def test_xterm_decides_its_own_mode(other_keys, keypad):
+    """
+    Under modifyOtherKeys pyte sends exactly what xterm sends, wherever
+    xterm answers, and a split among the others does not weigh against
+    it: caps lock on Delete at level 3 is "CSI 3 ; 1 ~", and super is
+    dropped. Lillecarl/pymux#693, Lillecarl/pymux#700.
+    """
+    differ = [
+        (case.request, case.pyte, case.answers["xterm"])
+        for case in _extended_cases(other_keys, keypad)
+        if case.answers["xterm"] is not None and case.answers["xterm"] != case.pyte
+    ]
+    assert not differ, "%d keys where pyte is not xterm, the first: %r" % (len(differ), differ[0])
 
 
 def test_an_arrow_with_num_lock_is_judged_by_the_whole_panel():
