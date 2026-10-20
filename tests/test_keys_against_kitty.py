@@ -120,18 +120,19 @@ DEVIATIONS = [
         ("'a'", Modifier.CTRL | Modifier.SHIFT, "press", 0),
     ),
     Deviation(
-        "shift with ctrl or alt on a key that is not a letter is lost",
+        "shift with ctrl or alt on a key with no shifted key is dropped",
         "Lillecarl/pymux#691",
-        # kitty takes the shifted key from the alternates: alt+shift+1 is
-        # "ESC !" and ctrl+shift+minus is ctrl+underscore. A key with no
-        # shifted key is "CSI number ; mods u". pyte drops the shift.
+        # Space and the keypad have no shifted key, so kitty finds no
+        # legacy form and writes "CSI 32 ; 8 u". Ghostty and WezTerm drop
+        # the shift, as pyte does: alt+ctrl+shift+space is "ESC NUL".
         lambda case: (
             case.flags == 0
+            and not case.shifted
             and bool(case.mods & Modifier.SHIFT)
             and bool(case.mods & (Modifier.ALT | Modifier.CTRL))
             and case.key not in _LETTERS
         ),
-        ("'1'", Modifier.ALT | Modifier.SHIFT, "press", 0),
+        ("' '", Modifier.ALT | Modifier.CTRL | Modifier.SHIFT, "press", 0),
     ),
     Deviation(
         "a modifier key reaches a pane that did not ask for every key",

@@ -790,6 +790,43 @@ def test_ctrl_on_a_key_with_no_control_code_is_lost():
     assert caught.value.encoded == "1"
 
 
+#: A key with shift and ctrl or alt, as a terminal that names the shifted
+#: key sends it, and what a legacy pane reads: the shifted key, with the
+#: shift spent on it.
+SHIFTED_WITH_A_MODIFIER = [
+    ("alt+shift+1", "\x1b[49:33;4u", "\x1b!"),
+    ("alt+shift+[", "\x1b[91:123;4u", "\x1b{"),
+    ("ctrl+shift+minus", "\x1b[45:95;6u", "\x1f"),
+    ("ctrl+shift+/", "\x1b[47:63;6u", "\x7f"),
+    ("ctrl+alt+shift+minus", "\x1b[45:95;8u", "\x1b\x1f"),
+    ("alt+shift+a", "\x1b[97:65;4u", "\x1bA"),
+]
+
+
+@pytest.mark.parametrize(("name", "key", "sent"), SHIFTED_WITH_A_MODIFIER)
+def test_shift_with_a_modifier_writes_the_shifted_key(name, key, sent):
+    """
+    alt+shift+1 reached a legacy pane as "ESC 1". kitty, Ghostty and
+    WezTerm all write "ESC !": the terminal says which key shift makes.
+    Lillecarl/pymux#691.
+    """
+    assert translate_key_data(key, flags=0, source_flags=REPORT_ALL | ALTERNATE_KEYS) == sent, name
+    event = parse_key_data(key)[0]
+    assert translate_key_event(event, flags=0, exactly=True) == sent, name
+
+
+def test_ctrl_and_shift_on_a_letter_stays_the_control_code():
+    "kitty does not take the capital under ctrl either. Lillecarl/pymux#168."
+    assert translate_key_data("\x1b[97:65;6u", flags=0, source_flags=REPORT_ALL | ALTERNATE_KEYS) == "\x01"
+
+
+def test_shift_with_a_modifier_and_no_shifted_key_is_lost():
+    "A name has no shifted key, so shift on alt+1 is lost, and said to be."
+    with pytest.raises(Unhearable) as caught:
+        translate_key_event(KeyEvent(ord("1"), Modifier.ALT | Modifier.SHIFT, "u"), flags=0, exactly=True)
+    assert caught.value.lost == Modifier.SHIFT
+
+
 #: A key that writes text, the flags of the pane, and what it reads:
 #: the text alone, the way kitty sends it unless the pane asked for
 #: every key as an escape code.

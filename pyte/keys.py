@@ -974,6 +974,24 @@ def _folded(event: KeyEvent, flags: int) -> KeyEvent | None:
     return event._replace(code=code, final=final)
 
 
+def _shifted_key_of(event: KeyEvent) -> int | None:
+    """
+    The key that shift makes of this one, when the terminal said which.
+
+    Only a key with shift held and a shifted key of its own, and never
+    a letter under ctrl: ctrl+shift+a is the control code of a, which
+    is what kitty writes too (Lillecarl/pymux#168).
+    """
+    if not event.mods & Modifier.SHIFT or not event.alternates or event.alternates[0] is None:
+        return None
+    shifted = event.alternates[0]
+    if shifted == event.code:
+        return None
+    if event.mods & Modifier.CTRL and ord("a") <= event.code <= ord("z"):
+        return None
+    return shifted
+
+
 def _sends_its_text(flags: int, mods: int, text: str, kind: int) -> bool:
     """
     Whether a key goes out as the text it writes, and nothing else.
@@ -1045,6 +1063,7 @@ def _encode_event(
         and not flags & KeyboardFlag.REPORT_ALL_KEYS
     ):
         kind = EventType.PRESS
+    shifted = _shifted_key_of(plain)
     if not flags & KeyboardFlag.REPORT_ALTERNATE_KEYS or final != "u":
         # kitty sends the other codes of a key for the "u" form only.
         alternates = ()
@@ -1112,6 +1131,12 @@ def _encode_event(
         if text and not mods & (Modifier.CTRL | Modifier.ALT):
             # The reported text accounts for shift and the layout.
             return text
+        if mods & (Modifier.CTRL | Modifier.ALT) and shifted is not None:
+            # The shifted key is the key, and shift is spent on it:
+            # alt+shift+1 is "ESC !", and ctrl+shift+minus is ctrl on an
+            # underscore. kitty's `encode_printable_ascii_key_legacy`.
+            # Lillecarl/pymux#691.
+            code, mods = shifted, mods & ~Modifier.SHIFT
         if mods & (Modifier.CTRL | Modifier.ALT):
             result = "\x1b" if mods & Modifier.ALT else ""
             if mods & Modifier.CTRL:
@@ -1350,14 +1375,23 @@ def the_modifiers_a_pane_cannot_read(event: KeyEvent, flags: int) -> int:
         # Back tab is "CSI Z" and carries no ctrl, as in kitty.
         # Lillecarl/pymux#174.
         return lost | (event.mods & Modifier.CTRL)
+    # The key shift makes, which the encoder writes under ctrl or alt.
+    # Lillecarl/pymux#691.
+    shifted = _shifted_key_of(event)
     if event.mods & Modifier.CTRL:
-        # ctrl+a and ctrl+shift+a are one control code.
-        # Lillecarl/pymux#168.
-        lost |= event.mods & Modifier.SHIFT
-        folded = _folded(event, flags)
-        if folded is not None and not _has_a_control_code(folded.code):
+        if shifted is not None:
+            code = shifted
+        else:
+            # ctrl+a and ctrl+shift+a are one control code.
+            # Lillecarl/pymux#168.
+            lost |= event.mods & Modifier.SHIFT
+            folded = _folded(event, flags)
+            code = event.code if folded is None else folded.code
+        if not _has_a_control_code(code):
             # ctrl+1 is "1". Lillecarl/pymux#686.
             lost |= Modifier.CTRL
+        return lost
+    if event.mods & Modifier.ALT and shifted is not None:
         return lost
     if event.mods & Modifier.SHIFT and not chr(event.code).isalpha():
         # Shift is carried by the capital, and "1" has none. A keyboard
