@@ -45,9 +45,7 @@ import pyte
 
 class Terminal:
     def __init__(self, columns: int, lines: int, p_in) -> None:
-        self.screen = pyte.Screen(
-            lines, columns, write_process_input=lambda data: p_in.write(data.encode())
-        )
+        self.screen = pyte.Screen(lines, columns, write_process_input=lambda data: p_in.write(data.encode()))
         self.screen.set_mode(pyte.modes.AnsiMode.LINE_FEED_NEW_LINE)
         self.stream = pyte.Stream(self.screen)
         # The write count up to which rows were already sent.
@@ -115,7 +113,7 @@ async def websocket_handler(request):
                 p_out.write(msg.data.encode())
             elif msg.type == aiohttp.WSMsgType.ERROR:
                 raise ws.exception()
-    except (asyncio.CancelledError, OSError):  # Process died?
+    except asyncio.CancelledError, OSError:  # Process died?
         pass
     finally:
         loop.remove_reader(p_out)

@@ -84,9 +84,7 @@ class Terminal(Widget, can_focus=True):
                 lines = []
                 for i in range(screen.lines):
                     line = screen.page.data_buffer.get(screen.line_offset + i, {})
-                    text = Text(
-                        "".join(line[x].char if x in line else " " for x in range(screen.columns))
-                    )
+                    text = Text("".join(line[x].char if x in line else " " for x in range(screen.columns)))
                     if i == cursor.y - screen.line_offset and 0 <= cursor.x < len(text.plain):
                         text.stylize("reverse", cursor.x, cursor.x + 1)
                     lines.append(text)
