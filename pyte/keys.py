@@ -993,8 +993,12 @@ def _folded(event: KeyEvent, flags: int) -> KeyEvent | None:
     character no keyboard has and no program wants. A keypad key folds
     onto its normal key. Every other one -- a lock key, a modifier key,
     a media key, F13 upwards -- has no legacy form, so a pane that
-    speaks the legacy encoding does not hear it. kitty does the same.
-    Lillecarl/pymux#166.
+    speaks the legacy encoding does not hear it. Lillecarl/pymux#166.
+
+    **This is a choice, and the terminals split on it.** Ghostty sends
+    nothing too. kitty sends "CSI 57376 u" for F13, and WezTerm the
+    rxvt form "CSI 25 ~". A program that knows neither prints "7376u",
+    the symptom of Lillecarl/pymux#684. Lillecarl/pymux#692.
     """
     if _carries_the_number(flags):
         return event
