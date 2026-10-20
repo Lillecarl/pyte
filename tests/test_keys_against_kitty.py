@@ -145,17 +145,6 @@ DEVIATIONS = [
         ),
         ("LEFT_SHIFT", 0, "press", KeyboardFlag.DISAMBIGUATE),
     ),
-    Deviation(
-        "shift on Enter or Backspace is lost",
-        "Lillecarl/pymux#689",
-        # kitty writes "CSI 13 ; 2 u" once the pane disambiguates.
-        lambda case: (
-            case.key in ("ENTER", "BACKSPACE", "KP_ENTER")
-            and bool(case.flags & KeyboardFlag.DISAMBIGUATE)
-            and case.pyte in ("\r", "\x7f")
-        ),
-        ("ENTER", Modifier.SHIFT, "press", KeyboardFlag.DISAMBIGUATE),
-    ),
 ]
 
 

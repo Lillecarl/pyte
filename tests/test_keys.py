@@ -92,6 +92,25 @@ def test_disambiguate_keeps_text_and_plain_functional_keys_legacy():
     assert translate_key_data("\x1b[15~", flags=DISAMBIGUATE) == "\x1b[15~"
 
 
+@pytest.mark.parametrize(
+    ("key", "flags", "sent"),
+    [
+        ("\x1b[13;2u", DISAMBIGUATE, "\x1b[13;2u"),
+        ("\x1b[127;2u", DISAMBIGUATE, "\x1b[127;2u"),
+        ("\x1b[13;2u", DISAMBIGUATE | EVENT_TYPES, "\x1b[13;2u"),
+        ("\x1b[13;65u", DISAMBIGUATE, "\r"),
+        ("\x1b[13;2u", 0, "\r"),
+    ],
+)
+def test_shift_on_enter_reaches_a_pane_that_disambiguates(key, flags, sent):
+    """
+    kitty, Ghostty and WezTerm write shift+Enter as "CSI 13 ; 2 u" once
+    a pane disambiguates. A lock is no modifier, and a legacy pane has
+    no form for the shift. Lillecarl/pymux#689.
+    """
+    assert translate_key_data(key, flags=flags, source_flags=REPORT_ALL | EVENT_TYPES) == sent
+
+
 def test_disambiguate_kitty_input_round_trips():
     # Kitty-encoded input re-encodes to the same bytes.
     assert translate_key_data("\x1b[97;5u", flags=DISAMBIGUATE) == "\x1b[97;5u"

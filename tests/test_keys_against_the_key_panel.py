@@ -40,7 +40,6 @@ VOTES = {
     "ctrl and shift on a letter is the control code": (("wezterm",), ("kitty", "ghostty")),
     "shift with ctrl or alt on a key that is not a letter is lost": ((), ("kitty", "ghostty", "wezterm")),
     "a modifier key reaches a pane that did not ask for every key": ((), ("kitty", "ghostty")),
-    "shift on Enter or Backspace is lost": ((), ("kitty", "ghostty", "wezterm")),
 }
 
 

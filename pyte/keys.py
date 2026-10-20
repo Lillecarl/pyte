@@ -1054,7 +1054,15 @@ def _encode_event(
         return text
 
     if final == "u":
-        ambiguous = bool(mods & _MODIFIERS_THAT_MAKE_A_KEY_AMBIGUOUS) or code == KeyCode.ESCAPE
+        ambiguous = (
+            bool(mods & _MODIFIERS_THAT_MAKE_A_KEY_AMBIGUOUS)
+            or code == KeyCode.ESCAPE
+            # Enter, Tab and Backspace write no text, so shift has no
+            # character to hide in: kitty writes shift+Enter as "CSI 13 ;
+            # 2 u" once a pane disambiguates (`encode_function_key`).
+            # Lillecarl/pymux#689.
+            or (code in _CONTROL_CODES and bool(mods & ~_LOCK_MODIFIERS))
+        )
         # A functional key still here belongs to a pane that reads the
         # number of a key: `_folded` took it away from every other one.
         # It goes out as an escape code whatever else is asked for,
