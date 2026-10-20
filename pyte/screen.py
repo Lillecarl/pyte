@@ -585,7 +585,7 @@ class Screen:
         "The whole screen is set to reverse video."
         return PrivateMode.REVERSE_VIDEO.flag in self.mode
 
-    def encode_key(self, data: str, report=None) -> str:
+    def encode_key(self, data: str, report=None, profile: keys.KeyProfile = keys.DEFAULT_KEY_PROFILE) -> str:
         """
         The bytes that one key press sends to the program on this
         screen.
@@ -600,6 +600,9 @@ class Screen:
         The kitty flags are the ones this pane really gets, and not the
         ones it asked for. One value answers the query of the pane and
         drives the encoding, so the answer holds.
+
+        `profile` belongs to the person pressing the key and not to the
+        screen: two clients in two terminals share one pane.
         """
         return keys.translate_key_data(
             data,
@@ -612,9 +615,12 @@ class Screen:
             format_other_keys=self.format_other_keys,
             backarrow_sends_backspace=self.backarrow_sends_backspace,
             report=report,
+            profile=profile,
         )
 
-    def encode_key_event(self, event: keys.KeyEvent, exactly: bool = False) -> str:
+    def encode_key_event(
+        self, event: keys.KeyEvent, exactly: bool = False, profile: keys.KeyProfile = keys.DEFAULT_KEY_PROFILE
+    ) -> str:
         """
         The bytes one key event sends to the program on this screen.
 
@@ -635,6 +641,7 @@ class Screen:
             format_other_keys=self.format_other_keys,
             backarrow_sends_backspace=self.backarrow_sends_backspace,
             exactly=exactly,
+            profile=profile,
         )
 
     @property

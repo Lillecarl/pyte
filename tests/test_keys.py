@@ -396,7 +396,6 @@ WHAT_A_KEYBOARD_SENDS = [
 #: A terminal reports one only when something asked it to.
 KEYS_WITH_NO_LEGACY_FORM = [
     ("caps lock", "\x1b[57358u"),
-    ("menu", "\x1b[57363u"),
     ("f13", "\x1b[57376u"),
     ("keypad separator", "\x1b[57416u"),
     ("play", "\x1b[57428u"),

@@ -53,7 +53,8 @@ All three are served for a legacy terminal as well, as far as it can:
   kitty reports none either for a key that has none.
 
 The forms follow the encoder of kitty (`kitty/key_encoding.c`), so a
-pane sees what a real kitty gives it.
+pane sees what a real kitty gives it. Where the terminals split on a
+legacy form, a `KeyProfile` says whose answer a pane gets.
 """
 
 from __future__ import annotations
@@ -63,14 +64,17 @@ from enum import IntEnum, IntFlag
 from typing import NamedTuple
 
 __all__ = [
+    "DEFAULT_KEY_PROFILE",
     "FIRST_FUNCTIONAL_KEY",
     "FLAGS_THAT_NEED_A_SOURCE",
+    "KEY_PROFILES",
     "MAX_FLAGS_STACK",
     "EventType",
     "FlagsMode",
     "FunctionalKey",
     "KeyCode",
     "KeyEvent",
+    "KeyProfile",
     "KeyboardFlag",
     "Modifier",
     "Unhearable",
@@ -446,9 +450,10 @@ class FunctionalKey(IntEnum):
     The number of a keypad key, in the Private Use Area.
 
     The protocol numbers every key that writes no character from
-    `FIRST_FUNCTIONAL_KEY` up. Two groups are named here: the keypad,
-    which has a normal key to fold onto, and the modifier and lock
-    keys, which only a pane that asked for every key reads. The names
+    `FIRST_FUNCTIONAL_KEY` up. Three groups are named here: the keypad,
+    which has a normal key to fold onto, the modifier and lock keys,
+    which only a pane that asked for every key reads, and the keys a
+    `KeyProfile` may give a legacy form. The names
     are the ones kitty uses (`functional_key_number_to_name_map` in
     `kitty/key_encoding.py`).
     """
@@ -456,6 +461,9 @@ class FunctionalKey(IntEnum):
     CAPS_LOCK = 57358
     SCROLL_LOCK = 57359
     NUM_LOCK = 57360
+    MENU = 57363
+    F13 = 57376
+    F24 = 57387
 
     KP_0 = 57399
     KP_1 = 57400
@@ -537,6 +545,69 @@ class TildeKey(IntEnum):
     F2 = 12
     F3 = 13
     F4 = 14
+    MENU = 29
+
+
+#: F13 to F24 in the "CSI number ~" form, the numbers rxvt gives them.
+#: WezTerm sends these to a legacy pane, and nobody else does.
+_RXVT_FUNCTION_KEY = dict(
+    zip(
+        range(FunctionalKey.F13, FunctionalKey.F24 + 1),
+        (25, 26, 28, 29, 31, 32, 33, 34, 42, 43, 44, 45),
+        strict=True,
+    )
+)
+
+
+class KeyProfile(NamedTuple):
+    """
+    What a pane in the legacy encoding reads where the terminals split.
+
+    A pane in kitty sends what kitty sends, and a pane in WezTerm what
+    WezTerm sends, so pymux sends what the terminal of the client that
+    pressed the key would. Each field is one split the key panel found
+    (`tests/test_keys_against_the_key_panel.py` holds the vote).
+
+    **Only a legacy form is a choice.** Where a terminal answers a
+    pane that asked for nothing with "CSI u" or "CSI 27 ; m ; k ~", the
+    program prints it: kitty's "CSI 57376 u" for F13 is the symptom of
+    Lillecarl/pymux#684. No profile copies those, so Ghostty's and kitty's
+    profiles drop the key where the terminal itself writes junk.
+
+    **Nor is a key that terminfo names.** A program reads its keys
+    through the TERM of the pane, which is pyte's entry and not the
+    terminal's: kitty's ctrl+F3 is "CSI 13 ; 5 ~" because xterm-kitty
+    says so, and pyte's entry says "CSI 1 ; 5 R". Lillecarl/pymux#706.
+    """
+
+    #: super, hyper and meta written into a CSI form, "CSI 3 ; 9 ~". The
+    #: legacy encoding has no field for them on a key that types text.
+    writes_super: bool
+    #: Menu is "CSI 29 ~", which kitty and xterm send. Without it Menu
+    #: is a key the legacy encoding cannot write.
+    menu: bool
+    #: F13 to F24 take `_RXVT_FUNCTION_KEY`. Lillecarl/pymux#692.
+    rxvt_function_keys: bool
+    #: ctrl+shift on a key whose shifted key has no control code takes
+    #: the code of the unshifted key: ctrl+shift+[ is ESC, not "{".
+    #: Lillecarl/pymux#704.
+    ctrl_on_the_unshifted_key: bool
+
+
+#: The profile of each terminal on the key panel. Ghostty writes
+#: ctrl+shift+[ as "CSI 123 ; 5 u", so it takes kitty's "{".
+KEY_PROFILES = {
+    "kitty": KeyProfile(writes_super=True, menu=True, rxvt_function_keys=False, ctrl_on_the_unshifted_key=False),
+    "ghostty": KeyProfile(writes_super=True, menu=False, rxvt_function_keys=False, ctrl_on_the_unshifted_key=False),
+    "wezterm": KeyProfile(writes_super=False, menu=False, rxvt_function_keys=True, ctrl_on_the_unshifted_key=True),
+    "xterm": KeyProfile(writes_super=False, menu=True, rxvt_function_keys=False, ctrl_on_the_unshifted_key=True),
+}
+
+#: The profile of a terminal pymux cannot name.
+DEFAULT_KEY_PROFILE = KEY_PROFILES["kitty"]
+
+#: modifyOtherKeys is xterm's own mode, so xterm answers under it.
+_MODIFY_OTHER_KEYS_PROFILE = KEY_PROFILES["xterm"]
 
 
 #: The first code point of the Private Use Area. A key numbered from
@@ -1044,7 +1115,7 @@ def _xterm_keypad_form(
     return None
 
 
-def _folded(event: KeyEvent, flags: int) -> KeyEvent | None:
+def _folded(event: KeyEvent, flags: int, profile: KeyProfile = DEFAULT_KEY_PROFILE) -> KeyEvent | None:
     """
     The key event as a pane in the legacy encoding reads it.
 
@@ -1062,7 +1133,8 @@ def _folded(event: KeyEvent, flags: int) -> KeyEvent | None:
     **This is a choice, and the terminals split on it.** Ghostty sends
     nothing too. kitty sends "CSI 57376 u" for F13, and WezTerm the
     rxvt form "CSI 25 ~". A program that knows neither prints "7376u",
-    the symptom of Lillecarl/pymux#684. Lillecarl/pymux#692.
+    the symptom of Lillecarl/pymux#684, so the rxvt form is the one a
+    `KeyProfile` may choose. Lillecarl/pymux#692.
     """
     if _carries_the_number(flags):
         return event
@@ -1070,6 +1142,10 @@ def _folded(event: KeyEvent, flags: int) -> KeyEvent | None:
         return event
     normal = _KEYPAD_TO_NORMAL.get(event.code)
     if normal is None:
+        if event.code == FunctionalKey.MENU and profile.menu:
+            return event._replace(code=TildeKey.MENU, final="~")
+        if profile.rxvt_function_keys and event.code in _RXVT_FUNCTION_KEY:
+            return event._replace(code=_RXVT_FUNCTION_KEY[event.code], final="~")
         return None
     code, final = normal
     return event._replace(code=code, final=final)
@@ -1127,19 +1203,24 @@ def _encode_event(
     application_keypad: bool = False,
     format_other_keys: int = FormatOtherKeys.TILDE,
     backarrow_sends_backspace: bool = False,
+    profile: KeyProfile = DEFAULT_KEY_PROFILE,
 ) -> str:
     "Encode a key event for a pane with the given protocol flags."
+    if modify_other_keys:
+        profile = _MODIFY_OTHER_KEYS_PROFILE
     # The legacy forms write no lock, but caps lock still picks the
     # character a letter types, which the extended mode writes.
     caps_lock = bool(event.mods & Modifier.CAPS_LOCK)
     num_lock = bool(event.mods & Modifier.NUM_LOCK)
     if not flags and event.mods & _LOCK_MODIFIERS:
         event = event._replace(mods=event.mods & ~_LOCK_MODIFIERS)
+    if not flags and not profile.writes_super and event.mods & _MODIFIERS_THE_LEGACY_ENCODING_DROPS:
+        event = event._replace(mods=event.mods & ~_MODIFIERS_THE_LEGACY_ENCODING_DROPS)
     if application_keypad or modify_other_keys:
         keypad = _xterm_keypad_form(event, flags, application_keypad, num_lock, modify_other_keys)
         if keypad is not None:
             return keypad
-    plain = _folded(event, flags)
+    plain = _folded(event, flags, profile)
     if plain is None:
         return ""
     if plain.final == "u" and plain.code in _MODIFIER_KEYS and not flags & KeyboardFlag.REPORT_ALL_KEYS:
@@ -1255,7 +1336,9 @@ def _encode_event(
             # alt+shift+1 is "ESC !", and ctrl+shift+minus is ctrl on an
             # underscore. kitty's `encode_printable_ascii_key_legacy`.
             # Lillecarl/pymux#691.
-            code, mods = shifted, mods & ~Modifier.SHIFT
+            if not _ctrl_stays_on_the_unshifted_key(code, shifted, mods, profile):
+                code = shifted
+            mods &= ~Modifier.SHIFT
         if mods & (Modifier.CTRL | Modifier.ALT):
             result = "\x1b" if mods & Modifier.ALT else ""
             if mods & Modifier.CTRL:
@@ -1323,6 +1406,7 @@ def translate_key_data(
     format_other_keys: int = FormatOtherKeys.TILDE,
     backarrow_sends_backspace: bool = False,
     report=None,
+    profile: KeyProfile = DEFAULT_KEY_PROFILE,
 ) -> str:
     """
     Translate raw key data into the encoding for a pane with the given
@@ -1356,6 +1440,9 @@ def translate_key_data(
     keyboard it has. Without it, the pane hears that it has no event
     types (see `Screen.deliverable_kitty_keyboard_flags`) and
     reads presses only.
+
+    `profile` says which terminal a legacy pane gets the answer of,
+    where the terminals split: `KeyProfile`.
     """
     # The release of a key that the terminal never reports coming up.
     double = bool(
@@ -1376,12 +1463,13 @@ def translate_key_data(
             application_keypad,
             format_other_keys,
             backarrow_sends_backspace,
+            profile=profile,
         )
         if report is not None and item.event == EventType.PRESS:
             # Not a release. A pane that did not ask for the event types
             # is meant not to read one, and every press sends one, so
             # reporting those would be a line per keystroke.
-            lost = the_modifiers_a_pane_cannot_read(item, flags)
+            lost = the_modifiers_a_pane_cannot_read(item, flags, profile, modify_other_keys)
             if lost or not encoded:
                 report(item, lost, encoded)
         parts.append(encoded)
@@ -1398,6 +1486,7 @@ def translate_key_event(
     format_other_keys: int = FormatOtherKeys.TILDE,
     backarrow_sends_backspace: bool = False,
     exactly: bool = False,
+    profile: KeyProfile = DEFAULT_KEY_PROFILE,
 ) -> str:
     """
     The bytes one key event sends to a pane with these protocol flags.
@@ -1414,7 +1503,7 @@ def translate_key_event(
     caller that may not lose any of it asks with `exactly`.
     """
     if exactly:
-        lost = the_modifiers_a_pane_cannot_read(event, flags)
+        lost = the_modifiers_a_pane_cannot_read(event, flags, profile, modify_other_keys)
         encoded = translate_key_event(
             event,
             flags,
@@ -1424,6 +1513,7 @@ def translate_key_event(
             application_keypad,
             format_other_keys,
             backarrow_sends_backspace,
+            profile=profile,
         )
         if lost or not encoded:
             raise Unhearable(event, lost, encoded)
@@ -1437,9 +1527,10 @@ def translate_key_event(
         application_keypad,
         format_other_keys,
         backarrow_sends_backspace,
+        profile,
     )
     if double and event.event == EventType.PRESS:
-        encoded += _encode_event(event._replace(event=EventType.RELEASE), flags, application_mode)
+        encoded += _encode_event(event._replace(event=EventType.RELEASE), flags, application_mode, profile=profile)
     return encoded
 
 
@@ -1467,6 +1558,22 @@ def _has_a_control_code(code: int) -> bool:
     )
 
 
+def _ctrl_stays_on_the_unshifted_key(code: int, shifted: int, mods: int, profile: KeyProfile) -> bool:
+    """
+    Whether ctrl+shift writes the control code of the key itself.
+
+    xterm and WezTerm do where the shifted key has none: ctrl+shift+[ is
+    ESC there, and "{" in kitty. ctrl+shift+; is ":" in all three.
+    Lillecarl/pymux#704.
+    """
+    return (
+        profile.ctrl_on_the_unshifted_key
+        and bool(mods & Modifier.CTRL)
+        and not _has_a_control_code(shifted)
+        and _has_a_control_code(code)
+    )
+
+
 def _carries_the_number(flags: int) -> bool:
     "Every modifier fits when it does: the form has a field for them."
     return bool(
@@ -1474,7 +1581,12 @@ def _carries_the_number(flags: int) -> bool:
     )
 
 
-def the_modifiers_a_pane_cannot_read(event: KeyEvent, flags: int) -> int:
+def the_modifiers_a_pane_cannot_read(
+    event: KeyEvent,
+    flags: int,
+    profile: KeyProfile = DEFAULT_KEY_PROFILE,
+    modify_other_keys: int = ModifyOtherKeys.OFF,
+) -> int:
     """
     The bits of `event.mods` this pane has no form for, and zero when
     the key fits whole.
@@ -1500,14 +1612,19 @@ def the_modifiers_a_pane_cannot_read(event: KeyEvent, flags: int) -> int:
     # The key shift makes, which the encoder writes under ctrl or alt.
     # Lillecarl/pymux#691.
     shifted = _shifted_key_of(event)
+    if modify_other_keys:
+        profile = _MODIFY_OTHER_KEYS_PROFILE
     if event.mods & Modifier.CTRL:
-        if shifted is not None:
+        if shifted is not None and _ctrl_stays_on_the_unshifted_key(event.code, shifted, event.mods, profile):
+            lost |= Modifier.SHIFT
+            code = event.code
+        elif shifted is not None:
             code = shifted
         else:
             # ctrl+a and ctrl+shift+a are one control code.
             # Lillecarl/pymux#168.
             lost |= event.mods & Modifier.SHIFT
-            folded = _folded(event, flags)
+            folded = _folded(event, flags, profile)
             code = event.code if folded is None else folded.code
         if not _has_a_control_code(code):
             # ctrl+1 is "1". Lillecarl/pymux#686.

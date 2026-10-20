@@ -24,7 +24,7 @@ from key_panel import Request, ask, judges_are_available, verdict
 from kitty_keys import SOURCE_FLAGS, judged, keyboard, kitty_encodes
 from test_keys_against_kitty import DEVIATIONS
 
-from pyte.keys import Modifier, ModifyOtherKeys, translate_key_data
+from pyte.keys import DEFAULT_KEY_PROFILE, KEY_PROFILES, KeyProfile, Modifier, ModifyOtherKeys, translate_key_data
 
 pytestmark = pytest.mark.skipif(not judges_are_available(), reason="the key judges are not there")
 
@@ -78,13 +78,13 @@ def _press(key: str, code: int, shifted: int, mods: int, other_keys: int, keypad
 
 EXTENDED_DEVIATIONS = [
     ExtendedDeviation(
-        "super is written and dropped by turns",
+        "super is dropped, and the panel writes it by turns",
         "Lillecarl/pymux#693",
-        # pyte drops super where a character is written and keeps it in a
-        # CSI form: super+Delete is "CSI 3 ; 9 ~", where xterm and WezTerm
-        # drop it, "CSI 3 ~". Ghostty writes it as xterm's meta.
+        # Under modifyOtherKeys pyte drops super, as xterm's profile says.
+        # xterm and WezTerm still write it at level 3 as "CSI 1 ; 1 P" for
+        # F1, and Ghostty writes it as xterm's meta.
         lambda case: bool(case.request.mods & Modifier.SUPER),
-        _press("DELETE", 57349, 0, Modifier.SUPER, ModifyOtherKeys.ALT_AND_META),
+        _press("F1", 57364, 0, Modifier.SUPER, ModifyOtherKeys.EVERY_KEY),
     ),
     ExtendedDeviation(
         "caps lock on keypad Begin at level 3",
@@ -112,7 +112,7 @@ EXTENDED_DEVIATIONS = [
 ]
 
 
-def _pyte_reads(request: Request) -> str:
+def _pyte_reads(request: Request, profile: KeyProfile = DEFAULT_KEY_PROFILE) -> str:
     "What pyte sends for this request, from what the terminal of the person sends."
     source = kitty_encodes(
         request.code, request.shifted, request.mods, request.action, SOURCE_FLAGS, request.cursor_key_mode
@@ -125,6 +125,7 @@ def _pyte_reads(request: Request) -> str:
         synthesize=False,
         modify_other_keys=request.other_keys,
         application_keypad=request.keypad,
+        profile=profile,
     )
 
 
@@ -167,6 +168,46 @@ def test_the_panel_is_not_against_pyte_in_the_extended_mode(other_keys, keypad):
         if vote.verdict in ("pyte-wrong", "pyte-alone") and not any(d.matches(case) for d in EXTENDED_DEVIATIONS):
             against.append((vote, case))
     assert not against, "%d keys the panel says pyte sends wrong, the first: %r" % (len(against), against[0])
+
+
+#: One key for each field of `KeyProfile`, at flags 0: name, code,
+#: shifted key, modifiers.
+PROFILE_EXAMPLES = [
+    ("DELETE", 57349, 0, Modifier.SUPER),
+    ("LEFT", 57350, 0, Modifier.SUPER | Modifier.CTRL),
+    ("F5", 57368, 0, Modifier.SUPER),
+    ("MENU", 57363, 0, 0),
+    ("MENU", 57363, 0, Modifier.CTRL),
+    ("F13", 57376, 0, 0),
+    ("F20", 57383, 0, Modifier.SHIFT),
+    ("F24", 57387, 0, 0),
+    ("'['", 91, 123, Modifier.CTRL | Modifier.SHIFT),
+    ("'['", 91, 123, Modifier.CTRL | Modifier.SHIFT | Modifier.ALT),
+]
+
+
+def _is_a_legacy_form(answer: str) -> bool:
+    "Neither CSI u nor the extended form, which a legacy pane prints."
+    return not (answer.startswith("\x1b[") and (answer.endswith("u") or answer.startswith("\x1b[27;")))
+
+
+@pytest.mark.parametrize("judge", sorted(KEY_PROFILES))
+def test_each_profile_sends_what_its_terminal_sends(judge):
+    """
+    Where the judge answers with a legacy form, its profile sends that.
+    Where it answers with a form a legacy pane prints, the profile sends
+    a legacy form of its own. Lillecarl/pymux#706.
+    """
+    requests = [_press(key, code, shifted, mods, ModifyOtherKeys.OFF) for key, code, shifted, mods in PROFILE_EXAMPLES]
+    wrong = []
+    for request, answers in zip(requests, ask(requests), strict=True):
+        answer = answers[judge]
+        if answer is None:
+            continue
+        pyte = _pyte_reads(request, KEY_PROFILES[judge])
+        if not _is_a_legacy_form(pyte) or (_is_a_legacy_form(answer) and answer != pyte):
+            wrong.append((request.key, request.mods, pyte, answer))
+    assert not wrong
 
 
 def test_an_arrow_with_num_lock_is_judged_by_the_whole_panel():
