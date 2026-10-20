@@ -303,6 +303,19 @@ _MODIFIERS_THAT_MAKE_A_KEY_AMBIGUOUS = Modifier.CTRL | Modifier.ALT | Modifier.S
 #: them, which is what a keyboard does as well.
 _MODIFIERS_THE_LEGACY_ENCODING_DROPS = Modifier.SUPER | Modifier.HYPER | Modifier.META
 
+#: The two locks, which a pane that pushed no flag at all never reads.
+#:
+#: They are a state of the keyboard and not a key held down, and the
+#: legacy encoding has no field for them: xterm writes no lock into
+#: "CSI 1 ; mods D", and kitty takes both off before it encodes, "if
+#: (!key_encoding_flags) mods &= ~GLFW_LOCK_MASK" (`convert_glfw_mods`,
+#: `kitty/key_encoding.c`). A pane that pushed any flag reads them,
+#: as it does from kitty. A keyboard that reports them sets one of
+#: them on every key while it is on, and Hyprland turns num lock on
+#: at login for a keyboard that has no key for it: every arrow then
+#: reached bash as "CSI 1 ; 129 D". Lillecarl/pymux#684.
+_LOCK_MODIFIERS = Modifier.CAPS_LOCK | Modifier.NUM_LOCK
+
 
 def _has_a_shifted_character(code: int, text: str) -> bool:
     """
@@ -943,6 +956,8 @@ def _encode_event(
     backarrow_sends_backspace: bool = False,
 ) -> str:
     "Encode a key event for a pane with the given protocol flags."
+    if not flags:
+        event = event._replace(mods=event.mods & ~_LOCK_MODIFIERS)
     if application_keypad:
         keypad = _application_keypad_form(event, flags)
         if keypad is not None:

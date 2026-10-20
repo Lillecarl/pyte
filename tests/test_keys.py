@@ -629,3 +629,45 @@ def test_a_folded_keypad_key_follows_the_cursor_key_mode():
     "The fold gives a normal key, and a normal arrow reads DECCKM."
     assert translate_key_data("\x1b[57419u", flags=0, application_mode=True) == "\x1bOA"
     assert translate_key_data("\x1b[57419u", flags=0) == "\x1b[A"
+
+
+#: A key with each lock on, from a keyboard that reports them, and the
+#: same key with neither.
+WITH_A_LOCK_ON = [
+    ("left, num lock", "\x1b[1;129D", "\x1b[D"),
+    ("up, caps lock", "\x1b[1;65A", "\x1b[A"),
+    ("home, both", "\x1b[1;193H", "\x1b[H"),
+    ("ctrl+left, num lock", "\x1b[1;133D", "\x1b[1;5D"),
+    ("shift+right, caps lock", "\x1b[1;66C", "\x1b[1;2C"),
+    ("f1, num lock", "\x1b[1;129P", "\x1bOP"),
+    ("delete, num lock", "\x1b[3;129~", "\x1b[3~"),
+    ("ctrl+a, num lock", "\x1b[97;133u", "\x01"),
+    ("keypad 0, num lock", "\x1b[57399;129u", "0"),
+]
+
+
+@pytest.mark.parametrize(("name", "locked", "plain"), WITH_A_LOCK_ON)
+def test_a_pane_that_pushed_no_flag_reads_no_lock(name, locked, plain):
+    """
+    A lock is a state of the keyboard, and the legacy encoding has no
+    field for it. With num lock on, every arrow reached bash as
+    "CSI 1 ; 129 D", which readline does not know: it rang the bell and
+    typed "29D". kitty takes both locks off for a pane that pushed no
+    flag. Lillecarl/pymux#684.
+    """
+    for application_mode in (False, True):
+        expected = translate_key_data(plain, flags=0, application_mode=application_mode)
+        assert translate_key_data(locked, flags=0, application_mode=application_mode) == expected, name
+
+
+def test_a_lock_leaves_the_application_keypad_alone():
+    "DECKPAM writes a keypad key with no modifier, and a lock is none."
+    assert translate_key_data("\x1b[57399;129u", flags=0, application_keypad=True) == translate_key_data(
+        "\x1b[57399u", flags=0, application_keypad=True
+    )
+
+
+def test_a_pane_that_pushed_a_flag_reads_the_locks():
+    "kitty reports the locks once a pane asked for anything."
+    assert translate_key_data("\x1b[1;129D", flags=DISAMBIGUATE) == "\x1b[1;129D"
+    assert translate_key_data("\x1b[1;65A", flags=REPORT_ALL) == "\x1b[1;65A"
