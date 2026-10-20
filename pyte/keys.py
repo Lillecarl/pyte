@@ -946,6 +946,32 @@ def _folded(event: KeyEvent, flags: int) -> KeyEvent | None:
     return event._replace(code=code, final=final)
 
 
+def _sends_its_text(flags: int, mods: int, text: str, kind: int) -> bool:
+    """
+    Whether a key goes out as the text it writes, and nothing else.
+
+    kitty's rule (`send_text_standalone` in `encode_glfw_key_event`,
+    `kitty/key_encoding.c`): a key that writes text sends that text
+    unless the pane asked for every key as an escape code, whatever
+    else it asked for. So a repeat, a shifted key with its alternates,
+    and a keypad digit with num lock reach a pane that disambiguates as
+    "a", "A" and "0". Lillecarl/pymux#690.
+
+    kitty has no text for a key with ctrl or alt held, so it never
+    meets that case. A terminal that sends some keeps the escape code.
+
+    The caller asks only for a pane that disambiguates. Without that
+    flag or REPORT_ALL_KEYS, the text flag is "undefined" in kitty's
+    own words (`docs/keyboard-protocol.rst`), and Lillecarl/pymux#695
+    holds those modes.
+    """
+    if flags & KeyboardFlag.REPORT_ALL_KEYS or kind == EventType.RELEASE:
+        return False
+    if not text or ord(text[0]) < 0x20 or text[0] == "\x7f":
+        return False
+    return not mods & _MODIFIERS_THAT_MAKE_A_KEY_AMBIGUOUS
+
+
 def _encode_event(
     event: KeyEvent,
     flags: int,
@@ -980,10 +1006,24 @@ def _encode_event(
     if kind == EventType.RELEASE and not mods & ~_LOCK_MODIFIERS and code in _CONTROL_CODES:
         if not flags & KeyboardFlag.REPORT_ALL_KEYS:
             return ""
+    # The repeat of a plain Enter, Tab or Backspace is its byte, as the
+    # press is: kitty writes both before it looks at the event type.
+    # Lillecarl/pymux#690.
+    if (
+        kind == EventType.REPEAT
+        and final == "u"
+        and code in _CONTROL_CODES
+        and not mods & ~_LOCK_MODIFIERS
+        and not flags & KeyboardFlag.REPORT_ALL_KEYS
+    ):
+        kind = EventType.PRESS
     if not flags & KeyboardFlag.REPORT_ALTERNATE_KEYS or final != "u":
         # kitty sends the other codes of a key for the "u" form only.
         alternates = ()
     embedded = text if flags & KeyboardFlag.REPORT_ASSOCIATED_TEXT else ""
+
+    if flags & KeyboardFlag.DISAMBIGUATE and _sends_its_text(flags, mods, text, kind):
+        return text
 
     if final == "u":
         ambiguous = bool(mods & _MODIFIERS_THAT_MAKE_A_KEY_AMBIGUOUS) or code == KeyCode.ESCAPE

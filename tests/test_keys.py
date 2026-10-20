@@ -697,6 +697,44 @@ def test_the_extended_mode_writes_no_lock(locked, level, tilde, csi_u):
     assert translate_key_data(locked, flags=0, modify_other_keys=level, format_other_keys=csi_u_form) == csi_u
 
 
+#: A key that writes text, the flags of the pane, and what it reads:
+#: the text alone, the way kitty sends it unless the pane asked for
+#: every key as an escape code.
+TEXT_SENT_AS_TEXT = [
+    ("keypad 0, num lock", "\x1b[57399;129;48u", DISAMBIGUATE, "0"),
+    ("keypad 7, num lock, event types", "\x1b[57406;129;55u", DISAMBIGUATE | EVENT_TYPES, "7"),
+    ("a repeat", "\x1b[97;1:2;97u", DISAMBIGUATE | EVENT_TYPES, "a"),
+    ("shift+a with its alternates", "\x1b[97:65;2;65u", DISAMBIGUATE | ALTERNATE_KEYS, "A"),
+    ("caps lock on a", "\x1b[97;65;65u", DISAMBIGUATE, "A"),
+    ("the text flag beside disambiguate", "\x1b[97;;97u", DISAMBIGUATE | ASSOCIATED_TEXT, "a"),
+    ("a repeat of Backspace", "\x1b[127;1:2u", DISAMBIGUATE | EVENT_TYPES, "\x7f"),
+    ("a repeat of Enter, caps lock", "\x1b[13;65:2u", DISAMBIGUATE | EVENT_TYPES, "\r"),
+]
+
+
+@pytest.mark.parametrize(("name", "data", "flags", "text"), TEXT_SENT_AS_TEXT)
+def test_a_key_that_writes_text_sends_the_text(name, data, flags, text):
+    """
+    kitty's `send_text_standalone`: with num lock on, a keypad digit
+    reached fish and neovim as "CSI 57399 ; 129 u", where kitty sends
+    "0". Lillecarl/pymux#690.
+    """
+    assert translate_key_data(data, flags=flags, source_flags=REPORT_ALL | EVENT_TYPES) == text, name
+
+
+def test_a_key_that_writes_text_is_an_escape_code_for_a_pane_that_asked():
+    "REPORT_ALL_KEYS takes every key out of the text, and the release stays."
+    assert translate_key_data("\x1b[57399;129;48u", flags=REPORT_ALL) == "\x1b[57399;129u"
+    assert translate_key_data("\x1b[97;1:3u", flags=DISAMBIGUATE | EVENT_TYPES, source_flags=EVENT_TYPES) == (
+        "\x1b[97;1:3u"
+    )
+
+
+def test_ctrl_keeps_its_escape_code_when_a_terminal_sends_text():
+    "kitty sends no text with ctrl held. Another terminal might, and ctrl still counts."
+    assert translate_key_data("\x1b[97;5;97u", flags=DISAMBIGUATE) == "\x1b[97;5u"
+
+
 @pytest.mark.parametrize("key", ["\x1b[13;65:3u", "\x1b[9;129:3u", "\x1b[127;193:3u"])
 def test_a_lock_does_not_bring_back_the_release_of_a_control_key(key):
     """

@@ -172,23 +172,6 @@ DEVIATIONS = [
         ),
         ("ENTER", Modifier.SHIFT, "press", KeyboardFlag.DISAMBIGUATE),
     ),
-    Deviation(
-        "a key that writes text is not sent as that text",
-        "Lillecarl/pymux#690",
-        # kitty sends the text of a key by itself unless the pane asked
-        # for every key as an escape code (`send_text_standalone` in
-        # `encode_glfw_key_event`), whatever event or other keys it asked
-        # for. A repeat, a shifted key with alternates, and a keypad digit
-        # with num lock reach the pane from pyte as "CSI ... u".
-        lambda case: (
-            bool(case.flags & KeyboardFlag.DISAMBIGUATE)
-            and not case.flags & KeyboardFlag.REPORT_ALL_KEYS
-            and case.action != "release"
-            and case.pyte.startswith("\x1b[")
-            and not case.kitty.startswith("\x1b")
-        ),
-        ("KP_0", Modifier.NUM_LOCK, "press", KeyboardFlag.DISAMBIGUATE),
-    ),
 ]
 
 
