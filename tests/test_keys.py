@@ -11,9 +11,11 @@ from __future__ import annotations
 import pytest
 
 from pyte.keys import (
+    FormatOtherKeys,
     KeyCode,
     KeyEvent,
     Modifier,
+    ModifyOtherKeys,
     parse_key_data,
     translate_key_data,
     translate_key_event,
@@ -667,7 +669,40 @@ def test_a_lock_leaves_the_application_keypad_alone():
     )
 
 
+#: A key with a lock on, the level of modifyOtherKeys, and what each of
+#: its two forms writes.
+WITH_A_LOCK_IN_THE_EXTENDED_MODE = [
+    ("\x1b[97;133u", ModifyOtherKeys.EVERY_MODIFIER, "\x1b[27;5;97~", "\x1b[97;5u"),
+    ("\x1b[97;135u", ModifyOtherKeys.ALT_AND_META, "\x1b[27;7;97~", "\x1b[97;7u"),
+    ("\x1b[9;66u", ModifyOtherKeys.EVERY_MODIFIER, "\x1b[27;2;9~", "\x1b[9;2u"),
+    ("\x1b[13;129u", ModifyOtherKeys.EVERY_KEY, "\x1b[27;1;13~", "\x1b[13;1u"),
+]
+
+
 def test_a_pane_that_pushed_a_flag_reads_the_locks():
     "kitty reports the locks once a pane asked for anything."
     assert translate_key_data("\x1b[1;129D", flags=DISAMBIGUATE) == "\x1b[1;129D"
     assert translate_key_data("\x1b[1;65A", flags=REPORT_ALL) == "\x1b[1;65A"
+
+
+@pytest.mark.parametrize(("locked", "level", "tilde", "csi_u"), WITH_A_LOCK_IN_THE_EXTENDED_MODE)
+def test_the_extended_mode_writes_no_lock(locked, level, tilde, csi_u):
+    """
+    xterm's modifyOtherKeys has no field for a lock either: its
+    modifier parameter counts shift, alt, ctrl and meta. kitty has no
+    such mode, so `test_keys_against_kitty.py` cannot judge this one.
+    """
+    assert translate_key_data(locked, flags=0, modify_other_keys=level) == tilde
+    csi_u_form = FormatOtherKeys.CSI_U
+    assert translate_key_data(locked, flags=0, modify_other_keys=level, format_other_keys=csi_u_form) == csi_u
+
+
+@pytest.mark.parametrize("key", ["\x1b[13;65:3u", "\x1b[9;129:3u", "\x1b[127;193:3u"])
+def test_a_lock_does_not_bring_back_the_release_of_a_control_key(key):
+    """
+    Enter, Tab and Backspace send no release unless the pane asked for
+    every key as an escape code. A lock is no modifier there: kitty
+    asks `!(mods & ~LOCK_MASK)`.
+    """
+    assert translate_key_data(key, flags=DISAMBIGUATE | EVENT_TYPES, source_flags=EVENT_TYPES) == ""
+    assert translate_key_data(key, flags=REPORT_ALL | EVENT_TYPES, source_flags=EVENT_TYPES) == key

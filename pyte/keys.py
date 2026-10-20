@@ -956,7 +956,7 @@ def _encode_event(
     backarrow_sends_backspace: bool = False,
 ) -> str:
     "Encode a key event for a pane with the given protocol flags."
-    if not flags:
+    if not flags and event.mods & _LOCK_MODIFIERS:
         event = event._replace(mods=event.mods & ~_LOCK_MODIFIERS)
     if application_keypad:
         keypad = _application_keypad_form(event, flags)
@@ -974,7 +974,10 @@ def _encode_event(
         return ""
     if not flags & KeyboardFlag.REPORT_EVENT_TYPES:
         kind = EventType.PRESS
-    if kind == EventType.RELEASE and mods == 0 and code in _CONTROL_CODES:
+    # A lock is no modifier here: kitty asks `!(mods & ~LOCK_MASK)`
+    # in `encode_function_key`, so caps lock does not make the release
+    # of Enter reach a pane that pushed only the event types.
+    if kind == EventType.RELEASE and not mods & ~_LOCK_MODIFIERS and code in _CONTROL_CODES:
         if not flags & KeyboardFlag.REPORT_ALL_KEYS:
             return ""
     if not flags & KeyboardFlag.REPORT_ALTERNATE_KEYS or final != "u":
