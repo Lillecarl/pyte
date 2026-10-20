@@ -299,9 +299,11 @@ POINTER_SHAPES = frozenset(
 )
 
 #: The names that xterm used, which kitty takes as well. A set takes
-#: them; kitty leaves "arrow" and "beam" out of the set that its own
-#: "OSC 22" reads, so those are not here either.
+#: them. "arrow" and "beam" are kitty's own names, which its "OSC 22"
+#: reads too: `kitty/screen.c` in 0.49.2.
 POINTER_SHAPE_ALIASES = {
+    "arrow": "default",
+    "beam": "text",
     "bottom_left_corner": "sw-resize",
     "bottom_right_corner": "se-resize",
     "bottom_side": "s-resize",
