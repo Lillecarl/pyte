@@ -273,10 +273,40 @@ def test_the_text_of_a_key_reaches_a_pane_that_asked():
     that a legacy terminal sends is the text of that key event.
     """
     assert translate_key_data("A", flags=REPORT_ALL | ASSOCIATED_TEXT) == ("\x1b[97;2;65u")
-    assert translate_key_data("a", flags=ASSOCIATED_TEXT) == "\x1b[97;;97u"
+    # The text rides an escape code, and without REPORT_ALL_KEYS a text
+    # key is not one: kitty, Ghostty and WezTerm send "a". Lillecarl/pymux#695.
+    assert translate_key_data("a", flags=ASSOCIATED_TEXT) == "a"
     # A key that writes no text carries none.
     assert translate_key_data("\r", flags=REPORT_ALL | ASSOCIATED_TEXT) == ("\x1b[13u")
     assert translate_key_data("\x01", flags=REPORT_ALL | ASSOCIATED_TEXT) == ("\x1b[97;5u")
+
+
+#: A pane that pushed a flag, but neither DISAMBIGUATE nor REPORT_ALL_KEYS:
+#: the sequence the terminal of the person sends, the flags, and what
+#: kitty, Ghostty and WezTerm all send. Lillecarl/pymux#695.
+WITHOUT_DISAMBIGUATE = [
+    ("f13", "\x1b[57376u", EVENT_TYPES, "\x1b[57376u"),
+    ("shift and f13", "\x1b[57376;2u", ALTERNATE_KEYS, "\x1b[57376;2u"),
+    ("num lock, alt and keypad 1", "\x1b[57400;131u", EVENT_TYPES, "\x1b[57400;131u"),
+    ("super and a", "\x1b[97;9u", ASSOCIATED_TEXT, "\x1b[97;9u"),
+    ("ctrl, alt, shift and space", "\x1b[32;8u", EVENT_TYPES, "\x1b[32;8u"),
+    ("shift and enter", "\x1b[13;2u", EVENT_TYPES, "\x1b[13;2u"),
+    ("shift and f3", "\x1b[13;2~", ALTERNATE_KEYS, "\x1b[13;2~"),
+    ("menu", "\x1b[57363u", ASSOCIATED_TEXT, "\x1b[29~"),
+    ("a repeated a", "\x1b[97;1:2;97u", EVENT_TYPES, "a"),
+]
+
+
+@pytest.mark.parametrize(
+    ("name", "sent", "flags", "read"), WITHOUT_DISAMBIGUATE, ids=[row[0] for row in WITHOUT_DISAMBIGUATE]
+)
+def test_a_pane_that_pushed_a_flag_reads_the_protocol(name, sent, flags, read):
+    """
+    It is not the legacy encoding: a key with no legacy form keeps its
+    number, and the locks count as modifiers. pyte dropped F13 and wrote
+    keypad 1 as "ESC 1" there.
+    """
+    assert translate_key_data(sent, flags=flags, source_flags=EVENT_TYPES | ALTERNATE_KEYS | ASSOCIATED_TEXT) == read
 
 
 # ----------------------------------------------------------------------

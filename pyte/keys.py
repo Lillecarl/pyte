@@ -1032,6 +1032,13 @@ def _serialize(
 #: when the pane asks for all keys as escape codes.
 _CONTROL_CODES = (KeyCode.ENTER, KeyCode.TAB, KeyCode.BACKSPACE)
 
+#: The keys kitty encodes as functional keys and not as text.
+_CONTROL_KEYS = (*_CONTROL_CODES, KeyCode.ESCAPE)
+
+#: What kitty's legacy form of a text key cannot carry once a pane
+#: pushed a flag and the locks count.
+_MODIFIERS_NO_LEGACY_FORM_TAKES = _LOCK_MODIFIERS | _MODIFIERS_THE_LEGACY_ENCODING_DROPS
+
 #: The normal key of each keypad key, as `(code, final)`.
 #:
 #: A terminal folds the keypad onto the main keyboard while it speaks
@@ -1157,14 +1164,21 @@ def _folded(event: KeyEvent, flags: int, profile: KeyProfile = DEFAULT_KEY_PROFI
     the symptom of Lillecarl/pymux#684, so the rxvt form is the one a
     `KeyProfile` may choose. Lillecarl/pymux#692.
     """
+    if event.final == "u" and event.code == FunctionalKey.MENU and _legacy_mode(flags) and (flags or profile.menu):
+        # kitty's legacy mode, which is wider than the legacy encoding:
+        # "CSI 29 ~" to a pane that pushed only the text, as xterm's F16.
+        return event._replace(code=TildeKey.MENU, final="~")
     if _carries_the_number(flags):
         return event
     if event.final != "u" or event.code < FIRST_FUNCTIONAL_KEY:
         return event
     normal = _KEYPAD_TO_NORMAL.get(event.code)
     if normal is None:
-        if event.code == FunctionalKey.MENU and profile.menu:
-            return event._replace(code=TildeKey.MENU, final="~")
+        if flags:
+            # A pane that pushed any flag reads the number, as kitty, Ghostty
+            # and WezTerm all send it: none of them drops a key once the
+            # pane speaks the protocol at all. Lillecarl/pymux#695.
+            return event
         if profile.rxvt_function_keys and event.code in _RXVT_FUNCTION_KEY:
             return event._replace(code=_RXVT_FUNCTION_KEY[event.code], final="~")
         return None
@@ -1204,10 +1218,10 @@ def _sends_its_text(flags: int, mods: int, text: str, kind: int) -> bool:
     kitty has no text for a key with ctrl or alt held, so it never
     meets that case. A terminal that sends some keeps the escape code.
 
-    The caller asks only for a pane that disambiguates. Without that
-    flag or REPORT_ALL_KEYS, the text flag is "undefined" in kitty's
-    own words (`docs/keyboard-protocol.rst`), and Lillecarl/pymux#695
-    holds those modes.
+    The caller asks for any pane that pushed a flag: the rule does not
+    look at DISAMBIGUATE, and Ghostty and WezTerm keep it too, so a
+    repeated "a" is "a" to a pane that pushed only the event types.
+    Lillecarl/pymux#695.
     """
     if flags & KeyboardFlag.REPORT_ALL_KEYS or kind == EventType.RELEASE:
         return False
@@ -1278,10 +1292,15 @@ def _encode_event(
         alternates = ()
     embedded = text if flags & KeyboardFlag.REPORT_ASSOCIATED_TEXT else ""
 
-    if flags & KeyboardFlag.DISAMBIGUATE and _sends_its_text(flags, mods, text, kind):
+    if flags and _sends_its_text(flags, mods, text, kind):
         return text
 
     if final == "u":
+        if flags and code not in _CONTROL_KEYS and not _a_legacy_form_carries(code, mods, shifted):
+            # A pane that pushed any flag reads the locks as modifiers, so
+            # num lock and alt on keypad 1 is "CSI 57400 ; 131 u" in kitty,
+            # Ghostty and WezTerm alike. Lillecarl/pymux#695.
+            return _serialize(event.code, mods_value, "u", alternates, kind, embedded)
         ambiguous = (
             bool(mods & _MODIFIERS_THAT_MAKE_A_KEY_AMBIGUOUS)
             or code == KeyCode.ESCAPE
@@ -1291,6 +1310,12 @@ def _encode_event(
             # Lillecarl/pymux#689.
             or (code in _CONTROL_CODES and bool(mods & ~_LOCK_MODIFIERS))
         )
+        # Outside the legacy mode a modified Enter, Tab, Backspace or
+        # Escape has no legacy form either: kitty's `encode_function_key`
+        # takes `legacy_functional_key_encoding_with_modifiers` only in
+        # it, so shift+Enter to a pane that pushed the event types alone
+        # is "CSI 13 ; 2 u". Lillecarl/pymux#695.
+        modified_control_key = not _legacy_mode(flags) and code in _CONTROL_KEYS and bool(mods & ~_LOCK_MODIFIERS)
         # A functional key still here belongs to a pane that reads the
         # number of a key: `_folded` took it away from every other one.
         # It goes out as an escape code whatever else is asked for,
@@ -1304,6 +1329,7 @@ def _encode_event(
         if (
             flags & KeyboardFlag.REPORT_ALL_KEYS
             or (flags & KeyboardFlag.DISAMBIGUATE and ambiguous)
+            or modified_control_key
             or no_legacy_form
             or (back_tab and not _legacy_mode(flags))
             or kind != EventType.PRESS
@@ -1391,11 +1417,13 @@ def _encode_event(
             char = char.upper()
         return char
 
-    if final == "R" and not _legacy_mode(flags):
+    if final == "R" and (not _legacy_mode(flags) or (flags and mods)):
         # A pane that speaks the protocol reads F3 as a number, because
         # kitty's own decoder refuses the letter: "CSI R" and "CSI 1;5R"
         # both raise there, and "CSI 13~" and "CSI 13;5~" come back as
-        # F3. Lillecarl/pymux#242.
+        # F3. Lillecarl/pymux#242. Any flag is enough for a modified
+        # one: kitty, Ghostty and WezTerm send "CSI 13 ; 2 ~" to a pane
+        # that pushed only the other keys. Lillecarl/pymux#695.
         code, final = TildeKey.F3, "~"
 
     if final == "~":
@@ -1577,6 +1605,24 @@ def _has_a_control_code(code: int) -> bool:
         or code in _CONTROL_CODE_OF
         or code in (KeyCode.ENTER, KeyCode.TAB, KeyCode.BACKSPACE, KeyCode.ESCAPE)
     )
+
+
+def _a_legacy_form_carries(code: int, mods: int, shifted: int | None) -> bool:
+    """
+    Whether a text key has a legacy form under these modifiers, for a
+    pane that pushed a flag and so counts the locks.
+
+    kitty's `encode_printable_ascii_key_legacy`: shift is spent on a key
+    that has a shifted one, and what is left has to be shift alone, alt,
+    ctrl, or ctrl and alt. Space keeps ctrl+shift and alt+shift as well.
+    """
+    if mods & _MODIFIERS_NO_LEGACY_FORM_TAKES:
+        return False
+    if shifted is not None:
+        mods &= ~Modifier.SHIFT
+    if not mods & Modifier.SHIFT or mods == Modifier.SHIFT:
+        return True
+    return code == ord(" ") and mods in (Modifier.CTRL | Modifier.SHIFT, Modifier.ALT | Modifier.SHIFT)
 
 
 def _ctrl_stays_on_the_unshifted_key(code: int, shifted: int, mods: int, profile: KeyProfile) -> bool:

@@ -31,7 +31,8 @@ pytestmark = pytest.mark.skipif(not judges_are_available(), reason="the key judg
 #: The vote on the example of each deviation in `test_keys_against_kitty.py`:
 #: the judges that send what pyte sends, then the ones that do not.
 VOTES = {
-    "a mode that no program pushes": ((), ("kitty", "ghostty", "wezterm")),
+    "kitty writes a keypad key by the number of its character": (("ghostty", "wezterm"), ("kitty",)),
+    "Escape under the event types alone": (("wezterm",), ("kitty", "ghostty")),
     "kitty folds keypad 0 and 9 and no digit between": (("ghostty", "wezterm"), ("kitty",)),
     "a key with no legacy form is dropped": (("ghostty",), ("kitty", "wezterm")),
     "super on a key a legacy pane reads is dropped": (("ghostty", "wezterm", "xterm"), ("kitty",)),

@@ -49,13 +49,28 @@ class Deviation(NamedTuple):
 
 DEVIATIONS = [
     Deviation(
-        "a mode that no program pushes",
+        "kitty writes a keypad key by the number of its character",
         "Lillecarl/pymux#695",
-        # The event types, the other keys or the text, with neither flag
-        # that says how to write a key. kitty keeps the locks there and
-        # folds the keypad by a rule of its own.
-        lambda case: bool(case.flags) and not _reads_the_number(case.flags),
-        ("KP_0", Modifier.ALT | Modifier.NUM_LOCK, "press", KeyboardFlag.REPORT_ALTERNATE_KEYS),
+        # A pane that pushed a flag but not DISAMBIGUATE or REPORT_ALL_KEYS
+        # gets a modified keypad + as "CSI 43 ; 9 u" from kitty, which
+        # folds the keypad first. Ghostty and WezTerm keep the keypad's
+        # own number, "CSI 57413 ; 9 u", and so does pyte.
+        lambda case: bool(case.flags) and not _reads_the_number(case.flags) and case.key.startswith("KP_"),
+        ("KP_ADD", Modifier.SUPER, "press", KeyboardFlag.REPORT_EVENT_TYPES),
+    ),
+    Deviation(
+        "Escape under the event types alone",
+        "Lillecarl/pymux#695",
+        # A lock on Escape, and its repeat and release, to a pane that
+        # pushed only the event types: kitty sends ESC for the second and
+        # "CSI 27 ; 65 u" for the first, Ghostty "CSI 27 ; 1 : 2 u" for the
+        # repeat and WezTerm ESC for the lock. pyte takes one of them each.
+        lambda case: (
+            bool(case.flags & KeyboardFlag.REPORT_EVENT_TYPES)
+            and not _reads_the_number(case.flags)
+            and case.key == "ESCAPE"
+        ),
+        ("ESCAPE", Modifier.CAPS_LOCK, "press", KeyboardFlag.REPORT_EVENT_TYPES),
     ),
     Deviation(
         "kitty folds keypad 0 and 9 and no digit between",
