@@ -20,7 +20,6 @@ off. `test_keys.py` holds them by hand.
 
 from __future__ import annotations
 
-import re
 from collections.abc import Callable
 from typing import NamedTuple
 
@@ -30,11 +29,6 @@ from kitty_keys import Case, disagreements, judged, kitty_keys_are_available
 from pyte.keys import KeyboardFlag, Modifier
 
 pytestmark = pytest.mark.skipif(not kitty_keys_are_available(), reason="PYTE_KITTY names no kitty")
-
-#: The keys that are a modifier or a lock, as kitty names them.
-_MODIFIER_KEYS = re.compile(
-    r"(LEFT|RIGHT)_(SHIFT|CONTROL|ALT|SUPER|HYPER|META)|CAPS_LOCK|NUM_LOCK|SCROLL_LOCK|ISO_LEVEL[35]_SHIFT"
-)
 
 _LETTERS = ("'a'", "'z'")
 
@@ -133,18 +127,6 @@ DEVIATIONS = [
             and case.key not in _LETTERS
         ),
         ("' '", Modifier.ALT | Modifier.CTRL | Modifier.SHIFT, "press", 0),
-    ),
-    Deviation(
-        "a modifier key reaches a pane that did not ask for every key",
-        "Lillecarl/pymux#688",
-        # kitty sends a modifier key only with REPORT_ALL_KEYS
-        # (`is_modifier_key` in `encode_glfw_key_event`).
-        lambda case: (
-            bool(_MODIFIER_KEYS.fullmatch(case.key))
-            and case.kitty == ""
-            and not case.flags & KeyboardFlag.REPORT_ALL_KEYS
-        ),
-        ("LEFT_SHIFT", 0, "press", KeyboardFlag.DISAMBIGUATE),
     ),
 ]
 

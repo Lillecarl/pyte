@@ -424,9 +424,21 @@ def test_a_key_the_legacy_encoding_cannot_write_reaches_no_such_pane():
 def test_a_pane_that_asked_reads_the_number_of_the_key():
     "The fold is for the legacy encoding. It must not hide a key."
     assert translate_key_data("\x1b[57399u", flags=DISAMBIGUATE) == ("\x1b[57399u")
-    assert translate_key_data("\x1b[57441u", flags=DISAMBIGUATE) == ("\x1b[57441u")
     assert translate_key_data("\x1b[57376u", flags=REPORT_ALL) == "\x1b[57376u"
     assert translate_key_data("\x1b[57399u", flags=ASSOCIATED_TEXT) == ("\x1b[57399u")
+
+
+@pytest.mark.parametrize("key", ["\x1b[57441u", "\x1b[57449;3u", "\x1b[57358u", "\x1b[57360;129u", "\x1b[57453u"])
+def test_a_modifier_key_reaches_only_a_pane_that_asked_for_every_key(key):
+    """
+    kitty sends a modifier or lock key only with REPORT_ALL_KEYS
+    (`is_modifier_key`), and Ghostty does the same. A pane that pushed
+    DISAMBIGUATE got an event each time shift went down.
+    Lillecarl/pymux#688.
+    """
+    for flags in (DISAMBIGUATE, DISAMBIGUATE | EVENT_TYPES, DISAMBIGUATE | ALTERNATE_KEYS | ASSOCIATED_TEXT):
+        assert translate_key_data(key, flags=flags, source_flags=REPORT_ALL | EVENT_TYPES) == "", flags
+    assert translate_key_data(key, flags=REPORT_ALL, source_flags=REPORT_ALL | EVENT_TYPES) == key
 
 
 #: A key in xterm's modifyOtherKeys form, and the bytes a pane that

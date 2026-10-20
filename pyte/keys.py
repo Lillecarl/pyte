@@ -403,11 +403,16 @@ class FunctionalKey(IntEnum):
     The number of a keypad key, in the Private Use Area.
 
     The protocol numbers every key that writes no character from
-    `FIRST_FUNCTIONAL_KEY` up. Only the keypad is named here, because
-    only the keypad has a normal key to fold onto. The names are the
-    ones kitty uses (`functional_key_number_to_name_map` in
+    `FIRST_FUNCTIONAL_KEY` up. Two groups are named here: the keypad,
+    which has a normal key to fold onto, and the modifier and lock
+    keys, which only a pane that asked for every key reads. The names
+    are the ones kitty uses (`functional_key_number_to_name_map` in
     `kitty/key_encoding.py`).
     """
+
+    CAPS_LOCK = 57358
+    SCROLL_LOCK = 57359
+    NUM_LOCK = 57360
 
     KP_0 = 57399
     KP_1 = 57400
@@ -438,6 +443,34 @@ class FunctionalKey(IntEnum):
     KP_INSERT = 57425
     KP_DELETE = 57426
     KP_BEGIN = 57427
+    LEFT_SHIFT = 57441
+    LEFT_CONTROL = 57442
+    LEFT_ALT = 57443
+    LEFT_SUPER = 57444
+    LEFT_HYPER = 57445
+    LEFT_META = 57446
+    RIGHT_SHIFT = 57447
+    RIGHT_CONTROL = 57448
+    RIGHT_ALT = 57449
+    RIGHT_SUPER = 57450
+    RIGHT_HYPER = 57451
+    RIGHT_META = 57452
+    ISO_LEVEL3_SHIFT = 57453
+    ISO_LEVEL5_SHIFT = 57454
+
+
+#: The keys a pane reads only once it asked for every key as an escape
+#: code: kitty's `is_modifier_key` (`kitty/keys.c`). A program that
+#: pushed DISAMBIGUATE to tell Escape from alt does not want an event
+#: each time shift goes down. Lillecarl/pymux#688.
+_MODIFIER_KEYS = frozenset(
+    (
+        FunctionalKey.CAPS_LOCK,
+        FunctionalKey.SCROLL_LOCK,
+        FunctionalKey.NUM_LOCK,
+        *range(FunctionalKey.LEFT_SHIFT, FunctionalKey.ISO_LEVEL5_SHIFT + 1),
+    )
+)
 
 
 class TildeKey(IntEnum):
@@ -1036,6 +1069,8 @@ def _encode_event(
             return keypad
     plain = _folded(event, flags)
     if plain is None:
+        return ""
+    if plain.final == "u" and plain.code in _MODIFIER_KEYS and not flags & KeyboardFlag.REPORT_ALL_KEYS:
         return ""
     code, mods, final, text, alternates, kind = plain
     mods_value = mods + 1

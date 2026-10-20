@@ -39,7 +39,6 @@ VOTES = {
     "ctrl and Enter is a line feed": ((), ("kitty", "ghostty", "wezterm")),
     "ctrl and shift on a letter is the control code": (("wezterm",), ("kitty", "ghostty")),
     "shift with ctrl or alt on a key with no shifted key is dropped": (("ghostty", "wezterm"), ("kitty",)),
-    "a modifier key reaches a pane that did not ask for every key": ((), ("kitty", "ghostty")),
 }
 
 
