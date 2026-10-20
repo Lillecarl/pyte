@@ -73,17 +73,30 @@ def test_every_modifier_is_the_second_level():
     assert screen.encode_key("\x01") == "\x1b[27;5;97~"
 
 
-def test_a_capital_letter_is_still_a_capital_letter():
+def test_shift_on_a_letter_is_the_escape_form_at_the_second_level():
     """
-    Shift on a letter gives a character, and a terminal sends the
-    character. Otherwise a person typing into vim, which asks for this
-    level, would put escape sequences in the buffer.
+    xterm sends shift+a as "CSI 27 ; 2 ; 65 ~" at this level: every key
+    that types a character from 0x40 to 0x7F does (`IsControlInput` in
+    its `input.c`), and Ghostty does the same. vim, which asks for this
+    level, reads it as "A". A key with no modifier is still its text.
+    Lillecarl/pymux#702.
     """
     screen, stream, _ = a_screen()
     stream.feed("\x1b[>4;2m")
 
-    assert screen.encode_key("A") == "A"
+    assert screen.encode_key("A") == "\x1b[27;2;65~"
     assert screen.encode_key("a") == "a"
+    assert screen.encode_key("\x1b[45:95;2;95u") == "\x1b[27;2;95~"
+    assert screen.encode_key("\x1b[49:33;2;33u") == "!"
+
+
+def test_the_escape_form_writes_the_character_the_key_types():
+    "alt+shift+minus is the underscore, as xterm and Ghostty write it. Lillecarl/pymux#702."
+    screen, stream, _ = a_screen()
+    stream.feed("\x1b[>4;2m")
+
+    assert screen.encode_key("\x1b[45:95;4u") == "\x1b[27;4;95~"
+    assert screen.encode_key("\x1b[97:65;6u") == "\x1b[27;6;65~"
 
 
 def test_shift_on_space_counts_at_the_second_level():

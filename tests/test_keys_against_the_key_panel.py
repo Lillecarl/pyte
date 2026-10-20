@@ -105,16 +105,15 @@ EXTENDED_DEVIATIONS = [
         _press("'1'", 49, 33, Modifier.CTRL, ModifyOtherKeys.ALT_AND_META),
     ),
     ExtendedDeviation(
-        "level 2 writes a shifted key by its unshifted code",
-        "Lillecarl/pymux#702",
-        # alt+shift+minus: pyte "CSI 27 ; 4 ; 45 ~", xterm and Ghostty
-        # "CSI 27 ; 4 ; 95 ~". Space has no shifted character.
+        "ctrl on a shifted key from 0x60 to 0x7F has no control code",
+        "Lillecarl/pymux#704",
+        # ctrl+shift+[: pyte and kitty "{", xterm ESC, Ghostty CSI u.
         lambda case: (
             case.request.key.startswith("'")
-            and bool(case.request.shifted)
-            and bool(case.request.mods & (Modifier.SHIFT | Modifier.CAPS_LOCK))
+            and 0x60 <= case.request.shifted <= 0x7F
+            and case.request.mods & (Modifier.CTRL | Modifier.SHIFT) == Modifier.CTRL | Modifier.SHIFT
         ),
-        _press("'-'", 45, 95, Modifier.ALT | Modifier.SHIFT, ModifyOtherKeys.EVERY_MODIFIER),
+        _press("'['", 91, 123, Modifier.CTRL | Modifier.SHIFT, ModifyOtherKeys.OFF, keypad=True),
     ),
     ExtendedDeviation(
         "ctrl and Enter is a line feed",

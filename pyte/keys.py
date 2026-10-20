@@ -360,7 +360,23 @@ def _has_a_shifted_character(code: int, text: str) -> bool:
     return character.isprintable() and character.upper() != character
 
 
-def _wants_the_escape_form(level: int, code: int, mods: int, text: str) -> bool:
+def _typed_code(code: int, mods: int, text: str, alternates: tuple[int | None, ...], caps_lock: bool) -> int:
+    """
+    The character the key types, which is what xterm writes in the
+    escape form: its keysym, after shift and caps lock. alt+shift+minus
+    is "CSI 27 ; 4 ; 95 ~", the underscore. Lillecarl/pymux#702.
+    """
+    if len(text) == 1:
+        return ord(text)
+    typed = code
+    if mods & Modifier.SHIFT and alternates and alternates[0] is not None:
+        typed = alternates[0]
+    if caps_lock and chr(typed).isalpha():
+        typed = ord(chr(typed).swapcase())
+    return typed
+
+
+def _wants_the_escape_form(level: int, code: int, typed: int, mods: int, text: str) -> bool:
     """
     Whether this key goes out as "CSI 27 ; mods ; code ~".
 
@@ -369,18 +385,21 @@ def _wants_the_escape_form(level: int, code: int, mods: int, text: str) -> bool:
     expected, but other modifiers cause ordinary keys to be encoded as
     if they were function-keys".
 
-    At `EVERY_MODIFIER` all of them apply, and shift is the one that
-    needs care: a capital letter is a character and goes out as one,
-    or a person typing into vim would get escape sequences instead of
-    text. Shift counts on a key that has no shifted character, which
-    is the shift+Tab that xterm gives as its example.
+    At `EVERY_MODIFIER` all of them apply. Shift alone counts on a key
+    with no shifted character, which is the shift+Tab that xterm gives
+    as its example, and on every key that types a character from 0x40
+    to 0x7F: xterm's `IsControlInput` (`input.c`). So shift+a is
+    "CSI 27 ; 2 ; 65 ~", which vim, the program that asks for this
+    level, reads as "A"; shift+1 is "!".
     """
     if level >= ModifyOtherKeys.EVERY_KEY:
         return True
     if level == ModifyOtherKeys.EVERY_MODIFIER:
         if mods & (Modifier.CTRL | Modifier.ALT):
             return True
-        return bool(mods & Modifier.SHIFT) and not _has_a_shifted_character(code, text)
+        if not mods & Modifier.SHIFT:
+            return False
+        return 0x40 <= typed <= 0x7F or not _has_a_shifted_character(code, text)
     if level == ModifyOtherKeys.ALT_AND_META:
         return bool(mods & Modifier.ALT)
     return False
@@ -1065,6 +1084,9 @@ def _encode_event(
     backarrow_sends_backspace: bool = False,
 ) -> str:
     "Encode a key event for a pane with the given protocol flags."
+    # The legacy forms write no lock, but caps lock still picks the
+    # character a letter types, which the extended mode writes.
+    caps_lock = bool(event.mods & Modifier.CAPS_LOCK)
     if not flags and event.mods & _LOCK_MODIFIERS:
         event = event._replace(mods=event.mods & ~_LOCK_MODIFIERS)
     if application_keypad:
@@ -1156,7 +1178,8 @@ def _encode_event(
             escape_code = 0x7F if (not backarrow_sends_backspace) != ctrl else 0x08
             wants_it = modify_other_keys == ModifyOtherKeys.EVERY_KEY or bool(mods & ~(Modifier.CTRL | _LOCK_MODIFIERS))
         else:
-            wants_it = _wants_the_escape_form(modify_other_keys, code, mods, text)
+            escape_code = _typed_code(code, mods, text, plain.alternates, caps_lock)
+            wants_it = _wants_the_escape_form(modify_other_keys, code, escape_code, mods, text)
         if wants_it:
             if format_other_keys == FormatOtherKeys.CSI_U:
                 return "%s%d;%du" % (CSI, escape_code, mods_value)
