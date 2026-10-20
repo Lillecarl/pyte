@@ -1260,7 +1260,10 @@ def _encode_event(
             result = "\x1b" if mods & Modifier.ALT else ""
             if mods & Modifier.CTRL:
                 if code == KeyCode.ENTER:
-                    result += "\n"
+                    # A CR, as kitty, xterm and WezTerm send. Ghostty's
+                    # "CSI 27 ; 5 ; 13 ~" prints junk in a shell, and an LF
+                    # is no terminal's. Lillecarl/pymux#694.
+                    result += "\r"
                 elif code == KeyCode.TAB:
                     result += "\t"
                 elif code == KeyCode.BACKSPACE:

@@ -36,7 +36,6 @@ VOTES = {
     "a key with no legacy form is dropped": (("ghostty",), ("kitty", "wezterm")),
     "super on a key a legacy pane reads is dropped": (("ghostty", "wezterm", "xterm"), ("kitty",)),
     "a modified F3 takes the cursor report form": (("wezterm", "xterm"), ("kitty", "ghostty")),
-    "ctrl and Enter is a line feed": ((), ("kitty", "ghostty", "wezterm", "xterm")),
     "ctrl and shift on a letter is the control code": (("wezterm", "xterm"), ("kitty", "ghostty")),
     "shift with ctrl or alt on a key with no shifted key is dropped": (("ghostty", "wezterm"), ("kitty",)),
 }
@@ -109,12 +108,6 @@ EXTENDED_DEVIATIONS = [
             and case.request.mods & (Modifier.CTRL | Modifier.SHIFT) == Modifier.CTRL | Modifier.SHIFT
         ),
         _press("'['", 91, 123, Modifier.CTRL | Modifier.SHIFT, ModifyOtherKeys.OFF, keypad=True),
-    ),
-    ExtendedDeviation(
-        "ctrl and Enter is a line feed",
-        "Lillecarl/pymux#694",
-        lambda case: case.request.key == "ENTER" and bool(case.request.mods & Modifier.CTRL),
-        _press("ENTER", 57345, 0, Modifier.CTRL, ModifyOtherKeys.OFF, keypad=True),
     ),
 ]
 

@@ -53,10 +53,17 @@ def test_the_number_of_a_tilde_key_is_kept():
     assert translate_key_data("\x1b[1~", flags=DISAMBIGUATE) == "\x1b[1~"
 
 
+def test_ctrl_and_enter_is_a_carriage_return():
+    "kitty, xterm and WezTerm send a CR. Lillecarl/pymux#694."
+    assert translate_key_data("\x1b[13;5u", flags=0) == "\r"
+    assert translate_key_data("\x1b[13;7u", flags=0) == "\x1b\r"
+    assert translate_key_data("\x1b[57414;5u", flags=0) == "\r"
+
+
 def test_flags_zero_kitty_to_legacy():
     # Kitty sequences are translated to their legacy equivalents.
     assert translate_key_data("\x1b[97;5u", flags=0) == "\x01"
-    assert translate_key_data("\x1b[13;5u", flags=0) == "\n"
+    assert translate_key_data("\x1b[13;5u", flags=0) == "\r"
     assert translate_key_data("\x1b[97;3u", flags=0) == "\x1ba"
     assert translate_key_data("\x1b[27u", flags=0) == "\x1b"
     assert translate_key_data("\x1b[97u", flags=0) == "a"
@@ -452,7 +459,7 @@ MODIFY_OTHER_KEYS = [
     ("ctrl+a", "\x1b[27;5;97~", "\x01"),
     ("alt+a", "\x1b[27;3;97~", "\x1ba"),
     ("ctrl+shift+a", "\x1b[27;6;97~", "\x01"),
-    ("ctrl+enter", "\x1b[27;5;13~", "\n"),
+    ("ctrl+enter", "\x1b[27;5;13~", "\r"),
     ("shift+enter", "\x1b[27;2;13~", "\r"),
     ("alt+tab", "\x1b[27;3;9~", "\x1b\t"),
     ("space, at level 3", "\x1b[27;1;32~", " "),

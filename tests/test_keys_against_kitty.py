@@ -92,17 +92,6 @@ DEVIATIONS = [
         ("F3", Modifier.SHIFT, "press", 0),
     ),
     Deviation(
-        "ctrl and Enter is a line feed",
-        "Lillecarl/pymux#694",
-        lambda case: (
-            case.flags == 0
-            and case.key in ("ENTER", "KP_ENTER")
-            and case.kitty.endswith("\r")
-            and case.pyte.endswith("\n")
-        ),
-        ("ENTER", Modifier.CTRL, "press", 0),
-    ),
-    Deviation(
         "ctrl and shift on a letter is the control code",
         "Lillecarl/pymux#168",
         # kitty finds no legacy form and writes "CSI 97 ; 6 u".
