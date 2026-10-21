@@ -15,21 +15,40 @@ Lillecarl/pymux#129.
 from __future__ import annotations
 
 from collections import defaultdict, namedtuple
+from enum import IntFlag
 from operator import is_
-from typing import ClassVar, NamedTuple
+from typing import ClassVar, Final, NamedTuple
 
 from .cells import UNWRITTEN, Cell
 from .keep import Keep
 
 __all__ = (
+    "NO_MARKS",
     "CursorPosition",
     "HorizontalMargins",
     "LogicalLine",
     "Margins",
     "Page",
     "Row",
+    "RowMark",
     "TextLine",
 )
+
+
+class RowMark(IntFlag):
+    """
+    Where a shell said something starts: a prompt ("OSC 133 ; A", and
+    iTerm2's "OSC 1337 ; SetMark"), or a command's output ("OSC 133 ;
+    C"). tmux keeps the same two as flags on a grid line, and copy mode
+    jumps between them. Lillecarl/pymux#500.
+    """
+
+    PROMPT = 1
+    OUTPUT = 2
+
+
+#: A row nobody marked.
+NO_MARKS: Final = RowMark(0)
 
 
 class Margins(NamedTuple):
@@ -96,13 +115,17 @@ class Row(dict[int, Cell]):
     a fifty thousand row history took. Lillecarl/pymux#227.
     """
 
-    __slots__ = ("wrapped",)
+    __slots__ = ("marks", "wrapped")
 
     def __init__(self) -> None:
         #: Did a wrap bring this row into being? Then it holds the rest
         #: of the row above and is not a line of its own, and a reflow
         #: joins the two back together before it lays them out again.
         self.wrapped: bool = False
+        #: What a shell marked on this row. It moves with the row as the
+        #: output scrolls, which a row number kept beside the buffer
+        #: cannot.
+        self.marks: RowMark = NO_MARKS
 
     def __missing__(self, column: int) -> Cell:
         "What a column nobody wrote reads as. It stays absent."
@@ -167,10 +190,13 @@ class LogicalLine:
     kept.
     """
 
-    __slots__ = ("cells",)
+    __slots__ = ("cells", "marks")
 
     def __init__(self) -> None:
         self.cells: list[Cell] = []
+        #: The marks of every row the line was cut into. A reflow puts
+        #: them on the first row of the line it lays out.
+        self.marks: RowMark = NO_MARKS
 
     def __repr__(self) -> str:
         return "LogicalLine(%r)" % "".join(cell.char for cell in self.cells)
@@ -408,6 +434,10 @@ class Page:
             row = data_buffer.get(number)
 
             if row is not None:
+                # Tested first: an `IntFlag`'s `|` runs Python, and
+                # this runs for every row a reflow reads.
+                if row.marks:
+                    line.marks |= row.marks
                 # `default` answers an empty row without writing to it.
                 held = max(row, default=-1) + 1
                 for column in range(held):

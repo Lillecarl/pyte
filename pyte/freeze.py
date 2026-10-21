@@ -72,7 +72,7 @@ class Frozen(NamedTuple):
 
     root: Any
     #: Rows by the id of their buffer, as a string so JSON keeps it:
-    #: `[number, wrapped, cells]`. Every row of a buffer in `whole`, and
+    #: `[number, wrapped, cells, marks]`. Every row of a buffer in `whole`, and
     #: the rows written since the freeze before for any other.
     buffers: dict[str, list[FrozenRow]]
     #: The appearances new since the freeze before, each one
@@ -272,7 +272,7 @@ class _Walk:
                     raise TypeError("cannot freeze a cell of kind %s" % _name(type(cell)))
                 kind = PROTECTED + cell.protection  # type: ignore[attr-defined]
             cells.append([column, cell.char, self.appearance(cell.appearance), kind])
-        return [number, row.wrapped, cells]
+        return [number, row.wrapped, cells, int(row.marks)]
 
 
 def thaw(frozen: Frozen, into: object) -> None:
@@ -331,8 +331,8 @@ class _Thawer:
                 return made
             buffer: defaultdict[int, Row] = defaultdict(page_module.Row)
             self.made_buffers[value["buffer"]] = buffer
-            for number, wrapped, cells in self.frozen.buffers.get(value["buffer"], ()):
-                buffer[number] = self.row(wrapped, cells)
+            for number, wrapped, cells, marks in self.frozen.buffers.get(value["buffer"], ()):
+                buffer[number] = self.row(wrapped, cells, marks)
             return buffer
         if "list" in value:
             items: list = []
@@ -360,9 +360,11 @@ class _Thawer:
             return made_object
         raise ValueError("a frozen value of no known shape: %r" % (value,))
 
-    def row(self, wrapped: bool, cells: list) -> Row:
+    def row(self, wrapped: bool, cells: list, marks: int) -> Row:
         row = page_module.Row()
         row.wrapped = wrapped
+        if marks:
+            row.marks = page_module.RowMark(marks)
         appearances = self.appearances
         for column, char, index, kind in cells:
             appearance = appearances[index]

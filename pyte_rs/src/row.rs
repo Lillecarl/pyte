@@ -20,6 +20,15 @@ fn unwritten(py: Python<'_>) -> PyResult<&Py<PyAny>> {
     })
 }
 
+/// `pyte.page.NO_MARKS`: what a row nobody marked holds.
+static NO_MARKS: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
+
+fn no_marks(py: Python<'_>) -> PyResult<&Py<PyAny>> {
+    NO_MARKS.get_or_try_init(py, || {
+        Ok(py.import("pyte.page")?.getattr("NO_MARKS")?.unbind())
+    })
+}
+
 /// `pyte.page.RowImage`: the cells of a row at one moment, alive for as
 /// long as the image is, and equal to an image of the same cell objects
 /// in the same columns.
@@ -64,6 +73,10 @@ pub struct Row {
     /// Did a wrap bring this row into being?
     #[pyo3(get, set)]
     wrapped: bool,
+    /// What a shell marked on this row: a `pyte.page.RowMark`.
+    /// Lillecarl/pymux#500.
+    #[pyo3(get, set)]
+    marks: Py<PyAny>,
 }
 
 impl Row {
@@ -127,13 +140,14 @@ impl Row {
 #[pymethods]
 impl Row {
     #[new]
-    fn new() -> Self {
-        Self {
+    fn new(py: Python<'_>) -> PyResult<Self> {
+        Ok(Self {
             cells: Vec::new(),
             outside: BTreeMap::new(),
             count: 0,
             wrapped: false,
-        }
+            marks: no_marks(py)?.clone_ref(py),
+        })
     }
 
     fn __getitem__(&self, py: Python<'_>, column: i64) -> PyResult<Py<PyAny>> {

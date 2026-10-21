@@ -1625,6 +1625,18 @@ class Screen:
         if line is not None:
             line.wrapped = False
 
+    def mark_row(self, mark: page_module.RowMark) -> None:
+        """
+        Put `mark` on the row the cursor stands on, the row tmux's
+        `input_osc_133` marks. Lillecarl/pymux#500.
+
+        It counts as a write, though nothing draws differently: a later
+        freeze takes only the rows written since the one before.
+        """
+        number = self.pt_cursor_position.y
+        self.page.data_buffer[number].marks |= mark
+        self.touch(number)
+
     def highest_row(self) -> int:
         """
         The highest row a front end has to draw.
@@ -6049,6 +6061,9 @@ class Screen:
             # cells takes one, because looking a row up makes it.
             if line.cells:
                 row = data_buffer[new_row_index]
+            if line.marks:
+                # On the first row of the line, where a prompt starts.
+                data_buffer[new_row_index].marks = line.marks
 
             for column_index, char in enumerate(line.cells):
                 char_width = char.width
