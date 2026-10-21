@@ -45,6 +45,7 @@ def feed(stream, code, param):
         ("52", "c;aGVsbG8="),  # Set the clipboard.
         ("52", "p;"),  # Clear the primary selection.
         ("99", "i=1:d=0:p=title;Build ready"),  # A notification.
+        ("777", "notify;Build;ready"),  # urxvt's plain notification.
         ("22", "pointer"),  # The shape of the pointer.
         ("1337", "OpenURL=:aHR0cHM6Ly9leGFtcGxlLmNvbQ=="),  # Open a browser.
         ("1337", "File=name=t.png;inline=1:AAAA"),  # An image of iTerm2's kind.
@@ -62,7 +63,7 @@ def test_a_sequence_for_the_user_leaves_the_pane(code, param):
 
 def test_the_forwarded_codes_are_the_ones_of_the_user():
     "The palette and the title belong to the pane; the rest goes out."
-    assert FORWARDED_OSC == {"22", "52", "99", "1337", "7", "133"}
+    assert FORWARDED_OSC == {"22", "52", "99", "777", "1337", "7", "133"}
 
 
 def test_a_clipboard_query_stays_inside_the_pane():
@@ -92,7 +93,6 @@ def test_a_clipboard_write_that_looks_like_a_query_still_leaves():
         ("11", "?"),  # A background query: the pane answers it.
         ("21", "background=?"),  # A kitty colour query.
         ("8", ";https://example.com"),  # A hyperlink.
-        ("777", "notify;title;body"),  # The rxvt notification.
     ],
 )
 def test_another_sequence_does_not_leave_the_pane(code, param):

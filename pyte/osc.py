@@ -79,6 +79,9 @@ class Osc(StrEnum):
     CLIPBOARD = "52"
     #: "OSC 99": a desktop notification.
     NOTIFICATION = "99"
+    #: "OSC 777 ; notify ; title ; body": the plain desktop notification
+    #: of urxvt, which foot, kitty, WezTerm, Ghostty and iTerm2 read.
+    SIMPLE_NOTIFICATION = "777"
     #: "OSC 7": the working directory of the program, as a file URL.
     #: xterm defined it; iTerm2 reads it as CurrentDir with a host.
     CURRENT_DIRECTORY = "7"
@@ -98,15 +101,16 @@ class Osc(StrEnum):
 
 #: The OSC sequences that a pane cannot answer by itself. They ask the
 #: terminal of the user for the shape of the pointer (22), the
-#: clipboard (52) or a desktop notification (99), they name a service
-#: of the embedder (1337), or they report where the program is and
-#: what it finished (7, 133). `Screen.osc_func` receives them, and a
-#: pane without such a function consumes them.
+#: clipboard (52) or a desktop notification (99, 777), they name a
+#: service of the embedder (1337), or they report where the program is
+#: and what it finished (7, 133). `Screen.osc_func` receives them, and
+#: a pane without such a function consumes them.
 FORWARDED_OSC = frozenset(
     [
         Osc.POINTER_SHAPE,
         Osc.CLIPBOARD,
         Osc.NOTIFICATION,
+        Osc.SIMPLE_NOTIFICATION,
         Osc.TERMINAL_EXTENSION,
         Osc.CURRENT_DIRECTORY,
         Osc.SHELL_INTEGRATION,
