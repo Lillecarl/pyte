@@ -82,6 +82,25 @@ def test_a_clipboard_write_that_looks_like_a_query_still_leaves():
     assert forwarded == [("52", "c;Pz8/")]
 
 
+def test_clear_scrollback_clears_the_history_and_still_leaves():
+    """
+    iTerm2's "CSI 3 J": the pane's own history goes, the screen stays,
+    and the terminal of the user hears it too. Lillecarl/pymux#504.
+    """
+    stream, forwarded, _answers = make_screen()
+    screen = stream.screen
+    stream.feed("".join("row %d\r\n" % n for n in range(40)))
+    assert any(row < screen.line_offset for row in screen.page.data_buffer)
+    rows = range(screen.line_offset, screen.line_offset + screen.lines)
+    on_screen = {row: dict(screen.page.data_buffer.get(row, {})) for row in rows}
+
+    feed(stream, "1337", "ClearScrollback")
+
+    assert not any(row < screen.line_offset for row in screen.page.data_buffer)
+    assert {row: dict(screen.page.data_buffer.get(row, {})) for row in on_screen} == on_screen
+    assert forwarded == [("1337", "ClearScrollback")]
+
+
 # ----------------------------------------------------------------------
 # What does not leave the pane.
 

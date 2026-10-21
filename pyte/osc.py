@@ -33,6 +33,7 @@ from .colors import DEFAULT_COLORS, PALETTE, Color, parse_color
 from .keep import Keep
 
 __all__ = [
+    "CLEAR_SCROLLBACK",
     "COLOR_BASE",
     "DYNAMIC_COLOR_CODES",
     "DYNAMIC_COLOR_RESET_OFFSET",
@@ -116,6 +117,13 @@ FORWARDED_OSC = frozenset(
         Osc.SHELL_INTEGRATION,
     ]
 )
+
+
+#: "OSC 1337 ; ClearScrollback": iTerm2's spelling of "CSI 3 J". The one
+#: subcommand of 1337 that is the screen's own state, so a screen does
+#: it itself, and still hands it on: through a multiplexer the terminal
+#: of the user clears its own history too. Lillecarl/pymux#504.
+CLEAR_SCROLLBACK = "ClearScrollback"
 
 
 def asks_for_the_clipboard(payload: str) -> bool:

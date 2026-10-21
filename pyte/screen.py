@@ -66,6 +66,7 @@ from .images import (
 from .keep import Keep
 from .modes import AnsiMode, ModeReport, PrivateMode, flag_of
 from .osc import (
+    CLEAR_SCROLLBACK,
     COLOR_BASE,
     DYNAMIC_COLOR_CODES,
     DYNAMIC_COLOR_RESET_OFFSET,
@@ -5595,6 +5596,8 @@ class Screen:
             if answer is not None:
                 self.reply_osc(answer)
         elif code in FORWARDED_OSC:
+            if code == Osc.TERMINAL_EXTENSION and param == CLEAR_SCROLLBACK:
+                self.clear_history()
             self._forward_osc(code, param)
 
     def _reply_each(self, answers: Iterable[str]) -> None:
