@@ -1,5 +1,5 @@
 """
-PNG image decoding.
+PNG image decoding, and the one encoding a browser needs.
 
 The kitty graphics protocol carries PNG data, which a terminal that
 draws the image itself has to decode. ptterm keeps the bytes as they
@@ -10,6 +10,9 @@ terminal that does not speak the kitty protocol.
 The decoder covers what a PNG writer normally produces: bit depths of
 1, 2, 4, 8 and 16, all five colour types, the transparency chunk, and
 the five filters. Interlaced images (Adam7) are refused.
+
+`encode_png` writes RGBA pixels as a PNG, unfiltered: a browser decodes
+a PNG natively, and a sixel or raw image reaches one no other way.
 """
 
 from __future__ import annotations
@@ -19,6 +22,7 @@ import zlib
 
 __all__ = [
     "decode_png",
+    "encode_png",
 ]
 
 SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -175,6 +179,22 @@ def decode_png(data: bytes) -> tuple[int, int, bytes] | None:
         return None
 
     return (width, height, _rgba_of(samples, width, height, stride, depth, colour_type, palette, transparency))
+
+
+def _chunk(kind: bytes, payload: bytes) -> bytes:
+    return struct.pack(">I", len(payload)) + kind + payload + struct.pack(">I", zlib.crc32(kind + payload))
+
+
+def encode_png(width: int, height: int, rgba: bytes) -> bytes:
+    "RGBA pixels as a PNG of colour type 6, depth 8, every row unfiltered."
+    stride = width * 4
+    rows = b"".join(b"\0" + rgba[row * stride : (row + 1) * stride] for row in range(height))
+    return (
+        SIGNATURE
+        + _chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))
+        + _chunk(b"IDAT", zlib.compress(rows, 6))
+        + _chunk(b"IEND", b"")
+    )
 
 
 def _rgba_of(

@@ -15,7 +15,7 @@ import zlib
 
 import pytest
 
-from pyte.png import decode_png
+from pyte.png import decode_png, encode_png
 
 # ----------------------------------------------------------------------
 # Golden images.
@@ -243,3 +243,8 @@ def test_truncated_image_data_is_refused():
     header = struct.pack(">IIBBBBB", 4, 4, 8, 2, 0, 0, 0)
     body = zlib.compress(bytes(5))  # One short scanline.
     assert decode_png(_build([(b"IHDR", header), (b"IDAT", body)])) is None
+
+
+def test_an_encoded_image_decodes_to_its_pixels():
+    pixels = bytes(range(256)) * 3  # 192 pixels, every byte value.
+    assert decode_png(encode_png(16, 12, pixels)) == (16, 12, pixels)
