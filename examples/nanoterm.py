@@ -50,12 +50,14 @@ if __name__ == "__main__":
             ValueError,
         ):  # Nothing to read.
             break
-        else:
+        try:
             data = os.read(master_fd, 1024)
-            if not data:
-                break
+        except OSError:  # Linux says EIO once the program has ended.
+            break
+        if not data:
+            break
 
-            stream.feed(data.decode("utf-8", "replace"))
+        stream.feed(data.decode("utf-8", "replace"))
 
     os.kill(p_pid, signal.SIGTERM)
     print(*rows(screen), sep="\n")

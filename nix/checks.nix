@@ -68,6 +68,8 @@ let
     # `tests/test_naming_the_sequences.py` imports the rewriting tool,
     # and finds it beside the tests the way the checkout has it.
     cp -r ${testSources}/tools .
+    # `tests/test_the_examples_run.py` runs them.
+    cp -r ${testSources}/examples .
     chmod -R +w .
     export HOME="$TMPDIR"
     export LANG=C.UTF-8

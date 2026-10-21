@@ -94,6 +94,7 @@ let
     setup = ''
       cp -r ${../tests} tests
       cp -r ${../tools} tools
+      cp -r ${../examples} examples
       chmod -R +w .
       export HOME="$TMPDIR"
       export LANG=C.UTF-8
