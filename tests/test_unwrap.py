@@ -125,6 +125,16 @@ def test_a_row_of_nothing_is_a_text_line_of_nothing():
     ]
 
 
+def test_a_line_can_end_at_its_last_character():
+    "The spaces at the end of a line go; the ones a wrap left inside it stay."
+    page = _a_page("one ", "|two  ", "three   ")
+    assert page.text_lines(0, 2, trailing_spaces=False) == [
+        TextLine("one two", 0, 1),
+        TextLine("three", 2, 2),
+    ]
+    assert page.text_lines(0, 2)[1] == TextLine("three   ", 2, 2)
+
+
 def test_a_range_that_holds_nothing_gives_no_text_line():
     "A buffer with no row at all asks for nothing, and gets nothing."
     assert _a_page().text_lines(0, -1) == []

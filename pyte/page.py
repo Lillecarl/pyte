@@ -289,10 +289,13 @@ class Page:
 
         return "".join(characters)
 
-    def text_lines(self, first: int, last: int) -> list[TextLine]:
+    def text_lines(self, first: int, last: int, *, trailing_spaces: bool = True) -> list[TextLine]:
         """
         The lines the range holds, as text and as the rows each one
-        is laid out on.
+        is laid out on. Without `trailing_spaces`, each line ends at its
+        last character that is not a space, which is how tmux's copy
+        mode measures a row (`grid_line_length`). The trim is here, as
+        the line closes, because copy mode asks it of every line.
 
         **It carries no cell.** A reader that shows text and wants the
         cells of one line only when somebody looks at it asks this, and
@@ -324,6 +327,8 @@ class Page:
             # line whether a wrap made it or not: the caller asked for
             # these rows, so a line it cuts into arrives cut.
             if number != first and not (row is not None and row.wrapped):
+                if not trailing_spaces:
+                    text = text.rstrip(" ")
                 lines.append(TextLine(text, start, number - 1))
                 text = ""
                 start = number
@@ -339,6 +344,8 @@ class Page:
                 # CPython does in place.
                 text += "".join(row[column].char for column in range(max(row) + 1))
 
+        if not trailing_spaces:
+            text = text.rstrip(" ")
         lines.append(TextLine(text, start, last))
         return lines
 
