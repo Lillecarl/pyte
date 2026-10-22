@@ -103,6 +103,13 @@ def fit_parameters(handler: Callable[..., None]) -> Callable[..., None]:
 #: five digits, such as ``OSC 30001``.)
 MAX_OSC_CODE_LENGTH = 8
 
+#: Longest OSC payload, in characters, that the parser holds. Past it the
+#: parser reads on to the terminator and drops the sequence, so a program
+#: cannot make a screen hold any amount. Large enough for an iTerm2
+#: download in one sequence, which is base64 and so a third larger than
+#: the 64 MiB pymux takes. Lillecarl/pymux#744.
+MAX_OSC_LENGTH = 96 * 1024 * 1024
+
 
 #: The controls a CSI sequence runs where it meets them, and goes on.
 CONTROLS_IN_CSI = "".join([ctrl.BEL, ctrl.BS, ctrl.HT, ctrl.LF, ctrl.VT, ctrl.FF, ctrl.CR])
@@ -750,14 +757,19 @@ class Stream:
                 # or a terminator. Everything up to the terminator is
                 # the payload.
                 param = ""
+                too_long = False
                 while True:
                     if char == ESC:
                         char += yield None
                     if char in OSC_TERMINATORS:
                         break
-                    param += char
+                    if not too_long:
+                        param += char
+                        too_long = len(param) > MAX_OSC_LENGTH
                     char = yield None
 
+                if too_long:
+                    continue
                 param = param.removeprefix(";")
 
                 if code in ("0", "1", "2"):

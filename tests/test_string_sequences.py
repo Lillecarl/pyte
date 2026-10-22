@@ -110,6 +110,19 @@ def test_osc_still_works():
     assert "rest" in "\n".join(display(screen))
 
 
+def test_an_osc_past_its_bound_is_dropped_whole(monkeypatch):
+    "Nothing of it is held or drawn, and what follows it is read. Lillecarl/pymux#744."
+    monkeypatch.setattr(pyte.streams, "MAX_OSC_LENGTH", 8)
+    screen = a_screen(20, 5)
+    stream = pyte.Stream(screen)
+    stream.feed("\x1b]2;far too long a title\x07after")
+    assert not screen.titles.window
+    assert "after" in "\n".join(display(screen))
+    assert "long" not in "\n".join(display(screen))
+    stream.feed("\x1b]2;short\x07")
+    assert screen.titles.window == "short"
+
+
 def test_legacy_sequences_untouched():
     out = display_for(b"\x1b[1;31mred\x1b[0m plain")
     assert "red plain" in out
