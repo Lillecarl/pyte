@@ -50,6 +50,7 @@ PURE = {
     "modes",
     "osc",
     "page",
+    "painted",
     "parameters",
     "placeholders",
     "png",

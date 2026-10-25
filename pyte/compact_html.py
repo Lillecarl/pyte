@@ -31,8 +31,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, NamedTuple
 
-from .colors import DEFAULT_COLORS, PALETTE, SgrColor
-from .html import THEMED, href_of, runs_of_row
+from .html import href_of, runs_of_row
+from .painted import Paint
 
 if TYPE_CHECKING:
     from .cells import Appearance
@@ -55,42 +55,9 @@ class _Spelling(NamedTuple):
     dim: bool
 
 
-class _Palette(NamedTuple):
-    foreground: str
-    background: str
-    themed: tuple[str, ...]
-
-    @classmethod
-    def of(cls, colors: ColorOverrides | None) -> _Palette:
-        if colors is None:
-            return cls(
-                DEFAULT_COLORS["foreground"].hex,
-                DEFAULT_COLORS["background"].hex,
-                tuple(PALETTE[index].hex for index in range(THEMED)),
-            )
-        themed = []
-        for index in range(THEMED):
-            held = colors.color_of(index)
-            themed.append((held or PALETTE[index]).hex)
-        return cls(colors.named("foreground").hex, colors.named("background").hex, tuple(themed))
-
-    def value(self, color: SgrColor) -> str:
-        "The colour a cell asked for, or empty for the screen's own."
-        if color.rgb is not None:
-            return color.rgb.hex
-        if color.index is None:
-            return ""
-        if color.index < THEMED:
-            return self.themed[color.index]
-        return PALETTE[color.index].hex
-
-
-def _spelled(appearance: Appearance, palette: _Palette, reverse_video: bool) -> _Spelling:
+def _spelled(appearance: Appearance, palette: Paint, reverse_video: bool) -> _Spelling:
     rendition = appearance.rendition
-    color = palette.value(rendition.color or SgrColor())
-    background = palette.value(rendition.bgcolor or SgrColor())
-    if rendition.reverse != reverse_video:
-        color, background = background or palette.background, color or palette.foreground
+    color, background = palette.asked(appearance, reverse_video)
     return _Spelling(
         href=href_of(appearance.hyperlink),
         color=color,
@@ -153,7 +120,7 @@ def _lines_of(spelling: _Spelling) -> tuple[str, str, bool, bool]:
     return (spelling.background, spelling.href, spelling.underline, spelling.strike)
 
 
-def _row(row: Row, columns: int, palette: _Palette, reverse_video: bool) -> str:
+def _row(row: Row, columns: int, palette: Paint, reverse_video: bool) -> str:
     pieces: list[tuple[_Spelling, str]] = []
     for appearance, text in runs_of_row(row, columns, reverse_video):
         spelling = _spelled(appearance, palette, reverse_video)
@@ -183,7 +150,7 @@ def compact_html_of_row(
     row: Row, columns: int, colors: ColorOverrides | None = None, reverse_video: bool = False
 ) -> str:
     "One row of a screen, spelled as the module docstring says."
-    return _row(row, columns, _Palette.of(colors), reverse_video)
+    return _row(row, columns, Paint.of(colors), reverse_video)
 
 
 def compact_html_of_page(
@@ -201,7 +168,7 @@ def compact_html_of_page(
     them, the palette this package holds. Like `html_of_page`, a row the
     buffer does not hold is an empty line, and nothing here makes one.
     """
-    palette = _Palette.of(colors)
+    palette = Paint.of(colors)
     if reverse_video:
         foreground, background = palette.background, palette.foreground
     else:
