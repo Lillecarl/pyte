@@ -38,6 +38,7 @@ PURE = {
     "cells",
     "charsets",
     "colors",
+    "compact_html",
     "control",
     "escape",
     "freeze",
