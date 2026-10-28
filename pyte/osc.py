@@ -40,6 +40,7 @@ __all__ = [
     "DYNAMIC_COLOR_RESET_OFFSET",
     "FIRST_SPECIAL_COLOR",
     "FORWARDED_OSC",
+    "ITERM_COLOR_KEYS",
     "ITERM_CURSOR_SHAPES",
     "MAX_HYPERLINK_ID_LENGTH",
     "MAX_HYPERLINK_LENGTH",
@@ -47,6 +48,7 @@ __all__ = [
     "POINTER_SHAPES",
     "POINTER_SHAPE_ALIASES",
     "QUERY",
+    "SET_COLORS",
     "SPECIAL_COLOR_NAMES",
     "ColorBase",
     "ColorOverrides",
@@ -57,6 +59,7 @@ __all__ = [
     "parse_hyperlink",
     "parse_kitty_color_query",
     "pointer_shape_name",
+    "set_colors_of",
 ]
 
 
@@ -126,6 +129,45 @@ FORWARDED_OSC = frozenset(
 #: it itself, and still hands it on: through a multiplexer the terminal
 #: of the user clears its own history too. Lillecarl/pymux#504.
 CLEAR_SCROLLBACK = "ClearScrollback"
+
+#: "OSC 1337 ; SetColors=key=value": iTerm2's way to set one colour. Each
+#: key it shares with xterm is written as the xterm sequence that sets the
+#: same colour: the code, and the index for OSC 4 and OSC 5. A key with no
+#: such colour (tab, link, curfg) is left alone. Lillecarl/pymux#782.
+SET_COLORS = "SetColors"
+_ITERM_ANSI = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white"]
+ITERM_COLOR_KEYS: Final[dict[str, tuple[str, str]]] = {
+    "fg": ("10", ""),
+    "bg": ("11", ""),
+    "curbg": ("12", ""),
+    "selbg": ("17", ""),
+    "selfg": ("19", ""),
+    "bold": ("5", "0"),
+    "underline": ("5", "1"),
+    **{name: ("4", str(index)) for index, name in enumerate(_ITERM_ANSI)},
+    **{"br_" + name: ("4", str(index + 8)) for index, name in enumerate(_ITERM_ANSI)},
+}
+
+
+def set_colors_of(value: str) -> tuple[str, str] | None:
+    """
+    The xterm code and payload that set what "SetColors=`value`" sets,
+    or None. The colour is hex, three or six digits, after an optional
+    colour space ("srgb:", "rgb:", "p3:"), which a pane cannot keep.
+    """
+    key, sign, color = value.partition("=")
+    found = ITERM_COLOR_KEYS.get(key)
+    hexadecimal = color.rpartition(":")[2]
+    if found is None or not sign or len(hexadecimal) not in (3, 6):
+        return None
+    if any(digit not in "0123456789abcdefABCDEF" for digit in hexadecimal):
+        return None
+    code, index = found
+    # Three digits are CSS's short form, each digit twice; xterm's "#123"
+    # would read them as the high nibble alone.
+    spec = "#" + ("".join(digit * 2 for digit in hexadecimal) if len(hexadecimal) == 3 else hexadecimal)
+    return code, (index + ";" + spec if index else spec)
+
 
 #: "OSC 1337 ; CursorShape=N": iTerm2's shape of the cursor, which keeps
 #: the blinking as it was. Each number names the blinking DECSCUSR shape

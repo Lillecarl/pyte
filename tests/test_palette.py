@@ -345,6 +345,23 @@ def test_the_kitty_query_reads_the_colour_that_was_set(pane):
     assert responses == ["\x1b]21;foreground=rgb:aaaa/bbbb/cccc;1=rgb:dddd/eeee/ffff\x1b\\"]
 
 
+def test_iterm2_sets_the_colours_xterm_names(pane):
+    "OSC 1337 ; SetColors writes what the xterm sequence would. Lillecarl/pymux#782."
+    screen, stream, _responses = pane
+    stream.feed(osc(Osc.TERMINAL_EXTENSION, "SetColors=fg=aabbcc"))
+    stream.feed(osc(Osc.TERMINAL_EXTENSION, "SetColors=br_red=srgb:ddeeff"))
+    stream.feed(osc(Osc.TERMINAL_EXTENSION, "SetColors=bold=123"))
+    assert screen.colors.by_code == {"10": Color(0xAA, 0xBB, 0xCC)}
+    assert screen.colors.by_index == {9: Color(0xDD, 0xEE, 0xFF), FIRST_SPECIAL_COLOR: Color(0x11, 0x22, 0x33)}
+
+
+@pytest.mark.parametrize("value", ["tab=aabbcc", "fg=zzzzzz", "fg=aabb", "fg", "nothing=aabbcc"])
+def test_iterm2_colours_pyte_cannot_hold_change_nothing(pane, value):
+    screen, stream, _responses = pane
+    stream.feed(osc(Osc.TERMINAL_EXTENSION, "SetColors=" + value))
+    assert (screen.colors.by_code, screen.colors.by_index) == ({}, {})
+
+
 # ----------------------------------------------------------------------
 # What a reset of the terminal does.
 

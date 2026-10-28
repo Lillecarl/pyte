@@ -74,6 +74,7 @@ from .osc import (
     FIRST_SPECIAL_COLOR,
     FORWARDED_OSC,
     ITERM_CURSOR_SHAPES,
+    SET_COLORS,
     SPECIAL_COLOR_NAMES,
     ColorBase,
     ColorOverrides,
@@ -81,6 +82,7 @@ from .osc import (
     PointerShapes,
     asks_for_the_clipboard,
     parse_hyperlink,
+    set_colors_of,
 )
 from .page import (
     CursorPosition,
@@ -5622,6 +5624,8 @@ class Screen:
         elif key == CURSOR_SHAPE and sign and value in ITERM_CURSOR_SHAPES:
             blinking = self.cursor_style % 2 == 1
             self.set_cursor_style(ITERM_CURSOR_SHAPES[value] + (0 if blinking else 1))
+        elif key == SET_COLORS and (xterm := set_colors_of(value)) is not None:
+            self.osc(*xterm)
 
     def _reply_each(self, answers: Iterable[str]) -> None:
         """
