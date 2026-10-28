@@ -63,7 +63,7 @@ def test_a_sequence_for_the_user_leaves_the_pane(code, param):
 
 def test_the_forwarded_codes_are_the_ones_of_the_user():
     "The palette and the title belong to the pane; the rest goes out."
-    assert FORWARDED_OSC == {"22", "52", "99", "777", "1337", "7", "133"}
+    assert FORWARDED_OSC == {"22", "52", "9", "99", "777", "1337", "7", "133"}
 
 
 def test_a_clipboard_query_stays_inside_the_pane():

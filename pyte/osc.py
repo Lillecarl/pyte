@@ -89,6 +89,11 @@ class Osc(StrEnum):
     #: "OSC 777 ; notify ; title ; body": the plain desktop notification
     #: of urxvt, which foot, kitty, WezTerm, Ghostty and iTerm2 read.
     SIMPLE_NOTIFICATION = "777"
+    #: "OSC 9 ; text": iTerm2's desktop notification, which kitty,
+    #: Ghostty and Windows Terminal read too. A number and a semicolon
+    #: first make it ConEmu's instead, "OSC 9 ; 4 ; state ; percent" a
+    #: progress bar among them. Lillecarl/pymux#787.
+    MESSAGE = "9"
     #: "OSC 7": the working directory of the program, as a file URL.
     #: xterm defined it; iTerm2 reads it as CurrentDir with a host.
     CURRENT_DIRECTORY = "7"
@@ -108,7 +113,7 @@ class Osc(StrEnum):
 
 #: The OSC sequences that a pane cannot answer by itself. They ask the
 #: terminal of the user for the shape of the pointer (22), the
-#: clipboard (52) or a desktop notification (99, 777), they name a
+#: clipboard (52) or a desktop notification (9, 99, 777), they name a
 #: service of the embedder (1337), or they report where the program is
 #: and what it finished (7, 133). `Screen.osc_func` receives them, and
 #: a pane without such a function consumes them.
@@ -118,6 +123,7 @@ FORWARDED_OSC = frozenset(
         Osc.CLIPBOARD,
         Osc.NOTIFICATION,
         Osc.SIMPLE_NOTIFICATION,
+        Osc.MESSAGE,
         Osc.TERMINAL_EXTENSION,
         Osc.CURRENT_DIRECTORY,
         Osc.SHELL_INTEGRATION,
