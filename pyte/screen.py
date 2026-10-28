@@ -563,6 +563,10 @@ class Screen:
         return PrivateMode.BRACKETED_PASTE.flag in self.mode
 
     @property
+    def reports_focus(self) -> bool:
+        return PrivateMode.FOCUS_EVENTS.flag in self.mode
+
+    @property
     def draws_a_frame(self) -> bool:
         'Is the program between the two halves of "?2026"?'
         return PrivateMode.SYNCHRONIZED_OUTPUT.flag in self.mode
@@ -4951,6 +4955,7 @@ class Screen:
             PrivateMode.NO_CLEAR_ON_COLUMN_CHANGE,
             PrivateMode.REVERSE_WRAP_ANYWHERE,
             PrivateMode.MOUSE_REPORTING,
+            PrivateMode.FOCUS_EVENTS,
             PrivateMode.SGR_MOUSE,
             PrivateMode.ALTERNATE_SCROLL,
             PrivateMode.URXVT_MOUSE,

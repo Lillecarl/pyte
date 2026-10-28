@@ -149,6 +149,10 @@ class PrivateMode(IntEnum):
     #: Report the position of the mouse.
     MOUSE_REPORTING = 1000
 
+    #: Send "CSI I" when the screen gains the focus and "CSI O" when it
+    #: loses it. Whoever shows the screen knows the focus and sends them.
+    FOCUS_EVENTS = 1004
+
     #: Report the mouse the way SGR writes it.
     SGR_MOUSE = 1006
 
