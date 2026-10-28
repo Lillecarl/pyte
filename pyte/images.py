@@ -664,26 +664,43 @@ class GraphicsState:
 
         columns = max(1, -(-width // screen.cell_width))
         rows = max(1, -(-height // screen.cell_height))
-
-        cursor = screen.pt_cursor_position
-        self.placements.append(
-            GraphicsPlacement(
-                image_id,
-                0,
-                cursor.x,
-                cursor.y,
-                columns,
-                rows,
-                asked_for_the_box=False,  # Sixel names no box.
-            )
-        )
-        self._clear_cells(screen, cursor.x, cursor.y, columns, rows)
-
+        cursor = self._place_at_cursor(screen, image_id, columns, rows, asked_for_the_box=False)  # Sixel names no box.
+        # The left of the row below, as xterm leaves it.
         cursor.x = 0
         cursor.y += rows
         screen.max_y = max(screen.max_y, cursor.y)
         screen.ensure_bounds()
         return image_id
+
+    def add_png(self, data: bytes, columns: int, rows: int, screen, move_cursor: bool = True) -> int | None:
+        """
+        Store a PNG and place it at the cursor in a box of `columns` by
+        `rows` cells, which the drawer fits it to: iTerm2's inline image,
+        which the embedder decodes and sizes. The cursor ends right after
+        the image on its last row, as kitty's, unless `move_cursor` is
+        false; iTerm2's own imgcat writes a newline after. Lillecarl/pymux#789.
+        """
+        width, height = _png_size(data)
+        if self._total_image_data() + len(data) > MAX_TOTAL_IMAGE_DATA:
+            return None
+        image_id = self._new_image_id()
+        self.images_by_id[image_id] = GraphicsImage(PixelFormat.PNG, width, height, data)
+        cursor = self._place_at_cursor(screen, image_id, columns, rows, asked_for_the_box=True)
+        if move_cursor:
+            cursor.x += columns
+            cursor.y += rows - 1
+            screen.max_y = max(screen.max_y, cursor.y)
+            screen.ensure_bounds()
+        return image_id
+
+    def _place_at_cursor(self, screen, image_id: int, columns: int, rows: int, asked_for_the_box: bool):
+        "Place an image at the cursor over cells it reserves, and give back the cursor."
+        cursor = screen.pt_cursor_position
+        self.placements.append(
+            GraphicsPlacement(image_id, 0, cursor.x, cursor.y, columns, rows, asked_for_the_box=asked_for_the_box)
+        )
+        self._clear_cells(screen, cursor.x, cursor.y, columns, rows)
+        return cursor
 
     # ------------------------------------------------------------------
     # Screen interaction.
