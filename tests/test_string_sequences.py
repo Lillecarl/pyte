@@ -3,9 +3,71 @@
 from __future__ import annotations
 
 from a_screen import a_screen, display
+from hypothesis import given
+from hypothesis import strategies as st
 
 import pyte
 from pyte.screen import Screen
+
+#: Pieces that open, fill, end and break string sequences and OSCs.
+PIECES = [
+    "a",
+    "Gx",
+    ";",
+    "7",
+    "\\",
+    "\x1b",
+    "\x1b_",
+    "\x1bP",
+    "\x1bX",
+    "\x1b]",
+    "\x1b]2;",
+    "\x1b]52;",
+    "\x1b\\",
+    "\x9c",
+    "\x07",
+    "\x18",
+    "\x1a",
+]
+
+
+class Recording(Screen):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.sequences = []
+
+    def apc(self, data):
+        self.sequences.append(("apc", data))
+
+    def dcs(self, data):
+        self.sequences.append(("dcs", data))
+
+    def osc(self, code, param):
+        self.sequences.append(("osc", code, param))
+
+    def set_title(self, param):
+        self.sequences.append(("title", param))
+
+
+def what_a_feed_leaves(parts):
+    screen = a_screen(20, 5, Recording)
+    stream = pyte.Stream(screen)
+    for part in parts:
+        stream.feed(part)
+    return screen.sequences, display(screen), stream.replay()
+
+
+@given(st.lists(st.sampled_from(PIECES), max_size=30), st.data())
+def test_a_payload_reads_the_same_however_it_is_split(pieces, data):
+    """
+    A payload is taken in runs, up to the next character that can end
+    it. One character per feed is the parser's own pace, so any split
+    has to leave what that leaves. Lillecarl/pymux#717.
+    """
+    text = "".join(pieces)
+    cuts = sorted(data.draw(st.sets(st.integers(0, len(text)))))
+    parts = [text[start:end] for start, end in zip([0, *cuts], [*cuts, len(text)], strict=True)]
+    assert what_a_feed_leaves(parts) == what_a_feed_leaves(list(text))
 
 
 def display_for(data, columns=20, lines=5):

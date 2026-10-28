@@ -39,7 +39,9 @@ if TYPE_CHECKING:
 
     from .screen import Screen as Screen
 
-    ParserGenerator = Generator[bool | None, str]
+    #: What the parser answers with: `True` takes plain text, `None` the
+    #: next character, and a search the run up to and including its match.
+    ParserGenerator = Generator[bool | Callable[[str, int], re.Match[str] | None] | None, str]
 
 
 def fit_parameters(handler: Callable[..., None]) -> Callable[..., None]:
@@ -136,6 +138,13 @@ _SPECIAL = (
     ctrl.SI,
 )
 _TEXT = re.compile("[^" + "".join(map(re.escape, _SPECIAL)) + "]+").match
+
+#: What ends a run of APC, DCS, SOS or PM payload, and of OSC payload.
+#: The parser takes a payload one run at a time and decides only on the
+#: last character of each, since a kitty image is hundreds of kilobytes.
+#: Lillecarl/pymux#717.
+_STRING_END = re.compile("[" + re.escape(ctrl.CAN + ctrl.SUB + ctrl.ST_C1 + ctrl.ESC) + "]").search
+_OSC_END = re.compile("[" + re.escape(ctrl.BEL + ctrl.ST_C1 + ctrl.ESC) + "]").search
 
 
 def _take_ground(
@@ -389,26 +398,31 @@ class Stream:
         # this loop is the hottest one in a pane.
         opened = 0
         while offset < length:
-            if taking_plain_text:
+            if taking_plain_text is True:
                 taken = take(data, offset, *ground)
                 if taken != offset:
                     offset = opened = taken
                 else:
-                    taking_plain_text = False
+                    taking_plain_text = None
             else:
                 # A sequence is read here to its end, so the test of
                 # the loop above runs once per sequence and not per byte.
                 while True:
-                    taking_plain_text = send(data[offset : offset + 1])
-                    offset += 1
-                    if taking_plain_text:
+                    if taking_plain_text is None:
+                        end = offset + 1
+                    else:
+                        found = taking_plain_text(data, offset)
+                        end = length if found is None else found.end()
+                    taking_plain_text = send(data[offset:end])
+                    offset = end
+                    if taking_plain_text is True:
                         opened = offset
                         break
                     if offset >= length:
                         break
 
         self._taking_plain_text = taking_plain_text
-        if taking_plain_text:
+        if taking_plain_text is True:
             self._pending = ""
         elif opened:
             self._pending = data[opened:]
@@ -493,7 +507,7 @@ class Stream:
     @property
     def ground_timer_active(self) -> bool:
         "Is the parser part-way through a sequence, and not reading plain text?"
-        return not self._taking_plain_text
+        return self._taking_plain_text is not True
 
     def ground_timer_expired(self) -> None:
         """
@@ -513,8 +527,9 @@ class Stream:
 
         This generator is not the most beautiful, but it is as performant
         as possible. When a process generates a lot of output, then this
-        will be the bottleneck, because it processes just one character
-        at a time.
+        will be the bottleneck, because it processes one character at a
+        time. The payload of a string sequence or an OSC is the
+        exception: it arrives in runs.
 
         Don't change anything without profiling first.
         """
@@ -529,6 +544,9 @@ class Stream:
         CAN_OR_SUB = ctrl.CAN + ctrl.SUB
         ALLOWED_IN_CSI = CONTROLS_IN_CSI
         OSC_TERMINATORS = {ctrl.ST_C0, ctrl.ST_C1, ctrl.BEL}
+        STRING_END, OSC_END = _STRING_END, _OSC_END
+        STRING_ENDS = ctrl.CAN + ctrl.SUB + ctrl.ST_C1 + ESC
+        OSC_ENDS = ctrl.BEL + ctrl.ST_C1 + ESC
         # Intermediate bytes of a CSI sequence. ECMA-48 gives them the
         # whole range 0x20 to 0x2f. They name the sequence together with
         # the final byte, so the dispatch key holds them.
@@ -589,22 +607,24 @@ class Stream:
                     data = ""
                     aborted = False
                     while True:
-                        char = yield None
+                        run = yield STRING_END
+                        char = run[-1]
+                        if char not in STRING_ENDS:
+                            data += run
+                            continue
+                        data += run[:-1]
                         if char == ctrl.CAN or char == ctrl.SUB:
                             # Aborted. Nothing is dispatched.
                             aborted = True
                             break
                         elif char == ctrl.ST_C1:
                             break
-                        elif char == ESC:
-                            char = yield None
-                            if char == "\\":
-                                break
-                            # ESC followed by anything else stays part
-                            # of the payload. (Same behavior as the OSC
-                            # handling above.)
-                            data += ESC
-                        data += char
+                        char = yield None
+                        if char == "\\":
+                            break
+                        # ESC followed by anything else stays part of
+                        # the payload, the way OSC reads it.
+                        data += ESC + char
 
                     if dispatch is not None and not aborted:
                         dispatch(data)
@@ -758,15 +778,23 @@ class Stream:
                 # the payload.
                 param = ""
                 too_long = False
+                run = char
                 while True:
-                    if char == ESC:
-                        char += yield None
-                    if char in OSC_TERMINATORS:
-                        break
+                    char = run[-1]
+                    ended = False
+                    if char in OSC_ENDS:
+                        run = run[:-1]
+                        if char == ESC:
+                            char += yield None
+                        ended = char in OSC_TERMINATORS
+                        if not ended:
+                            run += char
                     if not too_long:
-                        param += char
+                        param += run
                         too_long = len(param) > MAX_OSC_LENGTH
-                    char = yield None
+                    if ended:
+                        break
+                    run = yield OSC_END
 
                 if too_long:
                     continue
