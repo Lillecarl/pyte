@@ -48,6 +48,7 @@ __all__ = [
     "POINTER_SHAPES",
     "POINTER_SHAPE_ALIASES",
     "QUERY",
+    "REPORT_CELL_SIZE",
     "SET_COLORS",
     "SPECIAL_COLOR_NAMES",
     "ColorBase",
@@ -168,6 +169,10 @@ def set_colors_of(value: str) -> tuple[str, str] | None:
     spec = "#" + ("".join(digit * 2 for digit in hexadecimal) if len(hexadecimal) == 3 else hexadecimal)
     return code, (index + ";" + spec if index else spec)
 
+
+#: "OSC 1337 ; ReportCellSize": asks the size of a cell, which the pane
+#: answers as "ReportCellSize=height;width;scale".
+REPORT_CELL_SIZE = "ReportCellSize"
 
 #: "OSC 1337 ; CursorShape=N": iTerm2's shape of the cursor, which keeps
 #: the blinking as it was. Each number names the blinking DECSCUSR shape

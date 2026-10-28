@@ -74,6 +74,7 @@ from .osc import (
     FIRST_SPECIAL_COLOR,
     FORWARDED_OSC,
     ITERM_CURSOR_SHAPES,
+    REPORT_CELL_SIZE,
     SET_COLORS,
     SPECIAL_COLOR_NAMES,
     ColorBase,
@@ -5626,6 +5627,12 @@ class Screen:
             self.set_cursor_style(ITERM_CURSOR_SHAPES[value] + (0 if blinking else 1))
         elif key == SET_COLORS and (xterm := set_colors_of(value)) is not None:
             self.osc(*xterm)
+        elif param == REPORT_CELL_SIZE:
+            # Points and the pixels in one, which a pane cannot tell
+            # apart: a scale of one. Lillecarl/pymux#783.
+            self.reply_osc(
+                "%s;%s=%.1f;%.1f;1.0" % (Osc.TERMINAL_EXTENSION, REPORT_CELL_SIZE, self.cell_height, self.cell_width)
+            )
 
     def _reply_each(self, answers: Iterable[str]) -> None:
         """

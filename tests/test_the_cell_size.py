@@ -54,6 +54,14 @@ def test_the_cell_size_reaches_the_report():
     assert replies == ["\x1b[6;19;10t"]
 
 
+def test_iterm2_asks_the_cell_size_too():
+    "OSC 1337 ; ReportCellSize: height, width, and a scale of one. Lillecarl/pymux#783."
+    screen, stream, replies, _asks = _screen()
+    screen.set_cell_size(*REAL_CELL)
+    stream.feed("\x1b]1337;ReportCellSize\x1b\\")
+    assert replies == ["\x1b]1337;ReportCellSize=19.0;10.0;1.0\x1b\\"]
+
+
 def test_the_text_area_is_reported_in_the_cell_it_was_told():
     screen, stream, replies, _asks = _screen(lines=24, columns=80)
     screen.set_cell_size(*REAL_CELL)
