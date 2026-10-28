@@ -68,10 +68,12 @@ from .modes import AnsiMode, ModeReport, PrivateMode, flag_of
 from .osc import (
     CLEAR_SCROLLBACK,
     COLOR_BASE,
+    CURSOR_SHAPE,
     DYNAMIC_COLOR_CODES,
     DYNAMIC_COLOR_RESET_OFFSET,
     FIRST_SPECIAL_COLOR,
     FORWARDED_OSC,
+    ITERM_CURSOR_SHAPES,
     SPECIAL_COLOR_NAMES,
     ColorBase,
     ColorOverrides,
@@ -5608,9 +5610,18 @@ class Screen:
             if answer is not None:
                 self.reply_osc(answer)
         elif code in FORWARDED_OSC:
-            if code == Osc.TERMINAL_EXTENSION and param == CLEAR_SCROLLBACK:
-                self.clear_history()
+            if code == Osc.TERMINAL_EXTENSION:
+                self._read_terminal_extension(param)
             self._forward_osc(code, param)
+
+    def _read_terminal_extension(self, param: str) -> None:
+        "The subcommands of OSC 1337 that are the screen's own state."
+        key, sign, value = param.partition("=")
+        if param == CLEAR_SCROLLBACK:
+            self.clear_history()
+        elif key == CURSOR_SHAPE and sign and value in ITERM_CURSOR_SHAPES:
+            blinking = self.cursor_style % 2 == 1
+            self.set_cursor_style(ITERM_CURSOR_SHAPES[value] + (0 if blinking else 1))
 
     def _reply_each(self, answers: Iterable[str]) -> None:
         """

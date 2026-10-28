@@ -98,6 +98,18 @@ def test_decrqm_answers_for_the_blinking():
     assert responses == ["\x1b[?12;1$y"]  # Set.
 
 
+def test_iterm2_names_the_shape_and_keeps_the_blinking():
+    "OSC 1337 ; CursorShape: 0 block, 1 bar, 2 underline. Lillecarl/pymux#781."
+    screen, stream, responses = make_screen()
+    stream.feed("\x1b]1337;CursorShape=1\x1b\\")
+    assert screen.cursor_style == 5  # A bar that blinks, as the block did.
+    stream.feed(csi(Csi.DECSCUSR, 2))  # A block that does not blink.
+    stream.feed("\x1b]1337;CursorShape=2\x1b\\")
+    assert screen.cursor_style == 4
+    stream.feed("\x1b]1337;CursorShape=7\x1b\\")
+    assert screen.cursor_style == 4
+
+
 def test_decrqss_reports_the_shape():
     screen, stream, responses = make_screen()
     stream.feed(set_mode(PrivateMode.CURSOR_BLINK))

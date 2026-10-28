@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from enum import StrEnum
-from typing import ClassVar, NamedTuple
+from typing import ClassVar, Final, NamedTuple
 
 from .colors import DEFAULT_COLORS, PALETTE, Color, parse_color
 from .keep import Keep
@@ -35,10 +35,12 @@ from .keep import Keep
 __all__ = [
     "CLEAR_SCROLLBACK",
     "COLOR_BASE",
+    "CURSOR_SHAPE",
     "DYNAMIC_COLOR_CODES",
     "DYNAMIC_COLOR_RESET_OFFSET",
     "FIRST_SPECIAL_COLOR",
     "FORWARDED_OSC",
+    "ITERM_CURSOR_SHAPES",
     "MAX_HYPERLINK_ID_LENGTH",
     "MAX_HYPERLINK_LENGTH",
     "MAX_POINTER_SHAPES",
@@ -124,6 +126,12 @@ FORWARDED_OSC = frozenset(
 #: it itself, and still hands it on: through a multiplexer the terminal
 #: of the user clears its own history too. Lillecarl/pymux#504.
 CLEAR_SCROLLBACK = "ClearScrollback"
+
+#: "OSC 1337 ; CursorShape=N": iTerm2's shape of the cursor, which keeps
+#: the blinking as it was. Each number names the blinking DECSCUSR shape
+#: it means. Lillecarl/pymux#781.
+CURSOR_SHAPE = "CursorShape"
+ITERM_CURSOR_SHAPES: Final = {"0": 1, "1": 5, "2": 3}
 
 
 def asks_for_the_clipboard(payload: str) -> bool:
