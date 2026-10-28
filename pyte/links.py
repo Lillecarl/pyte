@@ -9,6 +9,10 @@ what the program meant, and the text may only show its name.
 
 The pattern is foot's (`[url].regex` in `foot.ini`), which is where URL
 mode comes from. Lillecarl/pymux#608.
+
+A caller may add rules that make a link of text that is not one: an
+issue number, say. A rule's match never takes a place a link or a URL
+already holds. Lillecarl/pymux#776.
 """
 
 from __future__ import annotations
@@ -17,9 +21,11 @@ import re
 from typing import TYPE_CHECKING, NamedTuple
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from .page import Page, TextLine
 
-__all__ = ["URL_PATTERN", "Link", "links_in"]
+__all__ = ["URL_PATTERN", "Link", "LinkRule", "links_in"]
 
 _SCHEMES = (
     r"(?:https?://|mailto:|ftp://|file:|ssh:|ssh://|git://|tel:|magnet:"
@@ -55,6 +61,20 @@ class Link(NamedTuple):
     end_column: int
     #: Made with "OSC 8", and not found in the text.
     osc8: bool
+
+
+class LinkRule(NamedTuple):
+    """
+    Text that `pattern` matches is a link to `url`, a `str.format`
+    template: `{0}` is the whole match, `{1}` its first group, and a
+    named group goes by its name.
+    """
+
+    pattern: re.Pattern[str]
+    url: str
+
+    def url_of(self, match: re.Match[str]) -> str:
+        return self.url.format(match.group(0), *match.groups(""), **match.groupdict(""))
 
 
 def _cells_of(page: Page, line: TextLine) -> list[tuple[int, int]]:
@@ -101,7 +121,7 @@ def _overlaps(one: Link, other: Link) -> bool:
     )
 
 
-def links_in(page: Page, first: int, last: int) -> list[Link]:
+def links_in(page: Page, first: int, last: int, rules: Sequence[LinkRule] = ()) -> list[Link]:
     "The links rows `first` to `last` show, top to bottom."
     links = _osc8_links(page, first, last)
     for line in page.text_lines(first, last):
@@ -111,4 +131,12 @@ def links_in(page: Page, first: int, last: int) -> list[Link]:
             found = Link(match.group(), row, column, end_row, end_column, False)
             if not any(_overlaps(found, link) for link in links if link.osc8):
                 links.append(found)
+        for rule in rules:
+            for match in rule.pattern.finditer(line.text):
+                if match.end() == match.start():
+                    continue
+                (row, column), (end_row, end_column) = where[match.start()], where[match.end() - 1]
+                found = Link(rule.url_of(match), row, column, end_row, end_column, False)
+                if not any(_overlaps(found, link) for link in links):
+                    links.append(found)
     return sorted(links, key=lambda link: (link.row, link.column))
