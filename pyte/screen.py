@@ -37,6 +37,9 @@ from .cells import (
     _ERASED_CACHE,
     _PROTECTED_CHAR_CACHE,
     BASELINE_PARAMETERS,
+    CLUSTER_OPENERS,
+    JOINERS,
+    NARROW_JOINERS,
     PLAIN,
     PLAIN_APPEARANCE,
     UNDERLINE_PARAMETERS,
@@ -48,6 +51,8 @@ from .cells import (
     Rendition,
     WrittenCell,
     appearance_of,
+    character_width,
+    joins,
     protection_of,
 )
 from .colors import (
@@ -1008,6 +1013,9 @@ class Screen:
             # the arrows with no mode at all; off in xterm alone. codex
             # sets it anyway; `less` does not ask, and scrolls on arrows.
             PrivateMode.ALTERNATE_SCROLL.flag,
+            # On in kitty, which has no mode to turn it off, in Ghostty
+            # by default, and in tmux. Lillecarl/pymux#798.
+            PrivateMode.GRAPHEME_CLUSTERS.flag,
         }
 
         # According to VT220 manual and ``linux/drivers/tty/vt.c``
@@ -1092,8 +1100,11 @@ class Screen:
         self.horizontal_margins = None
 
         # xterm's DECSTR leaves the wheel alone too: alternate scroll is
-        # a setting of the person's, not of the program's.
-        kept = self.mode.intersection([*self._ALTERNATE_SCREEN_MODES, PrivateMode.ALTERNATE_SCROLL.flag])
+        # a setting of the person's, not of the program's. So is how
+        # wide a cluster is, which the cells already on the screen took.
+        kept = self.mode.intersection(
+            [*self._ALTERNATE_SCREEN_MODES, PrivateMode.ALTERNATE_SCROLL.flag, PrivateMode.GRAPHEME_CLUSTERS.flag]
+        )
         self.mode = {PrivateMode.AUTOWRAP.flag, PrivateMode.SHOW_CURSOR.flag}
         self.mode.update(kept)
         self.page.show_cursor = True
@@ -2296,6 +2307,15 @@ class Screen:
         # is what narrows, and this costs it nothing.
         changed_exotic = False
 
+        # Grapheme clusters, DEC 2027. The first character of a run can
+        # join the cell an earlier run drew, and so can the one after a
+        # character that opens a cluster: both go the long way, which
+        # asks. A first character in ASCII is not asked: it joins only a
+        # prepended sign, and every keystroke would pay for the question.
+        # Lillecarl/pymux#798.
+        clusters = PrivateMode.GRAPHEME_CLUSTERS.flag in self.mode
+        ask_first = clusters and chars >= "\x80"
+
         index = 0
         count = len(chars)
         while index < count:
@@ -2303,7 +2323,7 @@ class Screen:
             # on the row the cursor is on, with nothing wide anywhere on
             # the screen. `_draw_on_row` takes as many as it can, and
             # the loop below draws the one it stopped at.
-            if not waiting_to_wrap and not wide_chars and not in_irm:
+            if not waiting_to_wrap and not wide_chars and not in_irm and not ask_first:
                 edge = right_margin + 1 if cursor_position_x <= right_margin else columns
                 started = index
                 cursor_position_x, index, wrote = _draw_on_row(
@@ -2323,12 +2343,17 @@ class Screen:
             char = chars[index]
             index += 1
 
-            # Create 'Cell' instance.
+            # Create 'Cell' instance. A character that can join the
+            # cluster before it stays out of what the quick path reads.
             try:
                 pt_char = cells_of_kind[char]
             except KeyError:
-                pt_char = cells_of_kind[char] = char_cache[(char, *key_tail)]
+                pt_char = char_cache[(char, *key_tail)]
+                if char not in NARROW_JOINERS:
+                    cells_of_kind[char] = pt_char
             char_width = pt_char.width
+            joinable = ask_first
+            ask_first = clusters and char in CLUSTER_OPENERS
 
             # A character that does not fit in what is left of the line
             # goes to the next line when auto wrap mode is on, and takes
@@ -2347,6 +2372,16 @@ class Screen:
                 edge = right_margin + 1
             else:
                 edge = columns
+
+            if char_width > 0 and (joinable or (clusters and char in JOINERS)):
+                moved = self._join_cluster(data_buffer[cursor_position_y], cursor_position_x, char, edge)
+                if moved is not None:
+                    changed_exotic = True
+                    if moved and not wide_chars:
+                        wide_chars = self._wide_chars = True
+                    cursor_position_x += moved
+                    waiting_to_wrap = cursor_position_x >= edge
+                    continue
 
             # A cursor that waits to wrap wraps, wherever it stands.
             # Almost always it stands one past the edge and the test
@@ -2503,6 +2538,39 @@ class Screen:
                     self.written_at[changed_first] = self.writes
                 else:
                     self.touch_rows(range(changed_first, changed_last + 1))
+
+    def _join_cluster(self, row: Row, x: int, char: str, edge: int) -> int | None:
+        """
+        Put `char` in the cell left of column `x` when it belongs to the
+        grapheme cluster there, and say how many columns the cursor
+        moves: 1 when the cluster grew a column, as a flag's second half
+        does. None leaves `char` a cell of its own: no cluster takes it,
+        or the cluster would grow past `edge` or onto a cell it does not
+        own. Lillecarl/pymux#798.
+        """
+        previous = x - 1
+        cell = row.get(previous)
+        if cell is not None and cell.char == "":
+            previous -= 1
+            cell = row.get(previous)
+        if previous < 0 or cell is None or not cell.char or isinstance(cell, ErasedCell):
+            return None
+        # Asked only where a join can be, so text and CJK pay nothing.
+        if (char not in JOINERS and cell.char[-1] not in CLUSTER_OPENERS) or not joins(cell.char, char):
+            return None
+        cluster = cell.char + char
+        grown = character_width(cluster) - cell.width
+        if grown < 0 or grown > 1 or (grown and (previous + cell.width != x or x + 1 > edge)):
+            return None
+        marks = protection_of(cell)
+        if marks:
+            row[previous] = _PROTECTED_CHAR_CACHE[cluster, cell.appearance, marks]
+        else:
+            row[previous] = _CHAR_CACHE[cluster, cell.appearance]
+        if grown:
+            row[x] = _CHAR_CACHE["", cell.appearance]
+            self.repair_wide_char(row, x + 1)
+        return grown
 
     def _cover_the_run(self, first_row: int, first_column: int, last_row: int, last_column: int) -> None:
         "Tell the images which cells a run of text drew over."
@@ -4964,6 +5032,7 @@ class Screen:
             PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR,
             PrivateMode.BRACKETED_PASTE,
             PrivateMode.SYNCHRONIZED_OUTPUT,
+            PrivateMode.GRAPHEME_CLUSTERS,
             PrivateMode.INBAND_RESIZE,
         ]
     )

@@ -19,13 +19,17 @@ from enum import IntFlag
 from functools import lru_cache
 from typing import NamedTuple
 
-from wcwidth import wcwidth  # type: ignore[import-untyped]
+from wcwidth import grapheme_boundary_before, table_grapheme, wcwidth  # type: ignore[import-untyped]
+from wcwidth import width as cluster_width
 
 from .cache import FastDictCache
 from .colors import SgrColor
 
 __all__ = (
     "BASELINE_PARAMETERS",
+    "CLUSTER_OPENERS",
+    "JOINERS",
+    "NARROW_JOINERS",
     "PLAIN",
     "PLAIN_APPEARANCE",
     "UNDERLINE_PARAMETERS",
@@ -41,6 +45,7 @@ __all__ = (
     "WrittenCell",
     "appearance_of",
     "character_width",
+    "joins",
     "protection_of",
     "without_widening_selectors",
 )
@@ -85,10 +90,48 @@ def character_width(text: str) -> int:
     it, so a cell that holds a base and its marks is as wide as the
     base alone. A control character measures -1 and draws nothing, so
     it counts as nothing here.
+
+    A cell holds two characters that each take room only as a
+    grapheme cluster (DEC 2027): a family emoji, a flag, a skin tone.
+    That is as wide as Unicode says the cluster is, two columns.
+    Lillecarl/pymux#798.
     """
     if len(text) == 1:
         return max(0, wcwidth(text))
-    return sum(character_width(character) for character in text)
+    widths = [character_width(character) for character in text]
+    if sum(1 for width in widths if width) > 1:
+        return cluster_width(text)
+    return sum(widths)
+
+
+def _characters_of(*tables: tuple[tuple[int, int], ...]) -> frozenset[str]:
+    return frozenset(chr(code) for table in tables for first, last in table for code in range(first, last + 1))
+
+
+#: The characters of one column that can join the cluster before them:
+#: the second half of a flag, a vowel sign, a consonant after a virama.
+#: `Screen.draw`'s quick path takes characters of one column without
+#: asking, so it must never be handed one of these. Lillecarl/pymux#798.
+NARROW_JOINERS: frozenset[str] = _characters_of(
+    table_grapheme.GRAPHEME_REGIONAL_INDICATOR, table_grapheme.GRAPHEME_SPACINGMARK, table_grapheme.INCB_CONSONANT
+)
+
+#: Every character that takes room and can join the cluster before it:
+#: those above, and a skin tone, which is two columns on its own.
+JOINERS: frozenset[str] = NARROW_JOINERS | frozenset(
+    char for char in _characters_of(table_grapheme.GRAPHEME_EXTEND) if wcwidth(char) > 0
+)
+
+#: The characters that the next one joins whatever it is: a prepended
+#: sign, a zero width joiner (which takes the narrow ♀ of 🏃‍♀️) and a virama.
+CLUSTER_OPENERS: frozenset[str] = _characters_of(
+    table_grapheme.GRAPHEME_PREPEND, table_grapheme.GRAPHEME_ZWJ, table_grapheme.INCB_LINKER
+)
+
+
+def joins(cluster: str, character: str) -> bool:
+    "Whether `character` belongs to the grapheme cluster `cluster`, and no boundary falls before it."
+    return grapheme_boundary_before(cluster + character, len(cluster) + len(character)) < len(cluster)
 
 
 #: VARIATION SELECTOR-16: draw the character before it as an emoji.

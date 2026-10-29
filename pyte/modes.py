@@ -192,6 +192,11 @@ class PrivateMode(IntEnum):
     #: changes nothing, because showing is not its job.
     SYNCHRONIZED_OUTPUT = 2026
 
+    #: A grapheme cluster takes one cell, as wide as Unicode says: a
+    #: family emoji, a flag or a skin tone is two columns and not six,
+    #: two or four. Reset, each code point takes its own width.
+    GRAPHEME_CLUSTERS = 2027
+
     #: Report a resize in the input of the program, instead of only
     #: through SIGWINCH.
     INBAND_RESIZE = 2048
