@@ -362,6 +362,36 @@ def test_iterm2_colours_pyte_cannot_hold_change_nothing(pane, value):
     assert (screen.colors.by_code, screen.colors.by_index) == ({}, {})
 
 
+def test_osc_6_sets_the_tab_colour_a_channel_at_a_time(pane):
+    "iTerm2's tab colour. Lillecarl/pymux#786."
+    screen, stream, _responses = pane
+    assert screen.tab_color is None
+    stream.feed(osc(Osc.TAB_COLOR, "1", "bg", "red", "brightness", "200"))
+    assert screen.tab_color == (200, 0, 0)
+    stream.feed(osc(Osc.TAB_COLOR, "1", "bg", "blue", "brightness", "999"))
+    assert screen.tab_color == (200, 0, 255)
+    stream.feed(osc(Osc.TAB_COLOR, "1", "bg", "green", "brightness", "x"))
+    stream.feed(osc(Osc.TAB_COLOR, "1", "0"))
+    assert screen.tab_color == (200, 0, 255)
+    stream.feed(osc(Osc.TAB_COLOR, "1", "bg", "*", "default"))
+    assert screen.tab_color is None
+
+
+def test_set_colors_tab_sets_the_same_tab_colour(pane):
+    screen, stream, _responses = pane
+    stream.feed(osc(Osc.TERMINAL_EXTENSION, "SetColors=tab=a0b"))
+    assert screen.tab_color == (0xAA, 0x00, 0xBB)
+    stream.feed(osc(Osc.TERMINAL_EXTENSION, "SetColors=tab=zz"))
+    assert screen.tab_color == (0xAA, 0x00, 0xBB)
+
+
+def test_a_hard_reset_takes_the_tab_colour_away(pane):
+    screen, stream, _responses = pane
+    stream.feed(osc(Osc.TAB_COLOR, "1", "bg", "red", "brightness", "9"))
+    stream.feed(esc(escape.RIS))
+    assert screen.tab_color is None
+
+
 # ----------------------------------------------------------------------
 # What a reset of the terminal does.
 

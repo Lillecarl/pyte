@@ -51,6 +51,7 @@ __all__ = [
     "REPORT_CELL_SIZE",
     "SET_COLORS",
     "SPECIAL_COLOR_NAMES",
+    "TAB_CHANNELS",
     "ColorBase",
     "ColorOverrides",
     "Osc",
@@ -61,6 +62,8 @@ __all__ = [
     "parse_kitty_color_query",
     "pointer_shape_name",
     "set_colors_of",
+    "tab_color_after",
+    "tab_color_of_hex",
 ]
 
 
@@ -94,6 +97,8 @@ class Osc(StrEnum):
     #: first make it ConEmu's instead, "OSC 9 ; 4 ; state ; percent" a
     #: progress bar among them. Lillecarl/pymux#787.
     MESSAGE = "9"
+    #: "OSC 6": the colour of the tab, iTerm2's. Lillecarl/pymux#786.
+    TAB_COLOR = "6"
     #: "OSC 7": the working directory of the program, as a file URL.
     #: xterm defined it; iTerm2 reads it as CurrentDir with a host.
     CURRENT_DIRECTORY = "7"
@@ -140,7 +145,8 @@ CLEAR_SCROLLBACK = "ClearScrollback"
 #: "OSC 1337 ; SetColors=key=value": iTerm2's way to set one colour. Each
 #: key it shares with xterm is written as the xterm sequence that sets the
 #: same colour: the code, and the index for OSC 4 and OSC 5. A key with no
-#: such colour (tab, link, curfg) is left alone. Lillecarl/pymux#782.
+#: such colour (link, curfg) is left alone, and "tab" is the tab colour
+#: of "OSC 6". Lillecarl/pymux#782.
 SET_COLORS = "SetColors"
 _ITERM_ANSI = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white"]
 ITERM_COLOR_KEYS: Final[dict[str, tuple[str, str]]] = {
@@ -164,16 +170,51 @@ def set_colors_of(value: str) -> tuple[str, str] | None:
     """
     key, sign, color = value.partition("=")
     found = ITERM_COLOR_KEYS.get(key)
-    hexadecimal = color.rpartition(":")[2]
-    if found is None or not sign or len(hexadecimal) not in (3, 6):
-        return None
-    if any(digit not in "0123456789abcdefABCDEF" for digit in hexadecimal):
+    digits = _six_digits(color)
+    if found is None or not sign or digits is None:
         return None
     code, index = found
+    spec = "#" + digits
+    return code, (index + ";" + spec if index else spec)
+
+
+def _six_digits(color: str) -> str | None:
+    "The six hex digits of an iTerm2 colour, after its colour space, or None."
+    hexadecimal = color.rpartition(":")[2]
+    if len(hexadecimal) not in (3, 6) or any(digit not in "0123456789abcdefABCDEF" for digit in hexadecimal):
+        return None
     # Three digits are CSS's short form, each digit twice; xterm's "#123"
     # would read them as the high nibble alone.
-    spec = "#" + ("".join(digit * 2 for digit in hexadecimal) if len(hexadecimal) == 3 else hexadecimal)
-    return code, (index + ";" + spec if index else spec)
+    return "".join(digit * 2 for digit in hexadecimal) if len(hexadecimal) == 3 else hexadecimal
+
+
+#: "OSC 6 ; 1 ; bg ; red ; brightness ; N" sets one channel of the tab
+#: colour, 0 to 255, and "OSC 6 ; 1 ; bg ; * ; default" takes the colour
+#: away. A channel nothing set yet is 0. Lillecarl/pymux#786.
+TAB_CHANNELS: Final = ("red", "green", "blue")
+TabColor = tuple[int, int, int]
+
+
+def tab_color_after(param: str, current: TabColor | None) -> TabColor | None:
+    """The tab colour once "OSC 6 ; `param`" is read; `current` when it says nothing."""
+    parts = param.split(";")
+    if parts[:2] != ["1", "bg"] or len(parts) < 4:
+        return current
+    if parts[2:] == ["*", "default"]:
+        return None
+    if len(parts) != 5 or parts[2] not in TAB_CHANNELS or parts[3] != "brightness" or not parts[4].isdigit():
+        return current
+    channels = list(current or (0, 0, 0))
+    channels[TAB_CHANNELS.index(parts[2])] = min(int(parts[4]), 255)
+    return (channels[0], channels[1], channels[2])
+
+
+def tab_color_of_hex(color: str) -> TabColor | None:
+    """The tab colour "SetColors=tab=`color`" names, or None."""
+    digits = _six_digits(color)
+    if digits is None:
+        return None
+    return (int(digits[0:2], 16), int(digits[2:4], 16), int(digits[4:6], 16))
 
 
 #: "OSC 1337 ; ReportCellSize": asks the size of a cell, which the pane

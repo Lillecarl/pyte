@@ -89,6 +89,8 @@ from .osc import (
     asks_for_the_clipboard,
     parse_hyperlink,
     set_colors_of,
+    tab_color_after,
+    tab_color_of_hex,
 )
 from .page import (
     CursorPosition,
@@ -331,6 +333,7 @@ class Screen:
         "key_modifier_options": Keep.SAVED,
         "key_format_options": Keep.SAVED,
         "titles": Keep.SAVED,
+        "tab_color": Keep.SAVED,
         "colors": Keep.SAVED,
         "pointer_shapes": Keep.SAVED,
         "graphics": Keep.SAVED,
@@ -937,6 +940,9 @@ class Screen:
         # A reset gives a fresh one, the way it takes away everything
         # else that a program set.
         self.titles = Titles()
+        # "OSC 6": the colour the embedder draws this pane's tab in, as
+        # red, green and blue. Lillecarl/pymux#786.
+        self.tab_color: tuple[int, int, int] | None = None
 
         # Reset the kitty keyboard protocol flag stack as well. (RIS is a
         # full terminal reset. It also clears all graphics.)
@@ -5682,6 +5688,8 @@ class Screen:
             self._reply_each(self.colors.read_dynamic(code, param))
         elif self._reset_code_of(code) in DYNAMIC_COLOR_CODES:
             self.colors.reset_dynamic(self._reset_code_of(code))
+        elif code == Osc.TAB_COLOR:
+            self.tab_color = tab_color_after(param, self.tab_color)
         elif code == Osc.KITTY_COLORS:
             answer = self.colors.answer_kitty(param)
             if answer is not None:
@@ -5699,6 +5707,8 @@ class Screen:
         elif key == CURSOR_SHAPE and sign and value in ITERM_CURSOR_SHAPES:
             blinking = self.cursor_style % 2 == 1
             self.set_cursor_style(ITERM_CURSOR_SHAPES[value] + (0 if blinking else 1))
+        elif key == SET_COLORS and value.startswith("tab="):
+            self.tab_color = tab_color_of_hex(value[4:]) or self.tab_color
         elif key == SET_COLORS and (xterm := set_colors_of(value)) is not None:
             self.osc(*xterm)
         elif param == REPORT_CELL_SIZE:
