@@ -80,7 +80,6 @@ __all__ = [
     "Unhearable",
     "current_flags",
     "deliverable_flags",
-    "key_profile_of",
     "parse_key_data",
     "popped",
     "pushed",
@@ -623,26 +622,6 @@ KEY_PROFILES = {
 
 #: The profile of a terminal pymux cannot name.
 DEFAULT_KEY_PROFILE = KEY_PROFILES["kitty"]
-
-#: The TERM each terminal sets, where it names that terminal alone.
-#: "xterm-256color" does not: half the terminals here set it.
-_PROFILE_OF_TERM = {"xterm-kitty": "kitty", "xterm-ghostty": "ghostty", "wezterm": "wezterm"}
-
-
-def key_profile_of(version: str, term: str) -> str | None:
-    """
-    The name of the profile of a terminal, from its XTVERSION answer
-    or else its TERM. `None` for one neither names.
-
-    The answers begin with the name: "kitty(0.49.2)", "ghostty 1.2.0",
-    "WezTerm 20240203-110809-5046fc22", "XTerm(390)".
-    """
-    answer = version.lower()
-    for name in KEY_PROFILES:
-        if answer.startswith(name):
-            return name
-    return _PROFILE_OF_TERM.get(term)
-
 
 #: modifyOtherKeys is xterm's own mode, so xterm answers under it.
 _MODIFY_OTHER_KEYS_PROFILE = KEY_PROFILES["xterm"]

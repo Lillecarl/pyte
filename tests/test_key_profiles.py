@@ -15,7 +15,6 @@ from pyte.keys import (
     FunctionalKey,
     KeyboardFlag,
     ModifyOtherKeys,
-    key_profile_of,
     translate_key_data,
 )
 
@@ -24,23 +23,6 @@ KITTY, GHOSTTY, WEZTERM, XTERM = (KEY_PROFILES[name] for name in ("kitty", "ghos
 
 def sent(data: str, profile, flags: int = 0, **modes) -> str:
     return translate_key_data(data, flags=flags, profile=profile, **modes)
-
-
-@pytest.mark.parametrize(
-    ("version", "term", "name"),
-    [
-        ("kitty(0.49.2)", "xterm-256color", "kitty"),
-        ("ghostty 1.2.0", "", "ghostty"),
-        ("WezTerm 20240203-110809-5046fc22", "", "wezterm"),
-        ("XTerm(390)", "xterm", "xterm"),
-        ("", "xterm-kitty", "kitty"),
-        ("", "wezterm", "wezterm"),
-        ("", "xterm-256color", None),
-        ("foot(1.20.2)", "foot", None),
-    ],
-)
-def test_a_terminal_is_named_by_its_answer_and_then_by_its_term(version, term, name):
-    assert key_profile_of(version, term) == name
 
 
 def test_kitty_is_the_default():
