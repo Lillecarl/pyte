@@ -54,6 +54,7 @@ PURE = {
     "keys.unhearable",
     "links",
     "modes",
+    "mouse",
     "osc",
     "page",
     "painted",
