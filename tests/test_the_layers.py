@@ -45,7 +45,13 @@ PURE = {
     "html",
     "images",
     "keep",
-    "keys",
+    "keys.__init__",
+    "keys.encode",
+    "keys.events",
+    "keys.flags",
+    "keys.legacy",
+    "keys.parse",
+    "keys.unhearable",
     "links",
     "modes",
     "osc",
@@ -151,6 +157,8 @@ def _imports(path: Path):
     outside = set()
     inside = set()
     tree = ast.parse(path.read_text())
+    # A module of `keys/` reads ".events" as "keys.events".
+    package = _name_of(path).split(".")[:-1]
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -160,13 +168,14 @@ def _imports(path: Path):
             if not node.level:
                 outside.add((node.module or "").split(".")[0])
                 continue
+            base = package[: len(package) - (node.level - 1)]
             if node.module:
                 # "from .colors import SgrColor".
-                inside.add(node.module)
+                inside.add(".".join([*base, node.module]))
             else:
-                # "from . import keys" names one module per alias.
+                # "from . import charsets" names one module per alias.
                 for alias in node.names:
-                    inside.add(alias.name)
+                    inside.add(".".join([*base, alias.name]))
     return outside, inside
 
 
@@ -236,7 +245,11 @@ def test_the_reading_sees_an_import_where_there_is_one():
     found no import anywhere would pass every module.
     """
     outside, inside = _imports(MODULES["screen"])
-    assert {"cells", "colors", "images", "keys", "page"} <= inside
+    assert {"cells", "colors", "images", "keys.events", "page"} <= inside
+
+    # Inside `keys/`, a relative import names its neighbour in full.
+    _outside, inside = _imports(MODULES["keys.encode"])
+    assert {"keys.events", "keys.parse"} <= inside
 
     # `cells` is where the one outside import of the pure layer is:
     # `wcwidth` measures a character, and nothing else here reaches

@@ -26,7 +26,7 @@ from typing import NamedTuple
 import pytest
 from kitty_keys import Case, disagreements, judged, kitty_keys_are_available
 
-from pyte.keys import KeyboardFlag, Modifier
+from pyte.keys.events import KeyboardFlag, Modifier
 
 pytestmark = pytest.mark.skipif(not kitty_keys_are_available(), reason="PYTE_KITTY names no kitty")
 

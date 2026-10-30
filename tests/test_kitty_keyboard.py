@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pyte import keys
+from pyte.keys.flags import MAX_FLAGS_STACK
 from pyte.screen import Screen
 from pyte.streams import Stream
 
@@ -168,9 +168,9 @@ def test_reset_clears_stack():
 
 def test_stack_size_is_limited():
     screen, stream, responses = make_screen()
-    for _i in range(keys.MAX_FLAGS_STACK + 10):
+    for _i in range(MAX_FLAGS_STACK + 10):
         stream.feed("\x1b[>1u")
-    assert len(screen.kitty_flags_stack) == keys.MAX_FLAGS_STACK
+    assert len(screen.kitty_flags_stack) == MAX_FLAGS_STACK
 
 
 def test_plain_csi_u_is_ignored():

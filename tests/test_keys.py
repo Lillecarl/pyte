@@ -10,17 +10,10 @@ from __future__ import annotations
 
 import pytest
 
-from pyte.keys import (
-    FormatOtherKeys,
-    KeyCode,
-    KeyEvent,
-    Modifier,
-    ModifyOtherKeys,
-    Unhearable,
-    parse_key_data,
-    translate_key_data,
-    translate_key_event,
-)
+from pyte.keys.encode import translate_key_data, translate_key_event
+from pyte.keys.events import FormatOtherKeys, KeyCode, KeyEvent, Modifier, ModifyOtherKeys
+from pyte.keys.parse import parse_key_data
+from pyte.keys.unhearable import Unhearable
 
 DISAMBIGUATE = 0b1
 EVENT_TYPES = 0b10

@@ -24,7 +24,6 @@ from collections.abc import Callable, Iterable, Sequence
 from typing import ClassVar, NamedTuple
 
 from . import charsets as cs
-from . import keys
 
 # `Row` is read off the module where a row is made, so that a row
 # `pyte_rs.install()` puts in its place is the one every page gets.
@@ -69,6 +68,18 @@ from .images import (
     GraphicsState,
 )
 from .keep import Keep
+from .keys.encode import translate_key_data, translate_key_event
+from .keys.events import (
+    DEFAULT_KEY_PROFILE,
+    FlagsMode,
+    FormatOtherKeys,
+    KeyboardFlag,
+    KeyEvent,
+    KeyModifierResource,
+    KeyProfile,
+    ModifyOtherKeys,
+)
+from .keys.flags import current_flags, deliverable_flags, popped, pushed, with_flags_set
 from .modes import AnsiMode, ModeReport, PrivateMode, flag_of
 from .osc import (
     CLEAR_SCROLLBACK,
@@ -585,14 +596,14 @@ class Screen:
         The currently effective kitty keyboard protocol flags. (The top of
         the flag stack, or zero when the stack is empty.)
         """
-        return keys.current_flags(self.kitty_flags_stack)
+        return current_flags(self.kitty_flags_stack)
 
     @property
     def deliverable_kitty_keyboard_flags(self) -> int:
         "The flags that this pane really gets, of the ones it asked for."
         if not self.extended_keys_allowed:
             return 0
-        return keys.deliverable_flags(
+        return deliverable_flags(
             self.kitty_keyboard_flags,
             self.keyboard_source_flags,
             self.synthesize_key_events,
@@ -603,7 +614,7 @@ class Screen:
         "The whole screen is set to reverse video."
         return PrivateMode.REVERSE_VIDEO.flag in self.mode
 
-    def encode_key(self, data: str, report=None, profile: keys.KeyProfile = keys.DEFAULT_KEY_PROFILE) -> str:
+    def encode_key(self, data: str, report=None, profile: KeyProfile = DEFAULT_KEY_PROFILE) -> str:
         """
         The bytes that one key press sends to the program on this
         screen.
@@ -622,7 +633,7 @@ class Screen:
         `profile` belongs to the person pressing the key and not to the
         screen: two clients in two terminals share one pane.
         """
-        return keys.translate_key_data(
+        return translate_key_data(
             data,
             flags=self.deliverable_kitty_keyboard_flags,
             application_mode=self.in_application_mode,
@@ -637,7 +648,7 @@ class Screen:
         )
 
     def encode_key_event(
-        self, event: keys.KeyEvent, exactly: bool = False, profile: keys.KeyProfile = keys.DEFAULT_KEY_PROFILE
+        self, event: KeyEvent, exactly: bool = False, profile: KeyProfile = DEFAULT_KEY_PROFILE
     ) -> str:
         """
         The bytes one key event sends to the program on this screen.
@@ -649,7 +660,7 @@ class Screen:
         `exactly` raises `keys.Unhearable` instead: nobody typing
         `send-keys super+a` means "type an a".
         """
-        return keys.translate_key_event(
+        return translate_key_event(
             event,
             flags=self.deliverable_kitty_keyboard_flags,
             application_mode=self.in_application_mode,
@@ -672,8 +683,8 @@ class Screen:
         """
         return bool(
             self.synthesize_key_events
-            and self.deliverable_kitty_keyboard_flags & keys.KeyboardFlag.REPORT_EVENT_TYPES
-            and not self.keyboard_source_flags & keys.KeyboardFlag.REPORT_EVENT_TYPES
+            and self.deliverable_kitty_keyboard_flags & KeyboardFlag.REPORT_EVENT_TYPES
+            and not self.keyboard_source_flags & KeyboardFlag.REPORT_EVENT_TYPES
         )
 
     @property
@@ -718,8 +729,8 @@ class Screen:
         told the truth rather than what it set.
         """
         if not self.extended_keys_allowed:
-            return keys.ModifyOtherKeys.OFF
-        return self.key_modifier_options.get(keys.KeyModifierResource.OTHER_KEYS, keys.ModifyOtherKeys.OFF)
+            return ModifyOtherKeys.OFF
+        return self.key_modifier_options.get(KeyModifierResource.OTHER_KEYS, ModifyOtherKeys.OFF)
 
     @property
     def format_other_keys(self) -> int:
@@ -730,8 +741,8 @@ class Screen:
         chooses the form of: a form nothing writes is not a form.
         """
         if not self.extended_keys_allowed:
-            return keys.FormatOtherKeys.TILDE
-        return self.key_format_options.get(keys.KeyModifierResource.OTHER_KEYS, keys.FormatOtherKeys.TILDE)
+            return FormatOtherKeys.TILDE
+        return self.key_format_options.get(KeyModifierResource.OTHER_KEYS, FormatOtherKeys.TILDE)
 
     def set_key_format_options(self, *params: int) -> None:
         """
@@ -750,7 +761,7 @@ class Screen:
         if not params:
             return
         resource = _first_parameter(params[0])
-        if resource == keys.KeyModifierResource.OTHER_KEYS:
+        if resource == KeyModifierResource.OTHER_KEYS:
             value = self.format_other_keys
         else:
             value = self.key_format_options.get(resource, 0)
@@ -810,7 +821,7 @@ class Screen:
         if not params:
             return
         resource = _first_parameter(params[0])
-        if resource == keys.KeyModifierResource.OTHER_KEYS:
+        if resource == KeyModifierResource.OTHER_KEYS:
             # The one this screen acts on, so the answer is what it
             # really does and not what it was told.
             value = self.modify_other_keys
@@ -5643,18 +5654,18 @@ class Screen:
 
         elif private == ">":
             # Push. The flags default to none.
-            self.kitty_flags_stack = keys.pushed(self.kitty_flags_stack, _param(params, 0))
+            self.kitty_flags_stack = pushed(self.kitty_flags_stack, _param(params, 0))
 
         elif private == "<":
             # Pop. The count defaults to one.
-            self.kitty_flags_stack = keys.popped(self.kitty_flags_stack, _param(params, 0, 1))
+            self.kitty_flags_stack = popped(self.kitty_flags_stack, _param(params, 0, 1))
 
         elif private == "=":
             # Set. The mode defaults to setting the flags exactly.
-            stack = keys.with_flags_set(
+            stack = with_flags_set(
                 self.kitty_flags_stack,
                 _param(params, 0),
-                _param(params, 1, keys.FlagsMode.SET_EXACTLY),
+                _param(params, 1, FlagsMode.SET_EXACTLY),
             )
             if stack is not None:
                 self.kitty_flags_stack = stack

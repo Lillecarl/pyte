@@ -18,7 +18,7 @@ pair says what one key sends in each mode.
 from __future__ import annotations
 
 import pyte
-from pyte.keys import FunctionalKey
+from pyte.keys.events import FunctionalKey
 from pyte.modes import PrivateMode
 
 #: The name of each key, the sequence a terminal that disambiguates

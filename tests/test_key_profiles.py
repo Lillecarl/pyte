@@ -9,14 +9,8 @@ from __future__ import annotations
 
 import pytest
 
-from pyte.keys import (
-    DEFAULT_KEY_PROFILE,
-    KEY_PROFILES,
-    FunctionalKey,
-    KeyboardFlag,
-    ModifyOtherKeys,
-    translate_key_data,
-)
+from pyte.keys.encode import translate_key_data
+from pyte.keys.events import DEFAULT_KEY_PROFILE, KEY_PROFILES, FunctionalKey, KeyboardFlag, ModifyOtherKeys
 
 KITTY, GHOSTTY, WEZTERM, XTERM = (KEY_PROFILES[name] for name in ("kitty", "ghostty", "wezterm", "xterm"))
 

@@ -15,13 +15,8 @@ from __future__ import annotations
 
 import pytest
 
-from pyte.keys import (
-    FIRST_FUNCTIONAL_KEY,
-    KeyboardFlag,
-    KeyEvent,
-    Modifier,
-    translate_key_data,
-)
+from pyte.keys.encode import translate_key_data
+from pyte.keys.events import FIRST_FUNCTIONAL_KEY, KeyboardFlag, KeyEvent, Modifier
 
 KITTY = KeyboardFlag.DISAMBIGUATE
 

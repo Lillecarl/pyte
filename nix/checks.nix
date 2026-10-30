@@ -197,7 +197,7 @@ in
   } runPytest;
 
   # The key encoder, judged against kitty's and voted on by kitty,
-  # Ghostty, WezTerm and xterm. `pyte/keys.py` is a port of
+  # Ghostty, WezTerm and xterm. `pyte/keys/encode.py` is a port of
   # `kitty/key_encoding.c`, and #684 was a line of it the port missed: a
   # lock reached bash as "CSI 1 ; 129 D". The same argument as `xcms`.
   #

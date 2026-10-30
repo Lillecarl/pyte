@@ -42,7 +42,7 @@ import subprocess
 import time
 import tty
 
-from pyte.keys import Modifier
+from pyte.keys.events import Modifier
 
 __all__ = ["XtermKeys", "xterm_keys"]
 

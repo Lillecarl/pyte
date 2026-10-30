@@ -21,16 +21,9 @@ from __future__ import annotations
 
 import pytest
 
-from pyte.keys import (
-    FIRST_FUNCTIONAL_KEY,
-    KeyboardFlag,
-    KeyCode,
-    KeyEvent,
-    Modifier,
-    Unhearable,
-    the_modifiers_a_pane_cannot_read,
-    translate_key_event,
-)
+from pyte.keys.encode import translate_key_event
+from pyte.keys.events import FIRST_FUNCTIONAL_KEY, KeyboardFlag, KeyCode, KeyEvent, Modifier
+from pyte.keys.unhearable import Unhearable, the_modifiers_a_pane_cannot_read
 
 #: A key with no legacy form at all. The protocol numbers every key
 #: that writes no character from here up, so `chr` of one is a

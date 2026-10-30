@@ -20,12 +20,8 @@ from __future__ import annotations
 import pytest
 
 import pyte
-from pyte.keys import (
-    FormatOtherKeys,
-    KeyModifierResource,
-    ModifyOtherKeys,
-    translate_key_data,
-)
+from pyte.keys.encode import translate_key_data
+from pyte.keys.events import FormatOtherKeys, KeyModifierResource, ModifyOtherKeys
 
 #: What xterm 390 sends in its own mode where the other terminals split,
 #: from the key panel: the sequence the terminal of the person sends,

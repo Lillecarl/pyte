@@ -1,7 +1,7 @@
 """
 Ask kitty's own key encoder what a pane reads, and compare pyte.
 
-`pyte/keys.py` is a port of `kitty/key_encoding.c`, and only a
+`pyte/keys/encode.py` is a port of `kitty/key_encoding.c`, and only a
 comparison against the original says whether the port is right. kitty
 carries the encoder in its python extension, as `encode_key_for_tty`,
 so kitty answers both halves of the question:
@@ -32,7 +32,8 @@ import os
 import sys
 from typing import NamedTuple
 
-from pyte.keys import KeyboardFlag, Modifier, translate_key_data
+from pyte.keys.encode import translate_key_data
+from pyte.keys.events import KeyboardFlag, Modifier
 
 __all__ = [
     "MODIFIER_SETS",

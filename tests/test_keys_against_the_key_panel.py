@@ -24,7 +24,8 @@ from key_panel import Request, ask, judges_are_available, verdict
 from kitty_keys import SOURCE_FLAGS, judged, keyboard, kitty_encodes
 from test_keys_against_kitty import DEVIATIONS
 
-from pyte.keys import DEFAULT_KEY_PROFILE, KEY_PROFILES, KeyProfile, Modifier, ModifyOtherKeys, translate_key_data
+from pyte.keys.encode import translate_key_data
+from pyte.keys.events import DEFAULT_KEY_PROFILE, KEY_PROFILES, KeyProfile, Modifier, ModifyOtherKeys
 
 pytestmark = pytest.mark.skipif(not judges_are_available(), reason="the key judges are not there")
 
