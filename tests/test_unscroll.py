@@ -116,6 +116,45 @@ def test_the_plain_sequence_is_still_cursor_back():
     assert screen.pt_cursor_position.x == 2
 
 
+def prompt_high_up(screen, stream):
+    "Ten lines, then a prompt on the second row and nothing under it, as a full-screen program leaves it."
+    fill(stream, 10)
+    stream.feed(csi(escape.CUP, 2, 1) + csi(escape.ED, 0) + "$ ")
+
+
+def test_the_cursor_goes_to_the_bottom_with_the_history_over_it():
+    "kitty's scroll_prompt_to_bottom: the empty rows under the cursor give way to the history."
+    screen, stream = make_screen()
+    prompt_high_up(screen, stream)
+    assert screen.scroll_cursor_to_bottom() == 3
+    assert visible(screen) == ["line3", "line4", "line5", "line6", "$"]
+    assert screen.pt_cursor_position.y - screen.line_offset == LINES - 1
+    assert screen.pt_cursor_position.x == 2
+
+
+def test_it_never_brings_back_more_than_the_history_holds():
+    screen, stream = make_screen()
+    fill(stream, 2)
+    stream.feed(csi(escape.CUP, 1, 1) + csi(escape.ED, 0) + "$ ")
+    assert screen.scroll_cursor_to_bottom() == 0
+    assert visible(screen)[0] == "$"
+
+
+def test_a_written_row_under_the_cursor_stops_it():
+    screen, stream = make_screen()
+    prompt_high_up(screen, stream)
+    stream.feed(csi(escape.CUP, 4, 1) + "kept" + csi(escape.CUP, 2, 3))
+    assert screen.scroll_cursor_to_bottom() == 1
+    assert visible(screen)[-1] == "kept"
+
+
+def test_the_alternate_screen_is_left_alone():
+    screen, stream = make_screen()
+    prompt_high_up(screen, stream)
+    stream.feed(csi(escape.SM, 1049, private="?"))
+    assert screen.scroll_cursor_to_bottom() == 0
+
+
 def test_a_placement_that_falls_off_the_bottom_goes_away():
     screen, stream = make_screen(lines=5)
     fill(stream, 10)

@@ -4972,6 +4972,30 @@ class Screen:
             # screen is the one the buffer was written into.
             self._reflow(self.line_offset + self.lines - 1)
 
+    def scroll_cursor_to_bottom(self) -> int:
+        """
+        kitty's `scroll_prompt_to_bottom`: unscroll by the empty rows under
+        the cursor, so the cursor's row lands on the bottom row and the
+        history fills the rows above. The cursor moves down with its text,
+        which `unscroll` alone does not do. Only on the main screen, and
+        never past the history there is. Answers how many rows came back.
+        """
+        if self.in_alternate_screen:
+            return 0
+        cursor = self.pt_cursor_position
+        bottom = self.line_offset + self.lines - 1
+        row = bottom
+        while row > cursor.y and all(cell.char in ("", " ") for cell in self.data_buffer.get(row, {}).values()):
+            row -= 1
+        count = min(bottom - row, self.line_offset)
+        if count <= 0:
+            return 0
+        kept = cursor.y
+        self.unscroll(count)
+        cursor.y = kept
+        self.ensure_bounds()
+        return count
+
     def placeholder_runs(self, first_row: int, last_row: int) -> list[PlaceholderRun]:
         """
         The unicode placeholder runs between two rows of the scroll
