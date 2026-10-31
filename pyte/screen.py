@@ -897,18 +897,27 @@ class Screen:
             return "\x1b" + final
         return chr(0xDC00 + 0x40 + ord(final))
 
-    def reply(self, answer: CsiReport | StringReport) -> None:
+    def encode_report(self, answer: CsiReport | StringReport) -> str:
         """
-        Answer the program, with the controls that S8C1T picked.
+        A report as this screen writes it, with the controls that S8C1T
+        picked.
 
         A string sequence ends with ST, whatever `end` it carries: the
         program asked in the form this screen answers in.
         """
         if isinstance(answer, CsiReport):
-            self.write_process_input(self._control("[") + answer.body())
-        else:
-            sequence = answer.sequence()
-            self.write_process_input(self._control(sequence.kind) + sequence.payload + self._control("\\"))
+            return self._control("[") + answer.body()
+        sequence = answer.sequence()
+        return self._control(sequence.kind) + sequence.payload + self._control("\\")
+
+    def reply(self, answer: CsiReport | StringReport) -> None:
+        """
+        Answer the program. A report the person makes, such as a mouse
+        click, is input: the embedder writes `encode_report` to the
+        program itself, because a mirrored screen drops its replies and
+        must not drop a click. Lillecarl/pymux#759.
+        """
+        self.write_process_input(self.encode_report(answer))
 
     def set_seven_bit_controls(self) -> None:
         'S7C1T ("ESC SP F"): answer with "ESC" and a letter.'
