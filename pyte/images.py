@@ -23,6 +23,15 @@ from typing import ClassVar
 
 from . import sixel as sixel_module
 from .keep import Keep
+from .sequences.kitty_graphics import (
+    Action,
+    Compression,
+    Delete,
+    GraphicsKey,
+    Medium,
+    Quiet,
+    parse_control_data,
+)
 
 __all__ = [
     "ASSUMED_CELL_HEIGHT",
@@ -32,7 +41,6 @@ __all__ = [
     "GraphicsPlacement",
     "GraphicsState",
     "PixelFormat",
-    "parse_control_data",
 ]
 
 
@@ -80,7 +88,7 @@ MAX_TOTAL_IMAGE_DATA = 1024 * 1024 * 1024  # decoded bytes of all images
 
 #: The actions that carry image data. A message with one of them,
 #: arriving while a chunked transfer runs, is the next chunk of it.
-TRANSMIT_ACTIONS = frozenset(["t", "T", "q"])
+TRANSMIT_ACTIONS = frozenset([Action.TRANSMIT, Action.TRANSMIT_AND_PUT, Action.QUERY])
 
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -192,28 +200,6 @@ class GraphicsPlacement:
         )
 
 
-def parse_control_data(data: str) -> tuple[dict[str, str], str]:
-    """
-    Split a graphics command into its control data keys and the base64
-    payload. ("a=T,f=24;<payload>".)
-    """
-    if ";" in data:
-        control, payload = data.split(";", 1)
-    else:
-        control, payload = data, ""
-
-    keys: dict[str, str] = {}
-    for part in control.split(","):
-        if not part:
-            continue
-        if "=" in part:
-            key, value = part.split("=", 1)
-        else:
-            key, value = part, ""
-        keys[key] = value
-    return keys, payload
-
-
 def _png_size(data: bytes) -> tuple[int, int]:
     "Read the width and height from the PNG IHDR chunk."
     if data[:8] != PNG_SIGNATURE or data[12:16] != b"IHDR" or len(data) < 24:
@@ -271,16 +257,16 @@ class GraphicsState:
                 return None  # A chunk, and not the last one.
             keys, payload = assembled
 
-            action = keys.get("a", "t")
-            if action == "t":
+            action = keys.get(GraphicsKey.ACTION, Action.TRANSMIT)
+            if action == Action.TRANSMIT:
                 result = self._transmit(keys, payload, store=True)
-            elif action == "T":
+            elif action == Action.TRANSMIT_AND_PUT:
                 result = self._transmit_and_display(keys, payload, screen)
-            elif action == "q":
+            elif action == Action.QUERY:
                 result = self._transmit(keys, payload, store=False)
-            elif action == "p":
+            elif action == Action.PUT:
                 result = self._put(keys, screen)
-            elif action == "d":
+            elif action == Action.DELETE:
                 result = self._delete(keys, screen)
             else:
                 # Animation and composition are not implemented.
@@ -296,24 +282,24 @@ class GraphicsState:
         if result is None:
             return None
         response, is_ok = result[0], result[1]
-        quiet = keys.get("q", "0")
-        if not (keys.get("i") or keys.get("I")):
+        quiet = _quiet_of(keys.get(GraphicsKey.QUIET, ""))
+        if not (keys.get(GraphicsKey.IMAGE_ID) or keys.get(GraphicsKey.IMAGE_NUMBER)):
             return None  # Nothing to address a response to.
-        if is_ok and quiet in ("1", "2"):
+        if is_ok and quiet in (Quiet.ERRORS_ONLY, Quiet.NOTHING):
             return None  # Suppress OK responses.
-        if not is_ok and quiet == "2":
+        if not is_ok and quiet is Quiet.NOTHING:
             return None  # Suppress error responses.
         return (response, is_ok)
 
     @staticmethod
     def _prefix(keys: dict[str, str]) -> str:
         parts = []
-        if keys.get("i"):
-            parts.append("i=%s" % keys["i"])
-        if keys.get("I"):
-            parts.append("I=%s" % keys["I"])
-        if keys.get("p"):
-            parts.append("p=%s" % keys["p"])
+        if keys.get(GraphicsKey.IMAGE_ID):
+            parts.append("%s=%s" % (GraphicsKey.IMAGE_ID, keys[GraphicsKey.IMAGE_ID]))
+        if keys.get(GraphicsKey.IMAGE_NUMBER):
+            parts.append("%s=%s" % (GraphicsKey.IMAGE_NUMBER, keys[GraphicsKey.IMAGE_NUMBER]))
+        if keys.get(GraphicsKey.PLACEMENT_ID):
+            parts.append("%s=%s" % (GraphicsKey.PLACEMENT_ID, keys[GraphicsKey.PLACEMENT_ID]))
         return ",".join(parts) + ";" if parts else ""
 
     @staticmethod
@@ -341,8 +327,8 @@ class GraphicsState:
         runs is the next chunk of it, whether or not it repeats the
         keys. A placement or a delete passes through untouched.
         """
-        if self._pending is not None and keys.get("a", "t") in TRANSMIT_ACTIONS:
-            more = keys.get("m", "0")
+        if self._pending is not None and keys.get(GraphicsKey.ACTION, Action.TRANSMIT) in TRANSMIT_ACTIONS:
+            more = keys.get(GraphicsKey.MORE, "0")
             first_keys, first_payload = self._pending
             self._pending = None
             if len(first_payload) + len(payload) > MAX_PENDING_PAYLOAD:
@@ -353,7 +339,7 @@ class GraphicsState:
             self._pending = (keys, payload)
             return None
 
-        if keys.get("m", "0") == "1":
+        if keys.get(GraphicsKey.MORE, "0") == "1":
             # The first chunk. Nothing happens until the last one.
             if len(payload) > MAX_PENDING_PAYLOAD:
                 raise GraphicsError("EINVAL", "too much data")
@@ -368,11 +354,11 @@ class GraphicsState:
         it is a success, and the id of the stored image (None for the
         'q' action and for chunked transmissions still in flight).
         """
-        if "i" in keys and "I" in keys:
+        if GraphicsKey.IMAGE_ID in keys and GraphicsKey.IMAGE_NUMBER in keys:
             raise GraphicsError("EINVAL", "both image id and image number given")
 
-        medium = keys.get("t", "d")
-        if medium != "d":
+        medium = keys.get(GraphicsKey.MEDIUM, Medium.DIRECT)
+        if medium != Medium.DIRECT:
             raise GraphicsError("EINVAL", "unsupported transmission medium: %r" % medium)
 
         image_id: int | None = None
@@ -382,22 +368,22 @@ class GraphicsState:
             except Exception:
                 raise GraphicsError("EINVAL", "invalid base64 data")
 
-            fmt = self._int(keys, "f", PixelFormat.RGBA)
-            compression = keys.get("o", "")
+            fmt = self._int(keys, GraphicsKey.FORMAT, PixelFormat.RGBA)
+            compression = keys.get(GraphicsKey.COMPRESSION, "")
             if fmt == PixelFormat.PNG:
                 if compression:
                     raise GraphicsError("EINVAL", "PNG data cannot be compressed")
                 width, height = _png_size(data)
             elif fmt in (PixelFormat.RGB, PixelFormat.RGBA):
-                if compression == "z":
+                if compression == Compression.ZLIB:
                     try:
                         data = zlib.decompress(data)
                     except Exception:
                         raise GraphicsError("EINVAL", "invalid compressed data")
                 elif compression:
                     raise GraphicsError("EINVAL", "unknown compression: %r" % compression)
-                width = self._int(keys, "s")
-                height = self._int(keys, "v")
+                width = self._int(keys, GraphicsKey.WIDTH)
+                height = self._int(keys, GraphicsKey.HEIGHT)
                 if width <= 0 or height <= 0:
                     raise GraphicsError("EINVAL", "width and height required")
                 expected = width * height * (3 if fmt == PixelFormat.RGB else 4)
@@ -406,12 +392,12 @@ class GraphicsState:
             else:
                 raise GraphicsError("EINVAL", "unknown format: %i" % fmt)
 
-            image = GraphicsImage(fmt, width, height, data, number=self._int(keys, "I"))
+            image = GraphicsImage(fmt, width, height, data, number=self._int(keys, GraphicsKey.IMAGE_NUMBER))
             if store and self._total_image_data() + len(data) > MAX_TOTAL_IMAGE_DATA:
                 raise GraphicsError("EINVAL", "image storage quota exceeded")
             if store:
-                if "i" in keys:
-                    image_id = int(keys["i"])
+                if GraphicsKey.IMAGE_ID in keys:
+                    image_id = int(keys[GraphicsKey.IMAGE_ID])
                     if image_id <= 0:
                         raise GraphicsError("EINVAL", "invalid image id")
                     # Re-transmitting an id replaces the image and all
@@ -421,7 +407,7 @@ class GraphicsState:
                     self.images_by_id[image_id] = image
                     if image.number:
                         self.newest_by_number[image.number] = image
-                elif "I" in keys:
+                elif GraphicsKey.IMAGE_NUMBER in keys:
                     # An image number always creates a new image; the
                     # terminal assigns the id and reports it.
                     image_id = self._new_image_id()
@@ -442,11 +428,11 @@ class GraphicsState:
 
         if not store:
             # The 'q' action: load, but don't store.
-            if "i" in keys or "I" in keys:
+            if GraphicsKey.IMAGE_ID in keys or GraphicsKey.IMAGE_NUMBER in keys:
                 return (self._prefix(keys) + "OK", True, None)
             return None
 
-        if "I" in keys:
+        if GraphicsKey.IMAGE_NUMBER in keys:
             # Report the assigned id together with the image number.
             return ("i=%i,I=%i;OK" % (image_id, image.number), True, image_id)
 
@@ -457,7 +443,7 @@ class GraphicsState:
 
     @staticmethod
     def _pending_response_possible(keys: dict[str, str]) -> bool:
-        return bool(keys.get("i") or keys.get("I"))
+        return bool(keys.get(GraphicsKey.IMAGE_ID) or keys.get(GraphicsKey.IMAGE_NUMBER))
 
     def _transmit_and_display(self, keys: dict[str, str], payload: str, screen) -> tuple[str, bool] | None:
         "Handle the 'T' action: transmit, then place at the cursor."
@@ -474,13 +460,13 @@ class GraphicsState:
     # Placement.
 
     def _lookup_image(self, keys: dict[str, str]) -> tuple[int, GraphicsImage]:
-        if "i" in keys and "I" in keys:
+        if GraphicsKey.IMAGE_ID in keys and GraphicsKey.IMAGE_NUMBER in keys:
             raise GraphicsError("EINVAL", "both image id and image number given")
-        if "i" in keys:
-            image_id = int(keys["i"])
+        if GraphicsKey.IMAGE_ID in keys:
+            image_id = int(keys[GraphicsKey.IMAGE_ID])
             image = self.images_by_id.get(image_id)
-        elif "I" in keys:
-            number = int(keys["I"])
+        elif GraphicsKey.IMAGE_NUMBER in keys:
+            number = int(keys[GraphicsKey.IMAGE_NUMBER])
             image = self.newest_by_number.get(number)
             image_id = 0
             for known_id, known in self.images_by_id.items():
@@ -497,8 +483,8 @@ class GraphicsState:
     @staticmethod
     def _put_prefix(keys: dict[str, str], image_id: int) -> str:
         parts = ["i=%i" % image_id]
-        if keys.get("p"):
-            parts.append("p=%s" % keys["p"])
+        if keys.get(GraphicsKey.PLACEMENT_ID):
+            parts.append("%s=%s" % (GraphicsKey.PLACEMENT_ID, keys[GraphicsKey.PLACEMENT_ID]))
         return ",".join(parts) + ";"
 
     def _put(self, keys: dict[str, str], screen, image_id: int | None = None) -> tuple[str, bool]:
@@ -509,9 +495,9 @@ class GraphicsState:
             if _image is None:
                 raise GraphicsError("ENOENT", "no such image")
 
-        placement_id = self._int(keys, "p")
-        columns = self._int(keys, "c")
-        rows = self._int(keys, "r")
+        placement_id = self._int(keys, GraphicsKey.PLACEMENT_ID)
+        columns = self._int(keys, GraphicsKey.COLUMNS)
+        rows = self._int(keys, GraphicsKey.ROWS)
         asked_for_the_box = columns > 0 or rows > 0
 
         if columns <= 0 and _image.width:
@@ -524,8 +510,8 @@ class GraphicsState:
         cursor = screen.pt_cursor_position
         x = cursor.x
         y = cursor.y
-        z = self._int(keys, "z")
-        virtual = self._int(keys, "U") == 1
+        z = self._int(keys, GraphicsKey.Z_INDEX)
+        virtual = self._int(keys, GraphicsKey.VIRTUAL) == 1
 
         # A placement id replaces an earlier placement of the same
         # image with the same id.
@@ -543,7 +529,7 @@ class GraphicsState:
             # z-index are drawn below the text.)
             self._clear_cells(screen, x, y, columns, rows)
 
-        if not virtual and keys.get("C", "0") != "1":
+        if not virtual and keys.get(GraphicsKey.CURSOR, "0") != "1":
             # Move the cursor to the cell right after the image, like
             # kitty does: same row counting, clamped by the screen.
             cursor.x += columns
@@ -559,45 +545,45 @@ class GraphicsState:
     # Deletion.
 
     def _delete(self, keys: dict[str, str], screen) -> tuple[str, bool] | None:
-        specifier = keys.get("d", "a")
+        specifier = keys.get(GraphicsKey.DELETE, Delete.ALL)
         lower = specifier.lower()
         free_data = specifier.isupper()
 
-        if lower == "f":
+        if lower == Delete.FRAMES:
             # Animation frames are not implemented.
             return None
 
-        if lower == "a":
+        if lower == Delete.ALL:
             targets = list(self.placements)
-        elif lower == "i":
-            image_id = self._int(keys, "i")
-            placement_id = self._int(keys, "p")
+        elif lower == Delete.BY_ID:
+            image_id = self._int(keys, GraphicsKey.IMAGE_ID)
+            placement_id = self._int(keys, GraphicsKey.PLACEMENT_ID)
             targets = [
                 pl
                 for pl in self.placements
                 if pl.image_id == image_id and (not placement_id or pl.placement_id == placement_id)
             ]
-        elif lower == "n":
-            number = self._int(keys, "I")
+        elif lower == Delete.BY_NUMBER:
+            number = self._int(keys, GraphicsKey.IMAGE_NUMBER)
             image = self.newest_by_number.get(number)
             targets = [pl for pl in self.placements if image is not None and pl.image_id in self._ids_of(image)]
-        elif lower == "c":
+        elif lower == Delete.AT_CURSOR:
             cursor = screen.pt_cursor_position
             targets = [
                 pl
                 for pl in self.placements
                 if pl.x <= cursor.x < pl.x + pl.columns and pl.y <= cursor.y < pl.y + pl.rows
             ]
-        elif lower in ("p", "q"):
-            x = self._int(keys, "x") - 1
-            y = self._int(keys, "y") - 1
+        elif lower in (Delete.AT_CELL, Delete.AT_CELL_AND_Z):
+            x = self._int(keys, GraphicsKey.SOURCE_X) - 1
+            y = self._int(keys, GraphicsKey.SOURCE_Y) - 1
             targets = [pl for pl in self.placements if pl.x <= x < pl.x + pl.columns and pl.y <= y < pl.y + pl.rows]
-            if lower == "q":
-                z = self._int(keys, "z")
+            if lower == Delete.AT_CELL_AND_Z:
+                z = self._int(keys, GraphicsKey.Z_INDEX)
                 targets = [pl for pl in targets if pl.z == z]
-        elif lower == "r":
-            low = self._int(keys, "x")
-            high = self._int(keys, "y")
+        elif lower == Delete.IN_RANGE:
+            low = self._int(keys, GraphicsKey.SOURCE_X)
+            high = self._int(keys, GraphicsKey.SOURCE_Y)
             image_ids = [image_id for image_id in self.images_by_id if low <= image_id <= high]
             targets = [pl for pl in self.placements if pl.image_id in image_ids]
         else:
@@ -871,3 +857,8 @@ class GraphicsState:
                 placement.columns,
                 placement.rows,
             )
+
+
+def _quiet_of(value: str) -> Quiet:
+    "The q key, and an answer for anything that is not one of its three."
+    return Quiet(int(value)) if value.isdigit() and int(value) in tuple(Quiet) else Quiet.ANSWER
