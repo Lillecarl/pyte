@@ -4,7 +4,9 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 from enum import StrEnum
 
 from ..control import CSI as _CSI
@@ -12,7 +14,18 @@ from ..escape import RM as _RM
 from ..escape import SM as _SM
 from ..modes import AnsiMode, PrivateMode
 
-__all__ = ("Csi", "Marker", "Mode", "Parameter", "csi", "reset_mode", "set_mode")
+__all__ = (
+    "Csi",
+    "CsiSequence",
+    "Marker",
+    "Mode",
+    "Parameter",
+    "ask_mode",
+    "csi",
+    "mode_named",
+    "reset_mode",
+    "set_mode",
+)
 
 
 class Csi(StrEnum):
@@ -265,3 +278,96 @@ def _marker_of(modes: Sequence[Mode]) -> Marker:
     if any(private) and not all(private):
         raise ValueError("a private mode and an ANSI mode cannot go in one sequence: %r" % (modes,))
     return Marker.QUESTION if any(private) else Marker.NONE
+
+
+def ask_mode(mode: Mode) -> str:
+    """
+    DECRQM: is this mode set? "CSI ? Ps $ p" for a private mode.
+
+        >>> ask_mode(PrivateMode.SYNCHRONIZED_OUTPUT)
+        '\\x1b[?2026$p'
+
+    A terminal answers with a `reports.ModeReport`.
+    """
+    return csi(Csi.DECRQM, mode, private=_marker_of((mode,)))
+
+
+def mode_named(number: int, private: bool) -> Mode | int:
+    "The member that names this mode, or the number when no member does."
+    try:
+        return PrivateMode(number) if private else AnsiMode(number)
+    except ValueError:
+        return number
+
+
+# ----------------------------------------------------------------------
+# Reading one.
+
+#: One CSI sequence, ECMA-48 5.4: the introducer, in its 7-bit or its
+#: 8-bit form, a marker, the parameters, the intermediate bytes and one
+#: final byte.
+_SEQUENCE_RE = re.compile(r"(?:\x1b\[|\x9b)([<=>?]?)([0-9;:]*)([ -/]*)([@-~])")
+
+
+@dataclass(frozen=True)
+class CsiSequence:
+    """
+    One CSI sequence, to write or as it was read.
+
+        >>> str(CsiSequence(Csi.SD, (2,)))
+        '\\x1b[2T'
+        >>> CsiSequence.parse("\\x1b[?2026;1$y")
+        CsiSequence(final='$y', params=(2026, 1), private=<Marker.QUESTION: '?'>)
+
+    `final` carries the intermediate bytes in front of the final byte,
+    the way `Csi` names them, so " q" is DECSCUSR. The parameters are
+    what `csi` takes: a number, `None` for an empty one, or a tuple of
+    subparameters.
+
+    A reply is read with the class that names it, in `reports.py`. This
+    is what each of those reads first.
+    """
+
+    final: str
+    params: tuple[Parameter, ...] = ()
+    private: Marker = Marker.NONE
+
+    def __str__(self) -> str:
+        return csi(self.final, *self.params, private=self.private)
+
+    @classmethod
+    def parse(cls, text: str) -> CsiSequence | None:
+        "The sequence `text` is, whole, or None."
+        match = _SEQUENCE_RE.fullmatch(text)
+        if match is None:
+            return None
+        marker, params, intermediates, final = match.groups()
+        return cls(intermediates + final, _parameters_of(params), Marker(marker))
+
+    def numbers(self) -> tuple[int, ...] | None:
+        """
+        The parameters as plain numbers, an empty one as zero. None when
+        one of them carries subparameters, which no report does.
+        """
+        numbers = []
+        for param in self.params:
+            if param is None:
+                numbers.append(0)
+            elif isinstance(param, int):
+                numbers.append(int(param))
+            else:
+                return None
+        return tuple(numbers)
+
+
+def _parameters_of(text: str) -> tuple[Parameter, ...]:
+    "What `csi` would take to write `text` again."
+    if not text:
+        return ()
+    return tuple(_parameter_of(part) for part in text.split(";"))
+
+
+def _parameter_of(text: str) -> Parameter:
+    if ":" in text:
+        return tuple(int(part) if part else None for part in text.split(":"))
+    return int(text) if text else None

@@ -67,6 +67,9 @@ PURE = {
     "sequences.__init__",
     "sequences.csi",
     "sequences.escapes",
+    "sequences.kitty_graphics",
+    "sequences.replies",
+    "sequences.reports",
     "sequences.strings",
     "sgr",
     "sixel",
@@ -100,6 +103,9 @@ MAY_IMPORT = {
     "codecs",
     "collections",
     "colorsys",
+    # A frozen record with its fields: `sequences/` writes and reads each
+    # sequence as one.
+    "dataclasses",
     "enum",
     "functools",
     # `html.escape`, which is a table and three replacements. `html.py`

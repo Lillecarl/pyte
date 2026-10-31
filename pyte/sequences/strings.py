@@ -11,14 +11,28 @@ APC one does.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import StrEnum
+from typing import ClassVar
 
 from ..control import BEL as _BEL
 from ..control import ESC as _ESC
 from ..control import OSC as _OSC
 from ..control import ST as _ST
+from ..control import ST_C1 as _ST_C1
 
-__all__ = ("Terminator", "apc", "dcs", "decrqss", "osc")
+__all__ = (
+    "OscString",
+    "SettingReport",
+    "StringKind",
+    "StringSequence",
+    "Terminator",
+    "VersionReport",
+    "apc",
+    "dcs",
+    "decrqss",
+    "osc",
+)
 
 
 class Terminator(StrEnum):
@@ -36,6 +50,21 @@ class Terminator(StrEnum):
 
     #: The bell, which xterm takes as the end of an OSC.
     BEL = _BEL
+
+    #: The 8-bit ST. A terminal answers with it after an 8-bit request.
+    ST_C1 = _ST_C1
+
+
+class StringKind(StrEnum):
+    "Which string sequence: the byte after ESC that opens it."
+
+    OSC = "]"
+    DCS = "P"
+    APC = "_"
+
+
+#: The 8-bit introducer of each, one byte in place of ESC and the byte.
+_C1 = {"\x9d": StringKind.OSC, "\x90": StringKind.DCS, "\x9f": StringKind.APC}
 
 
 def osc(code: str, *fields: str, end: str = Terminator.ST) -> str:
@@ -98,3 +127,146 @@ def apc(payload: str, end: str = Terminator.ST) -> str:
     `images.py` says what its payload means.
     """
     return "%s_%s%s" % (_ESC, payload, end)
+
+
+# ----------------------------------------------------------------------
+# Reading one.
+
+
+@dataclass(frozen=True)
+class StringSequence:
+    """
+    One OSC, DCS or APC, whole: what opens it, what it carries, and
+    what ends it.
+
+        >>> StringSequence.parse("\\x1b]11;rgb:0000/0000/0000\\x07")
+        StringSequence(kind=<StringKind.OSC: ']'>, payload='11;rgb:0000/0000/0000', end=<Terminator.BEL: '\\x07'>)
+
+    The payload never holds an ESC, so the first ST ends it. Only an
+    OSC ends at a bell: xterm's rule, and the one every terminal that
+    answers a colour query with a bell follows.
+    """
+
+    kind: StringKind
+    payload: str
+    end: Terminator = Terminator.ST
+
+    def __str__(self) -> str:
+        return "%s%s%s%s" % (_ESC, self.kind, self.payload, self.end)
+
+    @classmethod
+    def parse(cls, text: str) -> StringSequence | None:
+        "The string sequence `text` is, whole, or None."
+        if text[:1] in _C1:
+            kind, body = _C1[text[0]], text[1:]
+        elif text[:1] == _ESC and text[1:2] in StringKind._value2member_map_:
+            kind, body = StringKind(text[1]), text[2:]
+        else:
+            return None
+        for end in (Terminator.ST, Terminator.ST_C1, Terminator.BEL):
+            if end is Terminator.BEL and kind is not StringKind.OSC:
+                continue
+            if body.endswith(end):
+                payload = body[: -len(end)]
+                if _ESC in payload or _ST_C1 in payload:
+                    return None
+                return cls(kind, payload, end)
+        return None
+
+
+@dataclass(frozen=True)
+class OscString:
+    """
+    An OSC by its code: "OSC code ; payload ST".
+
+        >>> OscString.parse("\\x1b]52;c;aGk=\\x1b\\\\")
+        OscString(code='52', payload='c;aGk=', end=<Terminator.ST: '\\x1b\\\\'>)
+
+    `osc.Osc` names the codes. What the payload means belongs to the
+    code, so it stays one string here.
+    """
+
+    code: str
+    payload: str = ""
+    end: Terminator = Terminator.ST
+
+    def __str__(self) -> str:
+        if self.payload:
+            return osc(self.code, self.payload, end=self.end)
+        return osc(self.code, end=self.end)
+
+    @classmethod
+    def parse(cls, text: str) -> OscString | None:
+        return cls.read(StringSequence.parse(text))
+
+    @classmethod
+    def read(cls, sequence: StringSequence | None) -> OscString | None:
+        if sequence is None or sequence.kind is not StringKind.OSC:
+            return None
+        code, _, payload = sequence.payload.partition(";")
+        if not code.isdigit():
+            return None
+        return cls(code, payload, sequence.end)
+
+
+@dataclass(frozen=True)
+class SettingReport:
+    """
+    DECRPSS, the answer to DECRQSS: "DCS Ps $ r <setting> ST".
+
+        >>> SettingReport.parse("\\x1bP1$r0;38:2::1:2:3m\\x1b\\\\").setting
+        '0;38:2::1:2:3m'
+
+    `setting` is the sequence that would set it again, final byte and
+    all, so a colour probe reads its colour back from it.
+
+    **`code` is the number as sent, and says little.** DEC's manuals and
+    xterm disagree about which of 0 and 1 means a valid request, and
+    some terminals write none. A reader judges the setting itself.
+    """
+
+    MARK: ClassVar[str] = "$r"
+
+    setting: str = ""
+    code: int | None = 1
+
+    def __str__(self) -> str:
+        return dcs("%s%s%s" % ("" if self.code is None else self.code, self.MARK, self.setting))
+
+    @classmethod
+    def parse(cls, text: str) -> SettingReport | None:
+        return cls.read(StringSequence.parse(text))
+
+    @classmethod
+    def read(cls, sequence: StringSequence | None) -> SettingReport | None:
+        if sequence is None or sequence.kind is not StringKind.DCS:
+            return None
+        code, mark, setting = sequence.payload.partition(cls.MARK)
+        if not mark or (code and not code.isdigit()):
+            return None
+        return cls(setting, int(code) if code else None)
+
+
+@dataclass(frozen=True)
+class VersionReport:
+    """
+    The answer to XTVERSION, "CSI > q": "DCS > | name and version ST".
+    A terminal answers it whatever TERM says.
+    """
+
+    MARK: ClassVar[str] = ">|"
+
+    version: str
+
+    def __str__(self) -> str:
+        return dcs(self.MARK + self.version)
+
+    @classmethod
+    def parse(cls, text: str) -> VersionReport | None:
+        return cls.read(StringSequence.parse(text))
+
+    @classmethod
+    def read(cls, sequence: StringSequence | None) -> VersionReport | None:
+        if sequence is None or sequence.kind is not StringKind.DCS or not sequence.payload.startswith(cls.MARK):
+            return None
+        return cls(sequence.payload[len(cls.MARK) :])
