@@ -330,18 +330,26 @@ _SEQUENCE_RE = re.compile(r"(?:\x1b\[|\x9b)([<=>?]?)([0-9;:]*)([ -/]*)([@-~])")
 
 class CsiReport:
     """
-    What a terminal answers with a CSI sequence.
+    What a terminal answers or reports with a CSI sequence.
 
-    `str(report)` writes it with the 7-bit CSI. A screen writes it with
-    `sequence().body()` behind the CSI that S8C1T picks, so the report
-    never decides which of the two it gets.
+    `str(report)` writes it with the 7-bit CSI. A screen writes `body()`
+    behind the CSI that S8C1T picks, so the report never decides which
+    of the two it gets.
+
+    `sequence()` is the report as parameters, which a reader compares.
+    The X10 mouse report has a body and no sequence: it carries bytes
+    after the CSI, not parameters.
     """
 
     def sequence(self) -> CsiSequence:
         raise NotImplementedError
 
+    def body(self) -> str:
+        "What follows the CSI."
+        return self.sequence().body()
+
     def __str__(self) -> str:
-        return str(self.sequence())
+        return _CSI + self.body()
 
 
 @dataclass(frozen=True)

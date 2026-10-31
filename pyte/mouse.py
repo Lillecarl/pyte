@@ -6,7 +6,7 @@ the same button differently: X10 as bytes, urxvt as shifted numbers in
 text, SGR as plain numbers with the press and the release told apart by
 the final byte. `mouse_report` picks the mode the screen is in and
 writes the report. A widget maps its own toolkit's events to a
-`MouseAction` and hands the answer to `Screen.reply_csi`.
+`MouseAction` and hands the report to `Screen.reply`.
 
 The wheel on the alternate screen is not a report: there it moves the
 cursor, `WHEEL_ARROWS` times `ARROWS_PER_WHEEL_STEP`, for a program that
@@ -15,13 +15,25 @@ asked for the alternate screen and no mouse. Lillecarl/pymux#422.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import IntEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
+
+from .sequences.csi import CsiReport, CsiSequence
+from .sequences.reports import SgrMouseReport
 
 if TYPE_CHECKING:
     from .screen import Screen
 
-__all__ = ["ARROWS_PER_WHEEL_STEP", "WHEEL_ARROWS", "MouseAction", "mouse_report", "reports_mouse"]
+__all__ = [
+    "ARROWS_PER_WHEEL_STEP",
+    "WHEEL_ARROWS",
+    "MouseAction",
+    "UrxvtMouseReport",
+    "X10MouseReport",
+    "mouse_report",
+    "reports_mouse",
+]
 
 
 class MouseAction(IntEnum):
@@ -48,10 +60,6 @@ _RELEASE_BUTTON = 3
 #: `encode_mouse_event_impl`, for the urxvt and the X10 cases only.
 _BUTTON_OFFSET = 32
 
-#: X10 writes each coordinate as one byte as well, one based and
-#: shifted by the same 32. So a zero based column travels as `x + 33`.
-_COORDINATE_OFFSET = _BUTTON_OFFSET + 1
-
 #: How far to the right and how far down an X10 report reaches.
 #:
 #: This is X10's own limit. A coordinate byte holds `223 + 32` and no
@@ -63,14 +71,14 @@ _COORDINATE_OFFSET = _BUTTON_OFFSET + 1
 #: column 96 went nowhere. Lillecarl/pymux#139.
 _X10_COLUMNS = 223
 
-#: The button that SGR writes, and the final byte that says whether the
-#: press went down or came up. SGR is the only protocol that tells them
+#: The button that SGR writes, and whether it was a release, which SGR
+#: writes as the final byte. SGR is the only protocol that tells them
 #: apart that way, and the only one that leaves the button unshifted.
 _SGR_BUTTONS = {
-    MouseAction.PRESS: (0, "M"),
-    MouseAction.RELEASE: (0, "m"),
-    MouseAction.WHEEL_UP: (_WHEEL, "M"),
-    MouseAction.WHEEL_DOWN: (_WHEEL + 1, "M"),
+    MouseAction.PRESS: (0, False),
+    MouseAction.RELEASE: (0, True),
+    MouseAction.WHEEL_UP: (_WHEEL, False),
+    MouseAction.WHEEL_DOWN: (_WHEEL + 1, False),
 }
 
 #: The button that urxvt and X10 write. One table, because the two
@@ -120,34 +128,66 @@ def reports_mouse(screen: Screen) -> bool:
     return screen.sgr_mouse_support_enabled or screen.urxvt_mouse_support_enabled or screen.mouse_support_enabled
 
 
-def mouse_report(screen: Screen, action: MouseAction, column: int, row: int) -> str | None:
+@dataclass(frozen=True)
+class UrxvtMouseReport(CsiReport):
     """
-    The report of `action` at a zero based cell, as the body of a CSI
-    for `Screen.reply_csi`, or None when the screen's mode sends nothing.
+    urxvt's report: "CSI button ; column ; row M", the button shifted
+    and the cell counted from one. A release is button three, so the
+    final byte is always "M".
+    """
 
-    `reply_csi` and not a literal "\\x1b[": a mouse report is a C1
-    control that the terminal sends on its own, and S8C1T asks for one
-    byte in front of it. xterm writes every one of them through
-    `unparseputc1`, which is not a query only path.
+    FINAL: ClassVar[str] = "M"
+
+    button: int
+    column: int
+    row: int
+
+    def sequence(self) -> CsiSequence:
+        return CsiSequence(self.FINAL, (self.button, self.column, self.row))
+
+
+@dataclass(frozen=True)
+class X10MouseReport(CsiReport):
+    """
+    X10's report: "CSI M" and three bytes, the shifted button and the
+    cell, each coordinate one based and shifted by 32.
+
+    The bytes are not parameters, so the report has a body and no
+    `sequence()`.
+    """
+
+    FINAL: ClassVar[str] = "M"
+
+    button: int
+    column: int
+    row: int
+
+    def body(self) -> str:
+        return "%s%s%s%s" % (
+            self.FINAL,
+            chr(self.button),
+            _one_byte(self.column + _BUTTON_OFFSET),
+            _one_byte(self.row + _BUTTON_OFFSET),
+        )
+
+
+def mouse_report(screen: Screen, action: MouseAction, column: int, row: int) -> CsiReport | None:
+    """
+    The report of `action` at a zero based cell, for `Screen.reply`, or
+    None when the screen's mode sends nothing.
+
+    `Screen.reply` and not `str()`: a mouse report is a C1 control that
+    the terminal sends on its own, and S8C1T asks for one byte in front
+    of it. xterm writes every one of them through `unparseputc1`, which
+    is not a query only path.
     """
     if screen.sgr_mouse_support_enabled:
-        # Xterm SGR mode: the button as text, and the final byte says
-        # press or release.
-        button, final = _SGR_BUTTONS[action]
-        return f"<{button};{column + 1};{row + 1}{final}"
+        button, released = _SGR_BUTTONS[action]
+        return SgrMouseReport(button, column + 1, row + 1, released=released)
     if screen.urxvt_mouse_support_enabled:
-        # Urxvt mode: the shifted button as text, and always "M". A
-        # release is button three, so the two are told apart by the
-        # button and not by the final byte.
-        return f"{_SHIFTED_BUTTONS[action]};{column + 1};{row + 1}M"
+        return UrxvtMouseReport(_SHIFTED_BUTTONS[action], column + 1, row + 1)
     if screen.mouse_support_enabled:
-        # X10: the same shifted button, written as one byte, and the
-        # two coordinates after it.
         if column >= _X10_COLUMNS or row >= _X10_COLUMNS:
             return None
-        return "M%s%s%s" % (
-            chr(_SHIFTED_BUTTONS[action]),
-            _one_byte(column + _COORDINATE_OFFSET),
-            _one_byte(row + _COORDINATE_OFFSET),
-        )
+        return X10MouseReport(_SHIFTED_BUTTONS[action], column + 1, row + 1)
     return None

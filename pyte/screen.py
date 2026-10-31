@@ -894,18 +894,11 @@ class Screen:
         A string sequence ends with ST, whatever `end` it carries: the
         program asked in the form this screen answers in.
         """
-        sequence = answer.sequence()
-        if isinstance(sequence, CsiSequence):
-            self.write_process_input(self._control("[") + sequence.body())
+        if isinstance(answer, CsiReport):
+            self.write_process_input(self._control("[") + answer.body())
         else:
+            sequence = answer.sequence()
             self.write_process_input(self._control(sequence.kind) + sequence.payload + self._control("\\"))
-
-    def reply_csi(self, body: str) -> None:
-        """
-        Answer with a control sequence written by hand: a mouse report,
-        whose legacy forms carry bytes rather than parameters.
-        """
-        self.write_process_input(self._control("[") + body)
 
     def set_seven_bit_controls(self) -> None:
         'S7C1T ("ESC SP F"): answer with "ESC" and a letter.'
