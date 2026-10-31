@@ -34,8 +34,11 @@ __all__ = (
     "DeviceStatus",
     "FocusReport",
     "InBandSizeReport",
+    "KeyOptionReport",
     "KeyboardFlagsReport",
     "ModeReport",
+    "ScreenCellsReport",
+    "ScreenPixelsReport",
     "SgrMouseReport",
     "StatusQuery",
     "StatusReport",
@@ -103,7 +106,8 @@ class ModeReport(CsiReport):
 class CursorPositionReport(CsiReport):
     """
     CPR, the answer to "CSI 6 n": "CSI row ; column R", both counted
-    from one.
+    from one. DECXCPR, the answer to "CSI ? 6 n", adds the page:
+    "CSI ? row ; column ; page R".
 
     **The same bytes are a key.** "CSI 1 ; 5 R" is F3 with control in
     the legacy encoding, so a reader of input decides which it expects.
@@ -113,9 +117,12 @@ class CursorPositionReport(CsiReport):
 
     row: int
     column: int
+    page: int | None = None
 
     def sequence(self) -> CsiSequence:
-        return CsiSequence(self.FINAL, (self.row, self.column))
+        if self.page is None:
+            return CsiSequence(self.FINAL, (self.row, self.column))
+        return CsiSequence(self.FINAL, (self.row, self.column, self.page), Marker.QUESTION)
 
     @classmethod
     def parse(cls, text: str) -> CursorPositionReport | None:
@@ -123,12 +130,16 @@ class CursorPositionReport(CsiReport):
 
     @classmethod
     def read(cls, sequence: CsiSequence | None) -> CursorPositionReport | None:
-        if sequence is None or sequence.final != cls.FINAL or sequence.private is not Marker.NONE:
+        if sequence is None or sequence.final != cls.FINAL:
             return None
         numbers = sequence.numbers()
-        if numbers is None or len(numbers) != 2:
+        if numbers is None:
             return None
-        return cls(*numbers)
+        if sequence.private is Marker.NONE and len(numbers) == 2:
+            return cls(*numbers)
+        if sequence.private is Marker.QUESTION and len(numbers) == 3:
+            return cls(*numbers)
+        return None
 
 
 class AttributesKind(IntEnum):
@@ -288,8 +299,10 @@ class WindowReport(IntEnum):
     """
 
     TEXT_AREA_PIXELS = 4
+    SCREEN_PIXELS = 5
     CELL_SIZE_PIXELS = 6
     TEXT_AREA_CELLS = 8
+    SCREEN_CELLS = 9
 
     #: DEC 2048: the size in cells and in pixels, in one report.
     IN_BAND_SIZE = 48
@@ -366,6 +379,46 @@ class TextAreaCellsReport(CsiReport):
 
 
 @dataclass(frozen=True)
+class ScreenPixelsReport(CsiReport):
+    'The answer to "CSI 15 t": "CSI 5 ; height ; width t", the room on the screen in pixels.'
+
+    height: int
+    width: int
+
+    def sequence(self) -> CsiSequence:
+        return CsiSequence(Csi.XTWINOPS, (WindowReport.SCREEN_PIXELS, self.height, self.width))
+
+    @classmethod
+    def parse(cls, text: str) -> ScreenPixelsReport | None:
+        return cls.read(CsiSequence.parse(text))
+
+    @classmethod
+    def read(cls, sequence: CsiSequence | None) -> ScreenPixelsReport | None:
+        numbers = _window_numbers(sequence, WindowReport.SCREEN_PIXELS, 2)
+        return None if numbers is None else cls(*numbers)
+
+
+@dataclass(frozen=True)
+class ScreenCellsReport(CsiReport):
+    'The answer to "CSI 19 t": "CSI 9 ; rows ; columns t", the room on the screen in cells.'
+
+    rows: int
+    columns: int
+
+    def sequence(self) -> CsiSequence:
+        return CsiSequence(Csi.XTWINOPS, (WindowReport.SCREEN_CELLS, self.rows, self.columns))
+
+    @classmethod
+    def parse(cls, text: str) -> ScreenCellsReport | None:
+        return cls.read(CsiSequence.parse(text))
+
+    @classmethod
+    def read(cls, sequence: CsiSequence | None) -> ScreenCellsReport | None:
+        numbers = _window_numbers(sequence, WindowReport.SCREEN_CELLS, 2)
+        return None if numbers is None else cls(*numbers)
+
+
+@dataclass(frozen=True)
 class InBandSizeReport(CsiReport):
     """
     DEC 2048: "CSI 48 ; rows ; columns ; height ; width t", the size in
@@ -412,6 +465,39 @@ class KeyboardFlagsReport(CsiReport):
         if numbers is None or len(numbers) > 1:
             return None
         return cls(KeyboardFlag(numbers[0] if numbers else 0))
+
+
+@dataclass(frozen=True)
+class KeyOptionReport(CsiReport):
+    """
+    The answer to XTQMODKEYS ("CSI ? Pp m") and XTQFMTKEYS ("CSI ? Pp
+    g"): "CSI > resource ; value m" or "... f". It is the control that
+    sets the option, so a program sends it back to restore the state.
+
+    `control` is `Csi.XTMODKEYS` or `Csi.XTFMTKEYS`.
+    """
+
+    control: Csi
+    resource: int
+    value: int
+
+    def sequence(self) -> CsiSequence:
+        return CsiSequence(self.control, (self.resource, self.value), Marker.GREATER)
+
+    @classmethod
+    def parse(cls, text: str) -> KeyOptionReport | None:
+        return cls.read(CsiSequence.parse(text))
+
+    @classmethod
+    def read(cls, sequence: CsiSequence | None) -> KeyOptionReport | None:
+        if sequence is None or sequence.private is not Marker.GREATER:
+            return None
+        if sequence.final not in (Csi.XTMODKEYS, Csi.XTFMTKEYS):
+            return None
+        numbers = sequence.numbers()
+        if numbers is None or len(numbers) != 2:
+            return None
+        return cls(Csi(sequence.final), *numbers)
 
 
 @dataclass(frozen=True)

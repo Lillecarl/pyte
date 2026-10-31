@@ -31,33 +31,50 @@ from .reports import (
     FocusReport,
     InBandSizeReport,
     KeyboardFlagsReport,
+    KeyOptionReport,
     ModeReport,
+    ScreenCellsReport,
+    ScreenPixelsReport,
     SgrMouseReport,
     StatusReport,
     TextAreaCellsReport,
     TextAreaPixelsReport,
 )
-from .strings import OscString, SettingReport, StringSequence, VersionReport
+from .strings import (
+    CapabilityReport,
+    ChecksumReport,
+    OscString,
+    SettingReport,
+    StringSequence,
+    TitleReport,
+    VersionReport,
+)
 
 __all__ = ("Reply", "parse_reply")
 
 Reply = (
-    CellSizeReport
+    CapabilityReport
+    | CellSizeReport
+    | ChecksumReport
     | ColorSchemeReport
     | CursorPositionReport
     | DeviceAttributes
     | FocusReport
     | GraphicsReply
     | InBandSizeReport
+    | KeyOptionReport
     | KeyboardFlagsReport
     | ModeReport
     | OscString
+    | ScreenCellsReport
+    | ScreenPixelsReport
     | SettingReport
     | SgrMouseReport
     | StatusReport
     | StringSequence
     | TextAreaCellsReport
     | TextAreaPixelsReport
+    | TitleReport
     | VersionReport
 )
 
@@ -71,14 +88,25 @@ _CSI_REPLIES = (
     CellSizeReport,
     TextAreaPixelsReport,
     TextAreaCellsReport,
+    ScreenPixelsReport,
+    ScreenCellsReport,
     InBandSizeReport,
     KeyboardFlagsReport,
+    KeyOptionReport,
     FocusReport,
     SgrMouseReport,
 )
 
 #: The readers of a string reply.
-_STRING_REPLIES = (OscString, SettingReport, VersionReport, GraphicsReply)
+_STRING_REPLIES = (
+    OscString,
+    TitleReport,
+    SettingReport,
+    CapabilityReport,
+    ChecksumReport,
+    VersionReport,
+    GraphicsReply,
+)
 
 
 def parse_reply(text: str) -> Reply | None:

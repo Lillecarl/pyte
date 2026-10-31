@@ -31,6 +31,7 @@ from typing import ClassVar, Final, NamedTuple
 
 from .colors import DEFAULT_COLORS, PALETTE, Color, parse_color
 from .keep import Keep
+from .sequences.strings import OscString
 
 __all__ = [
     "CLEAR_SCROLLBACK",
@@ -482,9 +483,8 @@ def pointer_shape_name(name: str) -> str | None:
 class PointerShapeRead(NamedTuple):
     'What one "OSC 22" payload asks the screen to do.'
 
-    #: The payload to answer with, or `None` when the sequence asked
-    #: no question.
-    answer: str | None
+    #: The answer, or `None` when the sequence asked no question.
+    answer: OscString | None
 
     #: Did the shape change? Then the embedder has to look again.
     changed: bool
@@ -559,9 +559,9 @@ class PointerShapes:
             changed = True
         return PointerShapeRead(None, changed)
 
-    def _answer(self, param: str) -> str:
+    def _answer(self, param: str) -> OscString:
         """
-        The payload of the answer to "OSC 22 ; ? names".
+        The answer to "OSC 22 ; ? names".
 
         A name that this takes answers one, a name that nobody knows
         answers zero, and "__current__" answers the shape now, or zero
@@ -583,7 +583,7 @@ class PointerShapes:
                 answers.append("default")
             else:
                 answers.append("0")
-        return "22;%s" % ",".join(answers)
+        return OscString(Osc.POINTER_SHAPE, ",".join(answers))
 
 
 #: The value that asks for a colour instead of setting one.
@@ -634,7 +634,7 @@ class ColorOverrides:
     they are together here because one question reads both: what colour
     does this pane draw for that?
 
-    Every method that answers a program returns the payloads to send
+    Every method that answers a program returns the answers to send
     and writes nothing. A pane has one screen of these, and a reset
     takes them all away.
 
@@ -710,7 +710,7 @@ class ColorOverrides:
         # to the defaults: a pane answers, whatever its embedder said.
         return self.base.defaults.get(name) or DEFAULT_COLORS[name]
 
-    def read_indexed(self, code: str, param: str, offset: int) -> list[str]:
+    def read_indexed(self, code: str, param: str, offset: int) -> list[OscString]:
         """
         Read "OSC 4" or "OSC 5": the palette and the special colours.
 
@@ -734,7 +734,7 @@ class ColorOverrides:
             if value.strip() == QUERY:
                 color = self.color_of(entry)
                 if color is not None:
-                    answers.append("%s;%s;%s" % (code, number, color.spec))
+                    answers.append(OscString(code, "%s;%s" % (number, color.spec)))
             else:
                 color = parse_color(value)
                 if color is not None and self.color_of(entry) is not None:
@@ -757,7 +757,7 @@ class ColorOverrides:
             if number.isdigit():
                 self.by_index.pop(int(number) + offset, None)
 
-    def read_dynamic(self, code: str, param: str) -> list[str]:
+    def read_dynamic(self, code: str, param: str) -> list[OscString]:
         """
         Read "OSC 10" and the codes after it: the colours that a
         terminal names rather than numbers.
@@ -774,7 +774,7 @@ class ColorOverrides:
                 continue
             if value.strip() == QUERY:
                 color = self.named(DYNAMIC_COLOR_CODES[number])
-                answers.append("%s;%s" % (number, color.spec))
+                answers.append(OscString(number, color.spec))
             else:
                 color = parse_color(value)
                 if color is not None:
@@ -785,9 +785,9 @@ class ColorOverrides:
         'Read "OSC 110" and the codes after it: put one colour back.'
         self.by_code.pop(code, None)
 
-    def answer_kitty(self, param: str) -> str | None:
+    def answer_kitty(self, param: str) -> OscString | None:
         """
-        The payload that answers a kitty colour query, e.g.
+        The answer to a kitty colour query, e.g.
         "OSC 21 ; background=?", or `None` when there is nothing to
         answer.
 
@@ -821,7 +821,7 @@ class ColorOverrides:
                 self.set_a_kitty_colour(key, value)
         if not answers:
             return None
-        return "21;%s" % ";".join(answers)
+        return OscString(Osc.KITTY_COLORS, ";".join(answers))
 
     def set_a_kitty_colour(self, key: str, value: str) -> None:
         """

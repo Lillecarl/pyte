@@ -227,7 +227,7 @@ def test_a_piece_of_a_sequence_is_left_alone():
 
 
 def test_a_final_byte_with_no_name_is_counted():
-    assert reason("\x1b[1*{").startswith("no name")
+    assert reason("\x1b[1*}").startswith("no name")
 
 
 def test_what_follows_a_sequence_survives():

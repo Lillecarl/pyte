@@ -147,6 +147,15 @@ class Csi(StrEnum):
     #: DECLL, which ptterm ignores.
     XTVERSION = "q"
 
+    #: Macro space report: the answer to "CSI ? 62 n".
+    DECMSR = "*{"
+
+    #: xterm's key options: how much modifier information a key
+    #: carries, and which form it goes out in. The ">" marker tells
+    #: them from SGR and HVP, which end with the same bytes.
+    XTMODKEYS = "m"
+    XTFMTKEYS = "f"
+
     #: Window manipulation. Only the size and title reports are
     #: answered.
     XTWINOPS = "t"

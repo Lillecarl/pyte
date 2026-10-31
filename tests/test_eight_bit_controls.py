@@ -156,10 +156,7 @@ def test_an_operating_system_command_carries_two_bytes():
 
 
 def test_the_answer_of_a_table_carries_one_byte():
-    """
-    `_DEVICE_STATUS_ANSWERS` is a table of literals, and it holds the
-    body of each answer without the control in front of it.
-    """
+    "`_DEVICE_STATUS_ANSWERS` is a table, and the screen spells the control in front of each answer."
     assert answered(S8C1T + csi(escape.DSR, 15, private=Marker.QUESTION)) == b"\x9b?13n"
 
 

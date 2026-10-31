@@ -22,12 +22,16 @@ from ..control import ST as _ST
 from ..control import ST_C1 as _ST_C1
 
 __all__ = (
+    "CapabilityReport",
+    "ChecksumReport",
     "OscString",
     "SettingReport",
     "StringKind",
     "StringReport",
     "StringSequence",
     "Terminator",
+    "TitleKind",
+    "TitleReport",
     "VersionReport",
     "apc",
     "dcs",
@@ -291,3 +295,114 @@ class VersionReport(StringReport):
         if sequence is None or sequence.kind is not StringKind.DCS or not sequence.payload.startswith(cls.MARK):
             return None
         return cls(sequence.payload[len(cls.MARK) :])
+
+
+@dataclass(frozen=True)
+class ChecksumReport(StringReport):
+    """
+    DECCKSR: "DCS request ! ~ checksum ST", the answer to DECRQCRA and
+    to "CSI ? 63 ; request n". `request` is the number the question
+    carried, and the sum goes out as four hexadecimal digits.
+    """
+
+    MARK: ClassVar[str] = "!~"
+
+    request: int
+    checksum: int
+
+    def sequence(self) -> StringSequence:
+        return StringSequence(StringKind.DCS, "%d%s%04X" % (self.request, self.MARK, self.checksum))
+
+    @classmethod
+    def parse(cls, text: str) -> ChecksumReport | None:
+        return cls.read(StringSequence.parse(text))
+
+    @classmethod
+    def read(cls, sequence: StringSequence | None) -> ChecksumReport | None:
+        if sequence is None or sequence.kind is not StringKind.DCS:
+            return None
+        request, mark, checksum = sequence.payload.partition(cls.MARK)
+        if not mark or not request.isdigit() or len(checksum) != 4:
+            return None
+        try:
+            return cls(int(request), int(checksum, 16))
+        except ValueError:
+            return None
+
+
+@dataclass(frozen=True)
+class CapabilityReport(StringReport):
+    """
+    XTGETTCAP's answer, one for each name asked: "DCS 1 + r name =
+    value ST" for a capability the terminal has, "DCS 1 + r name ST"
+    for a flag it has, and "DCS 0 + r name ST" for one it lacks.
+
+    Both travel as hexadecimal. `name` stays that way, so a name that
+    was not hexadecimal comes back as it was asked; `value` is the
+    text, and the writer encodes it.
+    """
+
+    MARK: ClassVar[str] = "+r"
+
+    name: str
+    value: str | None = None
+    known: bool = True
+
+    def sequence(self) -> StringSequence:
+        payload = "%d%s%s" % (self.known, self.MARK, self.name)
+        if self.value is not None:
+            payload += "=" + self.value.encode("utf-8").hex()
+        return StringSequence(StringKind.DCS, payload)
+
+    @classmethod
+    def parse(cls, text: str) -> CapabilityReport | None:
+        return cls.read(StringSequence.parse(text))
+
+    @classmethod
+    def read(cls, sequence: StringSequence | None) -> CapabilityReport | None:
+        if sequence is None or sequence.kind is not StringKind.DCS:
+            return None
+        known, mark, rest = sequence.payload.partition(cls.MARK)
+        if not mark or known not in ("0", "1"):
+            return None
+        name, equals, value = rest.partition("=")
+        if not equals:
+            return cls(name, None, known == "1")
+        try:
+            return cls(name, bytes.fromhex(value).decode("utf-8"), known == "1")
+        except ValueError:
+            return None
+
+
+class TitleKind(StrEnum):
+    "Which title a report carries: the letter after the OSC."
+
+    #: "CSI 20 t" asks for it.
+    ICON = "L"
+
+    #: "CSI 21 t" asks for it.
+    WINDOW = "l"
+
+
+@dataclass(frozen=True)
+class TitleReport(StringReport):
+    'The answer to "CSI 20 t" and "CSI 21 t": "OSC L label ST" and "OSC l title ST".'
+
+    kind: TitleKind
+    title: str
+
+    def sequence(self) -> StringSequence:
+        return StringSequence(StringKind.OSC, self.kind + self.title)
+
+    @classmethod
+    def parse(cls, text: str) -> TitleReport | None:
+        return cls.read(StringSequence.parse(text))
+
+    @classmethod
+    def read(cls, sequence: StringSequence | None) -> TitleReport | None:
+        if sequence is None or sequence.kind is not StringKind.OSC:
+            return None
+        letter = sequence.payload[:1]
+        if letter not in TitleKind._value2member_map_:
+            return None
+        return cls(TitleKind(letter), sequence.payload[1:])

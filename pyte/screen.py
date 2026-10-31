@@ -50,6 +50,7 @@ from .cells import (
     joins,
     protection_of,
 )
+from .escape import DSR
 from .images import (
     ASSUMED_CELL_HEIGHT,
     ASSUMED_CELL_WIDTH,
@@ -111,7 +112,8 @@ from .parameters import (
 )
 from .placeholders import PlaceholderRun, merge_runs, runs_in_line
 from .reflow import first_row_to_lay_out, highest_row_held, lay_out
-from .sequences.csi import CsiReport, CsiSequence
+from .sequences.csi import Csi, CsiReport, CsiSequence, Marker
+from .sequences.kitty_graphics import GraphicsReply
 from .sequences.reports import (
     AttributesKind,
     CellSizeReport,
@@ -122,12 +124,26 @@ from .sequences.reports import (
     DeviceStatus,
     InBandSizeReport,
     KeyboardFlagsReport,
+    KeyOptionReport,
     ModeReport,
+    ScreenCellsReport,
+    ScreenPixelsReport,
     StatusReport,
     TextAreaCellsReport,
     TextAreaPixelsReport,
 )
-from .sequences.strings import SettingReport, StringReport, VersionReport
+from .sequences.strings import (
+    CapabilityReport,
+    ChecksumReport,
+    OscString,
+    SettingReport,
+    StringKind,
+    StringReport,
+    StringSequence,
+    TitleKind,
+    TitleReport,
+    VersionReport,
+)
 from .sgr import after_sgr, erased_appearance, parameters_of
 from .terminfo import (
     CAPABILITIES,
@@ -767,7 +783,7 @@ class Screen:
             value = self.format_other_keys
         else:
             value = self.key_format_options.get(resource, 0)
-        self.reply_csi(">%i;%if" % (resource, value))
+        self.reply(KeyOptionReport(Csi.XTFMTKEYS, resource, value))
 
     @staticmethod
     def _remember_a_key_option(options: dict[int, int], params: Sequence[object]) -> None:
@@ -829,7 +845,7 @@ class Screen:
             value = self.modify_other_keys
         else:
             value = self.key_modifier_options.get(resource, 0)
-        self.reply_csi(">%i;%im" % (resource, value))
+        self.reply(KeyOptionReport(Csi.XTMODKEYS, resource, value))
 
     def wrap_paste(self, text: str) -> str:
         """
@@ -893,18 +909,6 @@ class Screen:
         whose legacy forms carry bytes rather than parameters.
         """
         self.write_process_input(self._control("[") + body)
-
-    def reply_dcs(self, body: str) -> None:
-        "Answer with a device control string, closed with ST."
-        self.write_process_input(self._control("P") + body + self._control("\\"))
-
-    def reply_osc(self, body: str) -> None:
-        "Answer with an operating system command, closed with ST."
-        self.write_process_input(self._control("]") + body + self._control("\\"))
-
-    def reply_apc(self, body: str) -> None:
-        "Answer with an application program command, closed with ST."
-        self.write_process_input(self._control("_") + body + self._control("\\"))
 
     def set_seven_bit_controls(self) -> None:
         'S7C1T ("ESC SP F"): answer with "ESC" and a letter.'
@@ -4698,42 +4702,38 @@ class Screen:
     #: program that asks has to read one: a query with no answer leaves
     #: the program waiting, and leaves every answer after it one place
     #: out of step.
-    #:
-    #: Each answer is the body of a control sequence, without the CSI
-    #: in front of it. `reply_csi` spells that, because S8C1T changes
-    #: how it is spelled.
     _DEVICE_STATUS_ANSWERS = {
         # DSRPrinterPort. 13 is "no printer".
-        15: "?13n",
+        15: CsiSequence(DSR, (13,), Marker.QUESTION),
         # DSRUDKLocked. 20 is "unlocked". Nothing here defines a key,
         # so nothing can lock one either.
-        25: "?20n",
+        25: CsiSequence(DSR, (20,), Marker.QUESTION),
         # DSRKeyboard: 27, then the language, the state and the type.
         # 1 is North American, 0 is ready and 5 is a PC keyboard.
-        26: "?27;1;0;5n",
+        26: CsiSequence(DSR, (27, 1, 0, 5), Marker.QUESTION),
         # DSRLocatorStatus. 50 is "no locator". DECELR is not here, so
         # there is no locator to report on.
-        55: "?50n",
+        55: CsiSequence(DSR, (50,), Marker.QUESTION),
         # DSRLocatorId: 57, then the kind of pointing device. 0 is
         # "not known".
-        56: "?57;0n",
-        # DECMSR: the room left for a macro, in bytes. This terminal
-        # holds no macro and defines none, so there is no room. The
-        # answer carries no private marker, and ends with "* {".
-        62: "0*{",
+        56: CsiSequence(DSR, (57, 0), Marker.QUESTION),
+        # The room left for a macro, in bytes. This terminal holds no
+        # macro and defines none, so there is no room. The answer
+        # carries no private marker.
+        62: CsiSequence(Csi.DECMSR, (0,)),
         # DSRDataIntegrity. 70 is "no error since the last report".
-        75: "?70n",
+        75: CsiSequence(DSR, (70,), Marker.QUESTION),
         # DSRMultipleSessionStatus. 83 is "not configured for more
         # than one session". A pane is a session of pymux, not of the
         # terminal.
-        85: "?83n",
+        85: CsiSequence(DSR, (83,), Marker.QUESTION),
     }
 
     # ------------------------------------------------------------------
     # Reports and queries: everything a program can ask, and the answer.
     #
     # Not one of these holds state of its own. Each reads the screen and
-    # writes bytes back through `reply_csi` and its neighbours.
+    # answers through `reply`, with a class of `pyte.sequences`.
 
     def report_device_status(self, data: int = 0, *args, private=False, **kwargs) -> None:
         """
@@ -4760,18 +4760,18 @@ class Screen:
             # DECCKSR: the checksum of the macros, as "DCS Pid ! ~
             # xxxx ST". No macro is defined, so the sum is zero.
             pid = args[0] if args else 0
-            self.reply_dcs("%i!~0000" % pid)
+            self.reply(ChecksumReport(pid, 0))
             return
 
         if private is True and data in self._DEVICE_STATUS_ANSWERS:
-            self.reply_csi(self._DEVICE_STATUS_ANSWERS[data])
+            self.reply(self._DEVICE_STATUS_ANSWERS[data])
             return
 
         if data == 6:
             y, x = self.reported_position
             if private is True:
-                # DECXCPR: the page number comes after the position.
-                self.reply_csi("?%i;%i;1R" % (y, x))
+                # DECXCPR: a pane is one page.
+                self.reply(CursorPositionReport(y, x, page=1))
             else:
                 self.reply(CursorPositionReport(y, x))
             return
@@ -5173,16 +5173,16 @@ class Screen:
             try:
                 name = bytes.fromhex(encoded).decode("ascii")
             except ValueError:
-                self.reply_dcs("0+r%s" % encoded)
+                self.reply(CapabilityReport(encoded, known=False))
                 continue
 
             value = CAPABILITIES.get(name)
             if value is None:
-                self.reply_dcs("0+r%s" % encoded)
+                self.reply(CapabilityReport(encoded, known=False))
             elif value is True:
-                self.reply_dcs("1+r%s" % encoded)
+                self.reply(CapabilityReport(encoded))
             else:
-                self.reply_dcs("1+r%s=%s" % (encoded, str(value).encode("utf-8").hex()))
+                self.reply(CapabilityReport(encoded, str(value)))
 
     def report_window(self, *params: int, private: object = False, **kwargs) -> None:
         """
@@ -5222,9 +5222,9 @@ class Screen:
         elif what == WindowOp.RESIZE_PIXELS:
             self._resize_in_pixels(params)
         elif what == WindowOp.REPORT_ICON_LABEL:
-            self.reply_osc("L%s" % self.titles.to_report(self.titles.icon))
+            self.reply(TitleReport(TitleKind.ICON, self.titles.to_report(self.titles.icon)))
         elif what == WindowOp.REPORT_WINDOW_TITLE:
-            self.reply_osc("l%s" % self.titles.to_report(self.titles.window))
+            self.reply(TitleReport(TitleKind.WINDOW, self.titles.to_report(self.titles.window)))
         elif what == WindowOp.PUSH_TITLE:
             self.titles.push()
         elif what == WindowOp.POP_TITLE:
@@ -5248,10 +5248,10 @@ class Screen:
             # A program reads this to learn how large it could become.
             # Naming a screen it cannot reach would send it asking for
             # a size that nothing can give.
-            self.reply_csi("9;%i;%it" % (self.lines, self.columns))
+            self.reply(ScreenCellsReport(self.lines, self.columns))
         elif what == WindowOp.REPORT_SCREEN_SIZE_PIXELS:
             # The same room, counted in pixels.
-            self.reply_csi("5;%i;%it" % (self.lines * self.cell_height, self.columns * self.cell_width))
+            self.reply(ScreenPixelsReport(self.lines * self.cell_height, self.columns * self.cell_width))
 
     def _resize_in_cells(self, params: tuple[int, ...]) -> None:
         """
@@ -5360,7 +5360,7 @@ class Screen:
                 char = row[x].char
                 total += ord(char[0]) if char else ord(" ")
 
-        self.reply_dcs("%i!~%04X" % (pid, -total & 0xFFFF))
+        self.reply(ChecksumReport(pid, -total & 0xFFFF))
 
     def save_modes(self, *params: int) -> None:
         """
@@ -5505,7 +5505,7 @@ class Screen:
         elif code == Osc.KITTY_COLORS:
             answer = self.colors.answer_kitty(param)
             if answer is not None:
-                self.reply_osc(answer)
+                self.reply(answer)
         elif code in FORWARDED_OSC:
             if code == Osc.TERMINAL_EXTENSION:
                 self._read_terminal_extension(param)
@@ -5526,11 +5526,14 @@ class Screen:
         elif param == REPORT_CELL_SIZE:
             # Points and the pixels in one, which a pane cannot tell
             # apart: a scale of one. Lillecarl/pymux#783.
-            self.reply_osc(
-                "%s;%s=%.1f;%.1f;1.0" % (Osc.TERMINAL_EXTENSION, REPORT_CELL_SIZE, self.cell_height, self.cell_width)
+            self.reply(
+                OscString(
+                    Osc.TERMINAL_EXTENSION,
+                    "%s=%.1f;%.1f;1.0" % (REPORT_CELL_SIZE, self.cell_height, self.cell_width),
+                )
             )
 
-    def _reply_each(self, answers: Iterable[str]) -> None:
+    def _reply_each(self, answers: Iterable[OscString]) -> None:
         """
         Answer a colour query with one sequence for each question.
 
@@ -5538,7 +5541,7 @@ class Screen:
         questions may not come back as one.
         """
         for answer in answers:
-            self.reply_osc(answer)
+            self.reply(answer)
 
     @staticmethod
     def _reset_code_of(code: str) -> str:
@@ -5560,7 +5563,7 @@ class Screen:
         """
         read = self.pointer_shapes.read(param)
         if read.answer is not None:
-            self.reply_osc(read.answer)
+            self.reply(read.answer)
         if read.changed:
             self._forward_osc(Osc.POINTER_SHAPE, param)
 
@@ -5617,7 +5620,7 @@ class Screen:
         result = self.graphics.handle(data[1:], self)
         if result is not None:
             response, _is_ok = result
-            self.reply_apc("G" + response)
+            self.reply(StringSequence(StringKind.APC, GraphicsReply.KEY + response))
 
     def dcs(self, data: str) -> None:
         """

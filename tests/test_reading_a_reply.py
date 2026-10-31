@@ -27,18 +27,25 @@ from pyte.sequences.reports import (
     FocusReport,
     InBandSizeReport,
     KeyboardFlagsReport,
+    KeyOptionReport,
     ModeReport,
+    ScreenCellsReport,
+    ScreenPixelsReport,
     SgrMouseReport,
     StatusReport,
     TextAreaCellsReport,
     TextAreaPixelsReport,
 )
 from pyte.sequences.strings import (
+    CapabilityReport,
+    ChecksumReport,
     OscString,
     SettingReport,
     StringKind,
     StringSequence,
     Terminator,
+    TitleKind,
+    TitleReport,
     VersionReport,
 )
 
@@ -47,6 +54,7 @@ EVERY_REPLY = [
     ModeReport(AnsiMode.INSERT_REPLACE, ModeState.RESET, private=False),
     ModeReport(9999, ModeState.UNKNOWN),
     CursorPositionReport(2, 3),
+    CursorPositionReport(2, 3, page=1),
     DeviceAttributes(AttributesKind.PRIMARY, (62, 4, 22)),
     DeviceAttributes(AttributesKind.SECONDARY, (1, 4000, 29)),
     StatusReport(DeviceStatus.OK),
@@ -55,8 +63,12 @@ EVERY_REPLY = [
     CellSizeReport(height=20, width=10),
     TextAreaPixelsReport(height=480, width=800),
     TextAreaCellsReport(rows=24, columns=80),
+    ScreenPixelsReport(height=1080, width=1920),
+    ScreenCellsReport(rows=54, columns=192),
     InBandSizeReport(rows=24, columns=80, height=480, width=800),
     KeyboardFlagsReport(KeyboardFlag(31)),
+    KeyOptionReport(Csi.XTMODKEYS, 4, 2),
+    KeyOptionReport(Csi.XTFMTKEYS, 4, 1),
     FocusReport(True),
     FocusReport(False),
     SgrMouseReport(65, 10, 5),
@@ -67,6 +79,12 @@ EVERY_REPLY = [
     SettingReport(code=0),
     SettingReport("m", code=None),
     VersionReport("kitty(0.39.1)"),
+    ChecksumReport(1, 0xFF3A),
+    CapabilityReport("544e", "xterm"),
+    CapabilityReport("524742"),
+    CapabilityReport("6e6f6e65", known=False),
+    TitleReport(TitleKind.WINDOW, "vim"),
+    TitleReport(TitleKind.ICON, ""),
     GraphicsReply(31, "OK"),
     GraphicsReply(7, "ENOENT:no such image", placement_id=2),
 ]
@@ -100,6 +118,8 @@ def test_what_a_reply_writes_it_reads_back(reply):
         # And in its 8-bit form.
         ("\x9d10;rgb:ffff/ffff/ffff\x9c", OscString("10", "rgb:ffff/ffff/ffff", Terminator.ST_C1)),
         ("\x1bP>|WezTerm 20240203\x1b\\", VersionReport("WezTerm 20240203")),
+        # xterm, asked for TN.
+        ("\x1bP1+r544e=787465726d\x1b\\", CapabilityReport("544e", "xterm")),
         ("\x1b_Gi=31,p=0;OK\x1b\\", GraphicsReply(31, "OK", placement_id=0)),
     ],
 )
@@ -142,7 +162,8 @@ def test_a_report_that_is_not_its_own_is_refused():
 
 def test_a_string_no_class_names_is_still_a_reply():
     "A terminal answers in protocols pyte has no class for, and they must not reach a pane."
-    assert parse_reply("\x1bP+r544e=787465726d\x1b\\") == StringSequence(StringKind.DCS, "+r544e=787465726d")
+    # DECRPTUI, the answer to DA3.
+    assert parse_reply("\x1bP!|00000000\x1b\\") == StringSequence(StringKind.DCS, "!|00000000")
 
 
 def test_an_apc_does_not_end_at_a_bell():
