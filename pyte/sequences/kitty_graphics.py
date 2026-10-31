@@ -178,18 +178,11 @@ class GraphicsCommand:
     payload: str | None = None
 
     def __str__(self) -> str:
-        control = ",".join("%s=%s" % (key, _written(value)) for key, value in self.keys.items())
+        # "%s" writes a `StrEnum` as its letter and an `IntEnum` as its number.
+        control = ",".join(["%s=%s" % pair for pair in self.keys.items()])
         if self.payload is None:
             return apc(self.KEY + control)
         return apc("%s%s;%s" % (self.KEY, control, self.payload))
-
-
-def _written(value: Value) -> str:
-    if isinstance(value, StrEnum):
-        return str(value)
-    if isinstance(value, int):
-        return str(int(value))
-    return value
 
 
 def parse_control_data(data: str) -> tuple[dict[str, str], str]:

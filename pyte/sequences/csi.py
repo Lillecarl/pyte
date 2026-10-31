@@ -220,13 +220,22 @@ def csi(final: str, *params: Parameter, private: Marker = Marker.NONE) -> str:
 
 
 def _joined(params: Iterable[Parameter]) -> str:
-    "The parameters of a sequence, with the separators between them."
-    return ";".join(
-        # An `IntEnum` is an `int`, so only a real sequence of
-        # subparameters reaches the colons.
-        _one(value) if isinstance(value, (int, type(None))) else ":".join(_one(part) for part in value)
-        for value in params
-    )
+    """
+    The parameters of a sequence, with the separators between them.
+
+    A loop and not a generator: an image's placement writes a cursor
+    move every frame, and `checks.pymux-images` counts what that costs.
+    """
+    parts = []
+    for value in params:
+        if value is None:
+            parts.append("")
+        elif isinstance(value, int):
+            # "%d" writes an `IntEnum` as its number.
+            parts.append("%d" % value)
+        else:
+            parts.append(":".join(_one(part) for part in value))
+    return ";".join(parts)
 
 
 def _one(value: int | None) -> str:
