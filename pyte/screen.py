@@ -113,7 +113,6 @@ from .parameters import (
 from .placeholders import PlaceholderRun, merge_runs, runs_in_line
 from .reflow import first_row_to_lay_out, highest_row_held, lay_out
 from .sequences.csi import Csi, CsiReport, CsiSequence, Marker
-from .sequences.kitty_graphics import GraphicsReply
 from .sequences.reports import (
     AttributesKind,
     CellSizeReport,
@@ -137,9 +136,7 @@ from .sequences.strings import (
     ChecksumReport,
     OscString,
     SettingReport,
-    StringKind,
     StringReport,
-    StringSequence,
     TitleKind,
     TitleReport,
     VersionReport,
@@ -5617,10 +5614,9 @@ class Screen:
         if not data.startswith("G"):
             return  # Not the graphics protocol.
 
-        result = self.graphics.handle(data[1:], self)
-        if result is not None:
-            response, _is_ok = result
-            self.reply(StringSequence(StringKind.APC, GraphicsReply.KEY + response))
+        reply = self.graphics.handle(data[1:], self)
+        if reply is not None:
+            self.reply(reply)
 
     def dcs(self, data: str) -> None:
         """

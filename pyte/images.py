@@ -28,6 +28,7 @@ from .sequences.kitty_graphics import (
     Compression,
     Delete,
     GraphicsKey,
+    GraphicsReply,
     Medium,
     Quiet,
     parse_control_data,
@@ -239,15 +240,15 @@ class GraphicsState:
 
     # ------------------------------------------------------------------
 
-    def handle(self, data: str, screen) -> tuple[str, bool] | None:
+    def handle(self, data: str, screen) -> GraphicsReply | None:
         """
         Handle a graphics command (the payload of the APC sequence,
-        without the leading "G"). Returns the response body (including
-        the "i=...;" prefix) and whether it reports success, or None
-        when nothing should be sent to the process.
+        without the leading "G"). Returns the answer, or None when
+        nothing should be sent to the process.
 
         Like kitty, only commands that carry an image id ("i") or an
-        image number ("I") get a response at all.
+        image number ("I") get a response at all. An id that is not a
+        number names no image, so its command gets none either.
         """
         keys, payload = parse_control_data(data)
 
@@ -258,49 +259,54 @@ class GraphicsState:
             keys, payload = assembled
 
             action = keys.get(GraphicsKey.ACTION, Action.TRANSMIT)
-            if action == Action.TRANSMIT:
-                result = self._transmit(keys, payload, store=True)
+            if action in (Action.TRANSMIT, Action.QUERY):
+                transmitted = self._transmit(keys, payload, store=action == Action.TRANSMIT)
+                reply = None if transmitted is None else transmitted[0]
             elif action == Action.TRANSMIT_AND_PUT:
-                result = self._transmit_and_display(keys, payload, screen)
-            elif action == Action.QUERY:
-                result = self._transmit(keys, payload, store=False)
+                reply = self._transmit_and_display(keys, payload, screen)
             elif action == Action.PUT:
-                result = self._put(keys, screen)
+                reply = self._put(keys, screen)
             elif action == Action.DELETE:
-                result = self._delete(keys, screen)
+                reply = self._delete(keys, screen)
             else:
                 # Animation and composition are not implemented.
                 raise GraphicsError("EINVAL", "unsupported action: %r" % action)
         except GraphicsError as exc:
-            result = (self._prefix(keys) + exc.code + ":" + exc.args[0], False)
+            reply = self._reply(keys, "%s:%s" % (exc.code, exc.args[0]))
         except ValueError:
-            result = (
-                self._prefix(keys) + "EINVAL:invalid integer value",
-                False,
-            )
+            reply = self._reply(keys, "EINVAL:invalid integer value")
 
-        if result is None:
+        if reply is None:
             return None
-        response, is_ok = result[0], result[1]
         quiet = _quiet_of(keys.get(GraphicsKey.QUIET, ""))
-        if not (keys.get(GraphicsKey.IMAGE_ID) or keys.get(GraphicsKey.IMAGE_NUMBER)):
+        if reply.image_id is None and reply.image_number is None:
             return None  # Nothing to address a response to.
-        if is_ok and quiet in (Quiet.ERRORS_ONLY, Quiet.NOTHING):
+        if reply.ok and quiet in (Quiet.ERRORS_ONLY, Quiet.NOTHING):
             return None  # Suppress OK responses.
-        if not is_ok and quiet is Quiet.NOTHING:
+        if not reply.ok and quiet is Quiet.NOTHING:
             return None  # Suppress error responses.
-        return (response, is_ok)
+        return reply
+
+    @classmethod
+    def _reply(cls, keys: dict[str, str], message: str) -> GraphicsReply:
+        "The answer to a command, addressed the way the command named its image."
+        return GraphicsReply(
+            cls._number_of(keys, GraphicsKey.IMAGE_ID),
+            message,
+            placement_id=cls._number_of(keys, GraphicsKey.PLACEMENT_ID),
+            image_number=cls._number_of(keys, GraphicsKey.IMAGE_NUMBER),
+        )
 
     @staticmethod
-    def _prefix(keys: dict[str, str]) -> str:
-        parts = []
-        if keys.get(GraphicsKey.IMAGE_ID):
-            parts.append("%s=%s" % (GraphicsKey.IMAGE_ID, keys[GraphicsKey.IMAGE_ID]))
-        if keys.get(GraphicsKey.IMAGE_NUMBER):
-            parts.append("%s=%s" % (GraphicsKey.IMAGE_NUMBER, keys[GraphicsKey.IMAGE_NUMBER]))
-        if keys.get(GraphicsKey.PLACEMENT_ID):
-            parts.append("%s=%s" % (GraphicsKey.PLACEMENT_ID, keys[GraphicsKey.PLACEMENT_ID]))
-        return ",".join(parts) + ";" if parts else ""
+    def _number_of(keys: dict[str, str], key: str) -> int | None:
+        "The number a key carries, or None when it is missing, empty or not a number."
+        value = keys.get(key)
+        if not value:
+            return None
+        try:
+            return int(value)
+        except ValueError:
+            return None
 
     @staticmethod
     def _int(keys: dict[str, str], key: str, default: int = 0) -> int:
@@ -348,11 +354,10 @@ class GraphicsState:
 
         return (keys, payload)
 
-    def _transmit(self, keys: dict[str, str], payload: str, store: bool) -> tuple[str, bool, int | None] | None:
+    def _transmit(self, keys: dict[str, str], payload: str, store: bool) -> tuple[GraphicsReply, int | None] | None:
         """
-        Handle the 't' and 'q' actions. Returns the response, whether
-        it is a success, and the id of the stored image (None for the
-        'q' action and for chunked transmissions still in flight).
+        Handle the 't' and 'q' actions. Returns the answer and the id
+        of the stored image (None for the 'q' action).
         """
         if GraphicsKey.IMAGE_ID in keys and GraphicsKey.IMAGE_NUMBER in keys:
             raise GraphicsError("EINVAL", "both image id and image number given")
@@ -429,32 +434,32 @@ class GraphicsState:
         if not store:
             # The 'q' action: load, but don't store.
             if GraphicsKey.IMAGE_ID in keys or GraphicsKey.IMAGE_NUMBER in keys:
-                return (self._prefix(keys) + "OK", True, None)
+                return (self._reply(keys, GraphicsReply.OK), None)
             return None
 
         if GraphicsKey.IMAGE_NUMBER in keys:
             # Report the assigned id together with the image number.
-            return ("i=%i,I=%i;OK" % (image_id, image.number), True, image_id)
+            return (GraphicsReply(image_id, GraphicsReply.OK, image_number=image.number), image_id)
 
         # A transmission without an image id is stored all the same,
         # under the id-0 slot, and "a=T" places it. `handle` drops the
         # response, because there is nothing to address it to.
-        return (self._prefix(keys) + "OK", True, image_id)
+        return (self._reply(keys, GraphicsReply.OK), image_id)
 
     @staticmethod
     def _pending_response_possible(keys: dict[str, str]) -> bool:
         return bool(keys.get(GraphicsKey.IMAGE_ID) or keys.get(GraphicsKey.IMAGE_NUMBER))
 
-    def _transmit_and_display(self, keys: dict[str, str], payload: str, screen) -> tuple[str, bool] | None:
+    def _transmit_and_display(self, keys: dict[str, str], payload: str, screen) -> GraphicsReply | None:
         "Handle the 'T' action: transmit, then place at the cursor."
         result = self._transmit(keys, payload, store=True)
         if result is None:
             return None
-        _response, _is_ok, image_id = result
+        reply, image_id = result
         if image_id is None:
             return None
         self._put(keys, screen, image_id=image_id)
-        return (_response, True)
+        return reply
 
     # ------------------------------------------------------------------
     # Placement.
@@ -480,14 +485,7 @@ class GraphicsState:
             raise GraphicsError("ENOENT", "no such image")
         return image_id, image
 
-    @staticmethod
-    def _put_prefix(keys: dict[str, str], image_id: int) -> str:
-        parts = ["i=%i" % image_id]
-        if keys.get(GraphicsKey.PLACEMENT_ID):
-            parts.append("%s=%s" % (GraphicsKey.PLACEMENT_ID, keys[GraphicsKey.PLACEMENT_ID]))
-        return ",".join(parts) + ";"
-
-    def _put(self, keys: dict[str, str], screen, image_id: int | None = None) -> tuple[str, bool]:
+    def _put(self, keys: dict[str, str], screen, image_id: int | None = None) -> GraphicsReply:
         if image_id is None:
             image_id, _image = self._lookup_image(keys)
         else:
@@ -538,20 +536,19 @@ class GraphicsState:
             screen.max_y = max(screen.max_y, cursor.y)
             screen.ensure_bounds()
 
-        response = self._put_prefix(keys, image_id) + "OK"
-        return (response, True)
+        return GraphicsReply(image_id, GraphicsReply.OK, placement_id=self._number_of(keys, GraphicsKey.PLACEMENT_ID))
 
     # ------------------------------------------------------------------
     # Deletion.
 
-    def _delete(self, keys: dict[str, str], screen) -> tuple[str, bool] | None:
+    def _delete(self, keys: dict[str, str], screen) -> None:
         specifier = keys.get(GraphicsKey.DELETE, Delete.ALL)
         lower = specifier.lower()
         free_data = specifier.isupper()
 
         if lower == Delete.FRAMES:
             # Animation frames are not implemented.
-            return None
+            return
 
         if lower == Delete.ALL:
             targets = list(self.placements)
@@ -587,7 +584,7 @@ class GraphicsState:
             image_ids = [image_id for image_id in self.images_by_id if low <= image_id <= high]
             targets = [pl for pl in self.placements if pl.image_id in image_ids]
         else:
-            return None  # Unknown specifier: ignore.
+            return  # Unknown specifier: ignore.
 
         for placement in targets:
             self._clear_placement_cells(screen, placement)
@@ -598,7 +595,7 @@ class GraphicsState:
                 if not any(pl.image_id == image_id for pl in self.placements):
                     self.delete_image_data(image_id)
 
-        return None  # Deletes are not acknowledged.
+        return  # Deletes are not acknowledged.
 
     def _ids_of(self, image: GraphicsImage) -> list[int]:
         return [image_id for image_id, known in self.images_by_id.items() if known is image]
