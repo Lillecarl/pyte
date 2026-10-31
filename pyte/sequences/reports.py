@@ -22,7 +22,7 @@ from ..escape import DA as _DA
 from ..escape import DSR as _DSR
 from ..keys.events import KeyboardFlag
 from ..modes import AnsiMode, ModeState, PrivateMode
-from .csi import Csi, CsiSequence, Marker, csi, mode_named
+from .csi import Csi, CsiReport, CsiSequence, Marker, csi, mode_named
 
 __all__ = (
     "AttributesKind",
@@ -48,7 +48,7 @@ __all__ = (
 
 
 @dataclass(frozen=True)
-class ModeReport:
+class ModeReport(CsiReport):
     """
     DECRPM, the answer to DECRQM: "CSI ? Pd ; Ps $ y" for a private
     mode, and the same with no "?" for an ANSI one.
@@ -66,9 +66,9 @@ class ModeReport:
     state: ModeState
     private: bool = True
 
-    def __str__(self) -> str:
+    def sequence(self) -> CsiSequence:
         marker = Marker.QUESTION if self.private else Marker.NONE
-        return csi(self.FINAL, int(self.mode), self.state, private=marker)
+        return CsiSequence(self.FINAL, (int(self.mode), self.state), marker)
 
     @classmethod
     def parse(cls, text: str) -> ModeReport | None:
@@ -100,7 +100,7 @@ class ModeReport:
 
 
 @dataclass(frozen=True)
-class CursorPositionReport:
+class CursorPositionReport(CsiReport):
     """
     CPR, the answer to "CSI 6 n": "CSI row ; column R", both counted
     from one.
@@ -114,8 +114,8 @@ class CursorPositionReport:
     row: int
     column: int
 
-    def __str__(self) -> str:
-        return csi(self.FINAL, self.row, self.column)
+    def sequence(self) -> CsiSequence:
+        return CsiSequence(self.FINAL, (self.row, self.column))
 
     @classmethod
     def parse(cls, text: str) -> CursorPositionReport | None:
@@ -145,7 +145,7 @@ _ATTRIBUTES_MARKERS = {AttributesKind.PRIMARY: Marker.QUESTION, AttributesKind.S
 
 
 @dataclass(frozen=True)
-class DeviceAttributes:
+class DeviceAttributes(CsiReport):
     """
     The answer to "CSI c" or "CSI > c".
 
@@ -162,8 +162,8 @@ class DeviceAttributes:
     kind: AttributesKind
     params: tuple[int, ...]
 
-    def __str__(self) -> str:
-        return csi(self.FINAL, *self.params, private=_ATTRIBUTES_MARKERS[self.kind])
+    def sequence(self) -> CsiSequence:
+        return CsiSequence(self.FINAL, self.params, _ATTRIBUTES_MARKERS[self.kind])
 
     @classmethod
     def parse(cls, text: str) -> DeviceAttributes | None:
@@ -208,7 +208,7 @@ class DeviceStatus(IntEnum):
 
 
 @dataclass(frozen=True)
-class StatusReport:
+class StatusReport(CsiReport):
     """
     DSR, the answer to "CSI 5 n": "CSI 0 n", or "CSI 3 n" for a
     terminal that is not well. A program that asks after it wrote
@@ -219,8 +219,8 @@ class StatusReport:
 
     status: DeviceStatus = DeviceStatus.OK
 
-    def __str__(self) -> str:
-        return csi(self.FINAL, self.status)
+    def sequence(self) -> CsiSequence:
+        return CsiSequence(self.FINAL, (self.status,))
 
     @classmethod
     def parse(cls, text: str) -> StatusReport | None:
@@ -247,7 +247,7 @@ class ColorScheme(IntEnum):
 
 
 @dataclass(frozen=True)
-class ColorSchemeReport:
+class ColorSchemeReport(CsiReport):
     """
     "CSI ? 997 ; Ps n": the terminal draws dark or light. It answers
     "CSI ? 996 n", and sends one of its own at each switch while
@@ -259,8 +259,8 @@ class ColorSchemeReport:
 
     scheme: ColorScheme
 
-    def __str__(self) -> str:
-        return csi(self.FINAL, self.CODE, self.scheme, private=Marker.QUESTION)
+    def sequence(self) -> CsiSequence:
+        return CsiSequence(self.FINAL, (self.CODE, self.scheme), Marker.QUESTION)
 
     @classmethod
     def parse(cls, text: str) -> ColorSchemeReport | None:
@@ -306,14 +306,14 @@ def _window_numbers(sequence: CsiSequence | None, report: WindowReport, count: i
 
 
 @dataclass(frozen=True)
-class CellSizeReport:
+class CellSizeReport(CsiReport):
     'The answer to "CSI 16 t": "CSI 6 ; height ; width t", in pixels.'
 
     height: int
     width: int
 
-    def __str__(self) -> str:
-        return csi(Csi.XTWINOPS, WindowReport.CELL_SIZE_PIXELS, self.height, self.width)
+    def sequence(self) -> CsiSequence:
+        return CsiSequence(Csi.XTWINOPS, (WindowReport.CELL_SIZE_PIXELS, self.height, self.width))
 
     @classmethod
     def parse(cls, text: str) -> CellSizeReport | None:
@@ -326,14 +326,14 @@ class CellSizeReport:
 
 
 @dataclass(frozen=True)
-class TextAreaPixelsReport:
+class TextAreaPixelsReport(CsiReport):
     'The answer to "CSI 14 t": "CSI 4 ; height ; width t", in pixels.'
 
     height: int
     width: int
 
-    def __str__(self) -> str:
-        return csi(Csi.XTWINOPS, WindowReport.TEXT_AREA_PIXELS, self.height, self.width)
+    def sequence(self) -> CsiSequence:
+        return CsiSequence(Csi.XTWINOPS, (WindowReport.TEXT_AREA_PIXELS, self.height, self.width))
 
     @classmethod
     def parse(cls, text: str) -> TextAreaPixelsReport | None:
@@ -346,14 +346,14 @@ class TextAreaPixelsReport:
 
 
 @dataclass(frozen=True)
-class TextAreaCellsReport:
+class TextAreaCellsReport(CsiReport):
     'The answer to "CSI 18 t": "CSI 8 ; rows ; columns t".'
 
     rows: int
     columns: int
 
-    def __str__(self) -> str:
-        return csi(Csi.XTWINOPS, WindowReport.TEXT_AREA_CELLS, self.rows, self.columns)
+    def sequence(self) -> CsiSequence:
+        return CsiSequence(Csi.XTWINOPS, (WindowReport.TEXT_AREA_CELLS, self.rows, self.columns))
 
     @classmethod
     def parse(cls, text: str) -> TextAreaCellsReport | None:
@@ -366,7 +366,7 @@ class TextAreaCellsReport:
 
 
 @dataclass(frozen=True)
-class InBandSizeReport:
+class InBandSizeReport(CsiReport):
     """
     DEC 2048: "CSI 48 ; rows ; columns ; height ; width t", the size in
     cells and in pixels. A terminal sends it at each resize while the
@@ -378,8 +378,8 @@ class InBandSizeReport:
     height: int
     width: int
 
-    def __str__(self) -> str:
-        return csi(Csi.XTWINOPS, WindowReport.IN_BAND_SIZE, self.rows, self.columns, self.height, self.width)
+    def sequence(self) -> CsiSequence:
+        return CsiSequence(Csi.XTWINOPS, (WindowReport.IN_BAND_SIZE, self.rows, self.columns, self.height, self.width))
 
     @classmethod
     def parse(cls, text: str) -> InBandSizeReport | None:
@@ -392,13 +392,13 @@ class InBandSizeReport:
 
 
 @dataclass(frozen=True)
-class KeyboardFlagsReport:
+class KeyboardFlagsReport(CsiReport):
     'The answer to "CSI ? u": "CSI ? flags u", the kitty keyboard flags in force.'
 
     flags: KeyboardFlag
 
-    def __str__(self) -> str:
-        return csi(Csi.KITTY_KEYBOARD, int(self.flags), private=Marker.QUESTION)
+    def sequence(self) -> CsiSequence:
+        return CsiSequence(Csi.KITTY_KEYBOARD, (int(self.flags),), Marker.QUESTION)
 
     @classmethod
     def parse(cls, text: str) -> KeyboardFlagsReport | None:
@@ -415,7 +415,7 @@ class KeyboardFlagsReport:
 
 
 @dataclass(frozen=True)
-class FocusReport:
+class FocusReport(CsiReport):
     """
     DEC 1004: "CSI I" when the terminal's window gains the focus and
     "CSI O" when it loses it.
@@ -426,8 +426,8 @@ class FocusReport:
 
     focused: bool
 
-    def __str__(self) -> str:
-        return csi(self.GAINED if self.focused else self.LOST)
+    def sequence(self) -> CsiSequence:
+        return CsiSequence(self.GAINED if self.focused else self.LOST)
 
     @classmethod
     def parse(cls, text: str) -> FocusReport | None:
@@ -445,7 +445,7 @@ class FocusReport:
 
 
 @dataclass(frozen=True)
-class SgrMouseReport:
+class SgrMouseReport(CsiReport):
     """
     DEC 1006: "CSI < button ; column ; row M", and "m" for a release.
 
@@ -462,9 +462,9 @@ class SgrMouseReport:
     row: int
     released: bool = False
 
-    def __str__(self) -> str:
+    def sequence(self) -> CsiSequence:
         final = self.RELEASE if self.released else self.PRESS
-        return csi(final, self.button, self.column, self.row, private=Marker.LESS)
+        return CsiSequence(final, (self.button, self.column, self.row), Marker.LESS)
 
     @classmethod
     def parse(cls, text: str) -> SgrMouseReport | None:

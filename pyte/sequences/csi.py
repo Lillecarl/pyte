@@ -16,6 +16,7 @@ from ..modes import AnsiMode, PrivateMode
 
 __all__ = (
     "Csi",
+    "CsiReport",
     "CsiSequence",
     "Marker",
     "Mode",
@@ -318,8 +319,24 @@ def mode_named(number: int, private: bool) -> Mode | int:
 _SEQUENCE_RE = re.compile(r"(?:\x1b\[|\x9b)([<=>?]?)([0-9;:]*)([ -/]*)([@-~])")
 
 
+class CsiReport:
+    """
+    What a terminal answers with a CSI sequence.
+
+    `str(report)` writes it with the 7-bit CSI. A screen writes it with
+    `sequence().body()` behind the CSI that S8C1T picks, so the report
+    never decides which of the two it gets.
+    """
+
+    def sequence(self) -> CsiSequence:
+        raise NotImplementedError
+
+    def __str__(self) -> str:
+        return str(self.sequence())
+
+
 @dataclass(frozen=True)
-class CsiSequence:
+class CsiSequence(CsiReport):
     """
     One CSI sequence, to write or as it was read.
 
@@ -343,6 +360,13 @@ class CsiSequence:
 
     def __str__(self) -> str:
         return csi(self.final, *self.params, private=self.private)
+
+    def sequence(self) -> CsiSequence:
+        return self
+
+    def body(self) -> str:
+        "The sequence without its CSI: the marker, the parameters and the final byte."
+        return "%s%s%s" % (self.private, _joined(self.params), self.final)
 
     @classmethod
     def parse(cls, text: str) -> CsiSequence | None:

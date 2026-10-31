@@ -25,6 +25,7 @@ __all__ = (
     "OscString",
     "SettingReport",
     "StringKind",
+    "StringReport",
     "StringSequence",
     "Terminator",
     "VersionReport",
@@ -133,8 +134,25 @@ def apc(payload: str, end: str = Terminator.ST) -> str:
 # Reading one.
 
 
+class StringReport:
+    """
+    What a terminal answers with a string sequence.
+
+    `str(report)` writes it with 7-bit controls. A screen writes the
+    `kind` and the `payload` of `sequence()` between the controls that
+    S8C1T picks, and always ends with ST: `end` is how a sequence that
+    was read ended, and says nothing about how an answer ends.
+    """
+
+    def sequence(self) -> StringSequence:
+        raise NotImplementedError
+
+    def __str__(self) -> str:
+        return str(self.sequence())
+
+
 @dataclass(frozen=True)
-class StringSequence:
+class StringSequence(StringReport):
     """
     One OSC, DCS or APC, whole: what opens it, what it carries, and
     what ends it.
@@ -153,6 +171,9 @@ class StringSequence:
 
     def __str__(self) -> str:
         return "%s%s%s%s" % (_ESC, self.kind, self.payload, self.end)
+
+    def sequence(self) -> StringSequence:
+        return self
 
     @classmethod
     def parse(cls, text: str) -> StringSequence | None:
@@ -175,7 +196,7 @@ class StringSequence:
 
 
 @dataclass(frozen=True)
-class OscString:
+class OscString(StringReport):
     """
     An OSC by its code: "OSC code ; payload ST".
 
@@ -190,10 +211,9 @@ class OscString:
     payload: str = ""
     end: Terminator = Terminator.ST
 
-    def __str__(self) -> str:
-        if self.payload:
-            return osc(self.code, self.payload, end=self.end)
-        return osc(self.code, end=self.end)
+    def sequence(self) -> StringSequence:
+        payload = "%s;%s" % (self.code, self.payload) if self.payload else self.code
+        return StringSequence(StringKind.OSC, payload, self.end)
 
     @classmethod
     def parse(cls, text: str) -> OscString | None:
@@ -210,7 +230,7 @@ class OscString:
 
 
 @dataclass(frozen=True)
-class SettingReport:
+class SettingReport(StringReport):
     """
     DECRPSS, the answer to DECRQSS: "DCS Ps $ r <setting> ST".
 
@@ -230,8 +250,9 @@ class SettingReport:
     setting: str = ""
     code: int | None = 1
 
-    def __str__(self) -> str:
-        return dcs("%s%s%s" % ("" if self.code is None else self.code, self.MARK, self.setting))
+    def sequence(self) -> StringSequence:
+        code = "" if self.code is None else "%d" % self.code
+        return StringSequence(StringKind.DCS, "%s%s%s" % (code, self.MARK, self.setting))
 
     @classmethod
     def parse(cls, text: str) -> SettingReport | None:
@@ -248,7 +269,7 @@ class SettingReport:
 
 
 @dataclass(frozen=True)
-class VersionReport:
+class VersionReport(StringReport):
     """
     The answer to XTVERSION, "CSI > q": "DCS > | name and version ST".
     A terminal answers it whatever TERM says.
@@ -258,8 +279,8 @@ class VersionReport:
 
     version: str
 
-    def __str__(self) -> str:
-        return dcs(self.MARK + self.version)
+    def sequence(self) -> StringSequence:
+        return StringSequence(StringKind.DCS, self.MARK + self.version)
 
     @classmethod
     def parse(cls, text: str) -> VersionReport | None:

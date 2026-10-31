@@ -111,6 +111,23 @@ from .parameters import (
 )
 from .placeholders import PlaceholderRun, merge_runs, runs_in_line
 from .reflow import first_row_to_lay_out, highest_row_held, lay_out
+from .sequences.csi import CsiReport, CsiSequence
+from .sequences.reports import (
+    AttributesKind,
+    CellSizeReport,
+    ColorScheme,
+    ColorSchemeReport,
+    CursorPositionReport,
+    DeviceAttributes,
+    DeviceStatus,
+    InBandSizeReport,
+    KeyboardFlagsReport,
+    ModeReport,
+    StatusReport,
+    TextAreaCellsReport,
+    TextAreaPixelsReport,
+)
+from .sequences.strings import SettingReport, StringReport, VersionReport
 from .sgr import after_sgr, erased_appearance, parameters_of
 from .terminfo import (
     CAPABILITIES,
@@ -857,8 +874,24 @@ class Screen:
             return "\x1b" + final
         return chr(0xDC00 + 0x40 + ord(final))
 
+    def reply(self, answer: CsiReport | StringReport) -> None:
+        """
+        Answer the program, with the controls that S8C1T picked.
+
+        A string sequence ends with ST, whatever `end` it carries: the
+        program asked in the form this screen answers in.
+        """
+        sequence = answer.sequence()
+        if isinstance(sequence, CsiSequence):
+            self.write_process_input(self._control("[") + sequence.body())
+        else:
+            self.write_process_input(self._control(sequence.kind) + sequence.payload + self._control("\\"))
+
     def reply_csi(self, body: str) -> None:
-        "Answer with a control sequence."
+        """
+        Answer with a control sequence written by hand: a mouse report,
+        whose legacy forms carry bytes rather than parameters.
+        """
         self.write_process_input(self._control("[") + body)
 
     def reply_dcs(self, body: str) -> None:
@@ -1588,9 +1621,8 @@ class Screen:
         if PrivateMode.INBAND_RESIZE.flag not in self.mode:
             return
 
-        self.reply_csi(
-            "48;%i;%i;%i;%it"
-            % (
+        self.reply(
+            InBandSizeReport(
                 self.lines,
                 self.columns,
                 self.lines * self.cell_height,
@@ -4658,8 +4690,8 @@ class Screen:
 
     # Colour scheme that a pane is told about ("CSI ? 996 n"). pymux
     # renders a dark background, so a pane that asks gets the dark
-    # answer. (One is dark, two is light.)
-    color_scheme = 1
+    # answer.
+    color_scheme = ColorScheme.DARK
 
     #: What "CSI ? Ps n" answers about a part that this terminal does
     #: not have. Each one has a legal answer that says "no", and a
@@ -4721,7 +4753,7 @@ class Screen:
         stop the whole pane.
         """
         if private is True and data == 996:
-            self.reply_csi("?997;%in" % self.color_scheme)
+            self.reply(ColorSchemeReport(self.color_scheme))
             return
 
         if private is True and data == 63:
@@ -4741,12 +4773,11 @@ class Screen:
                 # DECXCPR: the page number comes after the position.
                 self.reply_csi("?%i;%i;1R" % (y, x))
             else:
-                self.reply_csi("%i;%iR" % (y, x))
+                self.reply(CursorPositionReport(y, x))
             return
 
         if data == 5 and private is False:
-            # "The terminal is well."
-            self.reply_csi("0n")
+            self.reply(StatusReport(DeviceStatus.OK))
 
     def unscroll(self, count: int | None = None, *args, **kwargs) -> None:
         """
@@ -4866,7 +4897,7 @@ class Screen:
         """
         if private != ">":
             return
-        self.reply_dcs(">|%s" % self.version())
+        self.reply(VersionReport(self.version()))
 
     #: The private modes that this screen acts on. DECRQM answers for
     #: these; every other mode is reported as not recognised, so that a
@@ -5029,7 +5060,7 @@ class Screen:
         else:
             state = ModeState.SET if enabled else ModeState.RESET
 
-        self.reply_csi("%s%i;%i$y" % ("?" if is_private else "", number, state))
+        self.reply(ModeReport(number, state, private=is_private))
 
     def set_cursor_style(self, *params: int, **kwargs) -> None:
         """
@@ -5121,10 +5152,10 @@ class Screen:
             # `tests/DEVIATIONS.md` carries it.
             value = "%i" % self.lines
         else:
-            self.reply_dcs("0$r")
+            self.reply(SettingReport(code=0))
             return
 
-        self.reply_dcs("1$r%s%s" % (value, name))
+        self.reply(SettingReport(value + name))
 
     def report_capabilities(self, query: str) -> None:
         """
@@ -5200,13 +5231,11 @@ class Screen:
             self.titles.pop(which)
         elif what == WindowOp.REPORT_CELL_SIZE_PIXELS:
             # Cell size in pixels: height first, then width.
-            self.reply_csi("6;%i;%it" % (self.cell_height, self.cell_width))
+            self.reply(CellSizeReport(self.cell_height, self.cell_width))
         elif what == WindowOp.REPORT_TEXT_AREA_CHARS:
-            # Size of the text area, in cells.
-            self.reply_csi("8;%i;%it" % (self.lines, self.columns))
+            self.reply(TextAreaCellsReport(self.lines, self.columns))
         elif what == WindowOp.REPORT_TEXT_AREA_PIXELS:
-            # Size of the text area, in pixels.
-            self.reply_csi("4;%i;%it" % (self.lines * self.cell_height, self.columns * self.cell_width))
+            self.reply(TextAreaPixelsReport(self.lines * self.cell_height, self.columns * self.cell_width))
         elif what == WindowOp.REPORT_SCREEN_SIZE_CHARS:
             # How much room there is, in cells.
             #
@@ -5380,15 +5409,9 @@ class Screen:
             # the patch level of xterm that a pane follows, which is
             # how a program reads it: the number says which behaviours
             # it may count on.
-            self.reply_csi(">%i;%i;0c" % (XTERM_TYPE, XTERM_PATCH_LEVEL))
+            self.reply(DeviceAttributes(AttributesKind.SECONDARY, (XTERM_TYPE, XTERM_PATCH_LEVEL, 0)))
         elif not private and not (params and params[0]):
-            self.reply_csi(
-                "?%s;%sc"
-                % (
-                    self.conformance_level,
-                    ";".join(str(one) for one in DEVICE_EXTENSIONS),
-                )
-            )
+            self.reply(DeviceAttributes(AttributesKind.PRIMARY, (self.conformance_level, *DEVICE_EXTENSIONS)))
 
     def report_kitty_keyboard(self, *params, private=False) -> None:
         """
@@ -5404,7 +5427,7 @@ class Screen:
             # Query: reply with the flags that this pane really gets.
             # (Not the ones it asked for: see
             # `deliverable_kitty_keyboard_flags`.)
-            self.reply_csi("?%iu" % self.deliverable_kitty_keyboard_flags)
+            self.reply(KeyboardFlagsReport(KeyboardFlag(self.deliverable_kitty_keyboard_flags)))
 
         elif private == ">":
             # Push. The flags default to none.

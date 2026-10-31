@@ -14,7 +14,7 @@ from enum import IntEnum, StrEnum
 from typing import ClassVar
 
 from ..control import ESC as _ESC
-from .strings import StringKind, StringSequence, apc
+from .strings import StringKind, StringReport, StringSequence, apc
 
 __all__ = (
     "GRAPHICS_START",
@@ -208,7 +208,7 @@ def parse_control_data(data: str) -> tuple[dict[str, str], str]:
 
 
 @dataclass(frozen=True)
-class GraphicsReply:
+class GraphicsReply(StringReport):
     """
     A terminal's answer to a graphics command: "APC G i=31 ; OK ST", or
     an error code and its text in place of the OK.
@@ -228,14 +228,14 @@ class GraphicsReply:
     placement_id: int | None = None
     image_number: int | None = None
 
-    def __str__(self) -> str:
+    def sequence(self) -> StringSequence:
         keys = {
             GraphicsKey.IMAGE_ID: self.image_id,
             GraphicsKey.IMAGE_NUMBER: self.image_number,
             GraphicsKey.PLACEMENT_ID: self.placement_id,
         }
         control = ",".join("%s=%d" % (key, value) for key, value in keys.items() if value is not None)
-        return apc("%s%s;%s" % (self.KEY, control, self.message))
+        return StringSequence(StringKind.APC, "%s%s;%s" % (self.KEY, control, self.message))
 
     @property
     def ok(self) -> bool:
