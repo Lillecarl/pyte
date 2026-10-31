@@ -19,7 +19,7 @@ from pyte.osc import (
     parse_kitty_color_query,
 )
 from pyte.screen import Screen
-from pyte.sequences import Terminator, osc
+from pyte.sequences.strings import Terminator, osc
 from pyte.streams import Stream
 
 BLACK = "rgb:0000/0000/0000"

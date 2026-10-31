@@ -11,7 +11,8 @@ from pyte import escape
 from pyte import sixel as sixel_module
 from pyte.images import PixelFormat
 from pyte.screen import Screen
-from pyte.sequences import apc, csi, decrqss
+from pyte.sequences.csi import csi
+from pyte.sequences.strings import apc, decrqss
 from pyte.sixel import DEFAULT_PALETTE, decode_sixel, stored_payload
 from pyte.streams import Stream
 

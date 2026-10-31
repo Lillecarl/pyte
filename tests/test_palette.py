@@ -21,7 +21,8 @@ from pyte import escape
 from pyte.colors import DEFAULT_COLORS, PALETTE, Color, parse_color
 from pyte.osc import FIRST_SPECIAL_COLOR, SPECIAL_COLOR_NAMES, Osc
 from pyte.screen import Screen
-from pyte.sequences import esc, osc
+from pyte.sequences.escapes import esc
+from pyte.sequences.strings import osc
 from pyte.streams import Stream
 
 

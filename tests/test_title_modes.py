@@ -18,7 +18,8 @@ import pytest
 from pyte import escape
 from pyte.parameters import TitleMode
 from pyte.screen import Screen
-from pyte.sequences import Csi, csi, esc
+from pyte.sequences.csi import Csi, csi
+from pyte.sequences.escapes import esc
 from pyte.streams import Stream
 
 #: "CSI > Ps t": set a title mode. "CSI > Ps T": take it away.

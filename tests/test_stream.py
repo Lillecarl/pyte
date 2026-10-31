@@ -11,7 +11,7 @@ from pyte import control as ctrl
 from pyte import escape
 from pyte import escape as esc
 from pyte.screen import Screen
-from pyte.sequences import announce
+from pyte.sequences.escapes import announce
 
 
 class counter:

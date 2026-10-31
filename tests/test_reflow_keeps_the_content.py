@@ -50,7 +50,8 @@ from test_row_versions import a_chunk
 from pyte import escape
 from pyte.cells import PLAIN_APPEARANCE, WrittenCell
 from pyte.modes import PrivateMode
-from pyte.sequences import Csi, csi, esc, set_mode
+from pyte.sequences.csi import Csi, csi, set_mode
+from pyte.sequences.escapes import esc
 from pyte.streams import Stream
 
 

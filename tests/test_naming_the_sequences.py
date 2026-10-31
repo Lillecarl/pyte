@@ -410,7 +410,7 @@ def test_the_import_goes_under_the_imports_the_file_has():
 
     lines = written.splitlines()
     assert lines[2] == "from pyte.streams import Stream"
-    assert lines[3] == "from pyte.sequences import Csi, csi"
+    assert lines[3] == "from pyte.sequences.csi import Csi, csi"
 
 
 def test_the_names_of_one_module_share_a_line():
@@ -418,7 +418,7 @@ def test_the_names_of_one_module_share_a_line():
     changes, _ = changes_in(source)
     written = with_the_imports(applied(source, changes), changes)
 
-    assert "from pyte.sequences import Csi, csi" in written
+    assert "from pyte.sequences.csi import Csi, csi" in written
     assert "from pyte import escape" in written
 
 
@@ -442,22 +442,9 @@ def test_every_rewrite_writes_the_string_it_replaces():
     from pyte import escape  # noqa: F401
     from pyte.modes import AnsiMode, PrivateMode  # noqa: F401
     from pyte.osc import Osc  # noqa: F401
-    from pyte.sequences import (  # noqa: F401
-        Csi,
-        Escape,
-        Sharp,
-        Terminator,
-        announce,
-        apc,
-        csi,
-        dcs,
-        decrqss,
-        esc,
-        osc,
-        reset_mode,
-        set_mode,
-        sharp,
-    )
+    from pyte.sequences.csi import Csi, csi, reset_mode, set_mode  # noqa: F401
+    from pyte.sequences.escapes import Escape, Sharp, announce, esc, sharp  # noqa: F401
+    from pyte.sequences.strings import Terminator, apc, dcs, decrqss, osc  # noqa: F401
 
     for text in (
         "\x1b[2T",
@@ -493,7 +480,7 @@ def test_every_rewrite_writes_the_string_it_replaces():
 @pytest.mark.parametrize("marker", ["?", ">", "<", "="])
 def test_every_marker_survives_the_round_trip(marker):
     from pyte import escape  # noqa: F401
-    from pyte.sequences import Csi, csi  # noqa: F401
+    from pyte.sequences.csi import Csi, csi  # noqa: F401
 
     text = "\x1b[%s1u" % marker
     expression = rewritten(text)

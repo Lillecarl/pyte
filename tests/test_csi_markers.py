@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pyte
 from pyte import escape
-from pyte.sequences import Csi, csi
+from pyte.sequences.csi import Csi, csi
 
 
 class Recorder:

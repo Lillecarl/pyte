@@ -21,7 +21,7 @@ from a_screen import a_screen
 
 import pyte
 from pyte.modes import PrivateMode
-from pyte.sequences import reset_mode, set_mode
+from pyte.sequences.csi import reset_mode, set_mode
 
 WIDE = 32
 NARROW = 20

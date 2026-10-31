@@ -37,7 +37,8 @@ from hypothesis import strategies as st
 
 from pyte import escape
 from pyte.modes import PrivateMode
-from pyte.sequences import Csi, Escape, Sharp, csi, esc, reset_mode, set_mode, sharp
+from pyte.sequences.csi import Csi, csi, reset_mode, set_mode
+from pyte.sequences.escapes import Escape, Sharp, esc, sharp
 from pyte.streams import Stream
 
 

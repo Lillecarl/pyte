@@ -25,22 +25,9 @@ import pytest
 from pyte import escape
 from pyte.modes import AnsiMode, PrivateMode
 from pyte.osc import Osc
-from pyte.sequences import (
-    Csi,
-    Escape,
-    Sharp,
-    Terminator,
-    announce,
-    apc,
-    csi,
-    dcs,
-    decrqss,
-    esc,
-    osc,
-    reset_mode,
-    set_mode,
-    sharp,
-)
+from pyte.sequences.csi import Csi, csi, reset_mode, set_mode
+from pyte.sequences.escapes import Escape, Sharp, announce, esc, sharp
+from pyte.sequences.strings import Terminator, apc, dcs, decrqss, osc
 
 
 def test_a_sequence_with_no_parameters():

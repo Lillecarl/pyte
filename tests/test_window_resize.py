@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from pyte.images import ASSUMED_CELL_HEIGHT, ASSUMED_CELL_WIDTH
 from pyte.screen import Screen
-from pyte.sequences import Csi, csi
+from pyte.sequences.csi import Csi, csi
 from pyte.streams import Stream
 
 

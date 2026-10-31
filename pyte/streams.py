@@ -31,7 +31,8 @@ from typing import TYPE_CHECKING, ClassVar
 from . import control as ctrl
 from . import escape as esc
 from .keep import Keep
-from .sequences import Csi, Escape
+from .sequences.csi import Csi
+from .sequences.escapes import Escape
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Mapping
@@ -220,7 +221,7 @@ class Stream:
         esc.HTS: "set_tab_stop",
         esc.DECSC: "save_cursor",
         esc.DECRC: "restore_cursor",
-        # The ones after the VT220. `sequences.py` names them.
+        # The ones after the VT220. `sequences/escapes.py` names them.
         Escape.NEL: "next_line",
         Escape.DECBI: "back_index",
         Escape.DECFI: "forward_index",
@@ -294,7 +295,7 @@ class Stream:
         esc.DECSTBM: "set_margins",
         esc.HPA: "cursor_to_column",
         # The rest of what a VT400, a VT500, xterm and kitty send.
-        # `sequences.py` names them, and a key here can carry the
+        # `sequences/csi.py` names them, and a key here can carry the
         # intermediate bytes as well as the final one.
         Csi.CBT: "cursor_to_previous_tab",
         Csi.CHT: "cursor_to_next_tab",

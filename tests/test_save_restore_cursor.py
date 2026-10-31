@@ -23,7 +23,8 @@ from pyte import escape
 from pyte.colors import SgrColor
 from pyte.modes import PrivateMode
 from pyte.screen import Screen
-from pyte.sequences import Csi, csi, esc, reset_mode, set_mode
+from pyte.sequences.csi import Csi, csi, reset_mode, set_mode
+from pyte.sequences.escapes import esc
 from pyte.streams import Stream
 
 #: The three ways to save, and to bring back what was saved.

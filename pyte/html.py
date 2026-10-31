@@ -11,7 +11,7 @@ and this file is CSS's.
 `txterm/style.py` spells a `rich.style.Style`; each belongs with the
 package that holds the library it speaks for. CSS has no library. It is
 a standard a string is written in, like the sixel `sixel.py` writes and
-the sequences `sequences.py` builds, so it asks nothing of this package
+the sequences `sequences/` builds, so it asks nothing of this package
 that the screen does not already do. Lillecarl/pymux#452.
 
 **CSS carries more of a rendition than either of the others.** Rich

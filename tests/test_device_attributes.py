@@ -12,7 +12,8 @@ import pytest
 from pyte import escape
 from pyte.parameters import ConformanceLevel
 from pyte.screen import Screen
-from pyte.sequences import Escape, csi, esc
+from pyte.sequences.csi import csi
+from pyte.sequences.escapes import Escape, esc
 from pyte.streams import Stream
 from pyte.terminfo import (
     DEVICE_EXTENSIONS,

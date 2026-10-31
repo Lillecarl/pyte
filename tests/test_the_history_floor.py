@@ -27,7 +27,7 @@ from test_row_versions import a_chunk
 
 from pyte.modes import PrivateMode
 from pyte.screen import Screen
-from pyte.sequences import Csi, csi, reset_mode, set_mode
+from pyte.sequences.csi import Csi, csi, reset_mode, set_mode
 from pyte.streams import Stream
 
 #: How deep the history goes in this file. It is tiny so that a prune

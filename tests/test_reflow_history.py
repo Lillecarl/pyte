@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from pyte.cells import WrittenCell
 from pyte.screen import Screen
-from pyte.sequences import Csi, csi
+from pyte.sequences.csi import Csi, csi
 from pyte.streams import Stream
 
 # The prompt of libvterm's "Shell wrapped prompt behaviour" case. On ten

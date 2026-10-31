@@ -10,7 +10,9 @@ import zlib
 from pyte import escape
 from pyte.modes import PrivateMode
 from pyte.screen import Screen
-from pyte.sequences import apc, csi, esc, reset_mode, set_mode
+from pyte.sequences.csi import csi, reset_mode, set_mode
+from pyte.sequences.escapes import esc
+from pyte.sequences.strings import apc
 from pyte.streams import Stream
 
 

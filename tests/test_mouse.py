@@ -13,7 +13,7 @@ import pytest
 from pyte.modes import PrivateMode
 from pyte.mouse import MouseAction, mouse_report, reports_mouse
 from pyte.screen import Screen
-from pyte.sequences import set_mode
+from pyte.sequences.csi import set_mode
 from pyte.streams import Stream
 
 

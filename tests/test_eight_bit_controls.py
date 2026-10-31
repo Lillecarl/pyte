@@ -24,7 +24,9 @@ import pytest
 
 from pyte import escape
 from pyte.screen import Screen
-from pyte.sequences import Csi, announce, csi, decrqss, esc, osc
+from pyte.sequences.csi import Csi, csi
+from pyte.sequences.escapes import announce, esc
+from pyte.sequences.strings import decrqss, osc
 from pyte.streams import Stream
 from pyte.terminfo import TERMINAL_VERSION
 

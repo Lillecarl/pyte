@@ -29,7 +29,7 @@ from hypothesis import strategies as st
 from test_row_versions import a_chunk
 
 from pyte.screen import Screen
-from pyte.sequences import Sharp, sharp
+from pyte.sequences.escapes import Sharp, sharp
 from pyte.streams import Stream
 
 

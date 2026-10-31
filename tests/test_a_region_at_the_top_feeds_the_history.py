@@ -25,7 +25,7 @@ from __future__ import annotations
 from pyte import escape
 from pyte.modes import PrivateMode
 from pyte.screen import Screen
-from pyte.sequences import Csi, csi, set_mode
+from pyte.sequences.csi import Csi, csi, set_mode
 from pyte.streams import Stream
 
 LINES = 6

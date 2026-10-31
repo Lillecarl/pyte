@@ -14,7 +14,9 @@ from __future__ import annotations
 
 from pyte import escape
 from pyte.screen import Screen
-from pyte.sequences import Csi, Escape, csi, decrqss, esc
+from pyte.sequences.csi import Csi, csi
+from pyte.sequences.escapes import Escape, esc
+from pyte.sequences.strings import decrqss
 from pyte.streams import Stream
 
 

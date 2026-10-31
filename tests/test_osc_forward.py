@@ -13,7 +13,7 @@ import pytest
 
 from pyte.osc import FORWARDED_OSC, Osc
 from pyte.screen import Screen
-from pyte.sequences import osc
+from pyte.sequences.strings import osc
 from pyte.streams import Stream
 
 

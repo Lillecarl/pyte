@@ -18,7 +18,7 @@ from __future__ import annotations
 import pytest
 
 from pyte.screen import Screen
-from pyte.sequences import Sharp, sharp
+from pyte.sequences.escapes import Sharp, sharp
 from pyte.streams import Stream
 
 LINES, COLUMNS = 5, 10

@@ -61,7 +61,8 @@ from pyte import escape
 from pyte.control import CSI
 from pyte.modes import AnsiMode, PrivateMode
 from pyte.osc import Osc
-from pyte.sequences import Csi, Escape, Sharp
+from pyte.sequences.csi import Csi
+from pyte.sequences.escapes import Escape, Sharp
 
 #: The suites that judge a writer. Their literals are the answer, so
 #: writing them through a builder would ask the writer to mark its own
@@ -656,20 +657,20 @@ def changes_in(source: str) -> tuple[list[Change], list[Skipped]]:
 #: a file actually uses are imported, and the ones that share a module
 #: share a line.
 _IMPORTS = {
-    "csi": "pyte.sequences",
-    "Csi": "pyte.sequences",
-    "esc": "pyte.sequences",
-    "Escape": "pyte.sequences",
-    "sharp": "pyte.sequences",
-    "Sharp": "pyte.sequences",
-    "announce": "pyte.sequences",
-    "set_mode": "pyte.sequences",
-    "reset_mode": "pyte.sequences",
-    "osc": "pyte.sequences",
-    "dcs": "pyte.sequences",
-    "decrqss": "pyte.sequences",
-    "apc": "pyte.sequences",
-    "Terminator": "pyte.sequences",
+    "csi": "pyte.sequences.csi",
+    "Csi": "pyte.sequences.csi",
+    "set_mode": "pyte.sequences.csi",
+    "reset_mode": "pyte.sequences.csi",
+    "esc": "pyte.sequences.escapes",
+    "Escape": "pyte.sequences.escapes",
+    "sharp": "pyte.sequences.escapes",
+    "Sharp": "pyte.sequences.escapes",
+    "announce": "pyte.sequences.escapes",
+    "osc": "pyte.sequences.strings",
+    "dcs": "pyte.sequences.strings",
+    "decrqss": "pyte.sequences.strings",
+    "apc": "pyte.sequences.strings",
+    "Terminator": "pyte.sequences.strings",
     "escape": "pyte",
     "AnsiMode": "pyte.modes",
     "PrivateMode": "pyte.modes",
@@ -865,21 +866,21 @@ def _proven(changes: list[Change], where: Path) -> None:
     and a run stops here rather than writing a file it cannot vouch
     for.
     """
-    import pyte.sequences
+    from pyte.sequences import csi, escapes, strings
 
     scope = {
-        "csi": pyte.sequences.csi,
-        "osc": pyte.sequences.osc,
-        "dcs": pyte.sequences.dcs,
-        "decrqss": pyte.sequences.decrqss,
-        "apc": pyte.sequences.apc,
-        "Terminator": pyte.sequences.Terminator,
+        "csi": csi.csi,
+        "osc": strings.osc,
+        "dcs": strings.dcs,
+        "decrqss": strings.decrqss,
+        "apc": strings.apc,
+        "Terminator": strings.Terminator,
         "Osc": Osc,
-        "esc": pyte.sequences.esc,
-        "sharp": pyte.sequences.sharp,
-        "announce": pyte.sequences.announce,
-        "set_mode": pyte.sequences.set_mode,
-        "reset_mode": pyte.sequences.reset_mode,
+        "esc": escapes.esc,
+        "sharp": escapes.sharp,
+        "announce": escapes.announce,
+        "set_mode": csi.set_mode,
+        "reset_mode": csi.reset_mode,
         "Csi": Csi,
         "Escape": Escape,
         "Sharp": Sharp,

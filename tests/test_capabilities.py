@@ -17,7 +17,7 @@ from __future__ import annotations
 import pytest
 
 from pyte.screen import Screen
-from pyte.sequences import dcs
+from pyte.sequences.strings import dcs
 from pyte.streams import Stream
 from pyte.terminfo import CAPABILITIES, TERMINAL_NAME
 

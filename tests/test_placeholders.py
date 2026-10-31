@@ -15,7 +15,7 @@ from pyte import escape
 from pyte.colors import Color, SgrColor
 from pyte.placeholders import DIACRITICS, PLACEHOLDER, foreground_id
 from pyte.screen import Screen
-from pyte.sequences import csi
+from pyte.sequences.csi import csi
 from pyte.streams import Stream
 
 

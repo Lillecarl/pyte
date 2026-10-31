@@ -15,7 +15,8 @@ from __future__ import annotations
 
 from pyte.modes import PrivateMode
 from pyte.screen import Screen
-from pyte.sequences import Csi, csi, decrqss, reset_mode, set_mode
+from pyte.sequences.csi import Csi, csi, reset_mode, set_mode
+from pyte.sequences.strings import decrqss
 from pyte.streams import Stream
 
 

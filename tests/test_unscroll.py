@@ -10,7 +10,8 @@ from __future__ import annotations
 
 from pyte import escape
 from pyte.screen import Screen
-from pyte.sequences import Csi, apc, csi
+from pyte.sequences.csi import Csi, csi
+from pyte.sequences.strings import apc
 from pyte.streams import Stream
 
 LINES = 5
