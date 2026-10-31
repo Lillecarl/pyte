@@ -142,6 +142,7 @@ from .sequences.strings import (
     VersionReport,
 )
 from .sgr import after_sgr, erased_appearance, parameters_of
+from .surroundings import Surroundings
 from .terminfo import (
     CAPABILITIES,
     DEVICE_EXTENSIONS,
@@ -388,6 +389,7 @@ class Screen:
         "osc_func": Keep.REBUILT,
         "resize_func": Keep.REBUILT,
         "may_resize": Keep.REBUILT,
+        "surroundings_func": Keep.REBUILT,
         "version": Keep.REBUILT,
         # Caches of what the cells say.
         "_cell_caches": Keep.REBUILT,
@@ -413,6 +415,7 @@ class Screen:
         resize_func: Callable[[int | None, int | None], None] | None = None,
         may_resize: Callable[[], bool] | None = None,
         color_base: ColorBase | None = None,
+        surroundings_func: Callable[[Surroundings], None] | None = None,
     ) -> None:
         bell_func = bell_func or (lambda: None)
         get_history_limit = get_history_limit or (lambda: 2000)
@@ -476,6 +479,10 @@ class Screen:
         self.osc_func = osc_func
         self.resize_func = resize_func
         self.may_resize = may_resize
+        #: Told the whole `Surroundings` after any setter changed one of
+        #: them: whoever mirrors this screen has to hear it, because none
+        #: of it is in the bytes.
+        self.surroundings_func = surroundings_func or (lambda surroundings: None)
         #: What XTVERSION answers, asked at each query: whoever owns the
         #: screen may name itself, and may name itself differently to
         #: different programs.
@@ -1478,6 +1485,47 @@ class Screen:
         self.cell_width = width
         self.cell_height = height
         self.graphics.count_the_cells_again(self)
+        self.surroundings_func(self.surroundings)
+
+    def set_keyboard_source(self, flags: int, synthesize: bool, extended_allowed: bool) -> None:
+        """
+        Say what the keyboard in front of this screen can report, in
+        kitty's flags, whether to make up the halves of an event it
+        cannot send, and whether anything but the legacy encoding is
+        allowed. The three fields `__init__` describes.
+        """
+        if (flags, synthesize, extended_allowed) == (
+            self.keyboard_source_flags,
+            self.synthesize_key_events,
+            self.extended_keys_allowed,
+        ):
+            return
+        self.keyboard_source_flags = flags
+        self.synthesize_key_events = synthesize
+        self.extended_keys_allowed = extended_allowed
+        self.surroundings_func(self.surroundings)
+
+    @property
+    def surroundings(self) -> Surroundings:
+        "Everything the embedder told this screen, as one value."
+        return Surroundings(
+            self.cell_width,
+            self.cell_height,
+            self.color_base,
+            self.keyboard_source_flags,
+            self.synthesize_key_events,
+            self.extended_keys_allowed,
+        )
+
+    def surround(self, surroundings: Surroundings) -> None:
+        "Take everything an embedder says at once: a mirror takes its source's."
+        self.set_cell_size(surroundings.cell_width, surroundings.cell_height)
+        self.set_color_base(surroundings.color_base)
+        self.set_keyboard_source(
+            surroundings.keyboard_source_flags,
+            surroundings.synthesize_key_events,
+            surroundings.extended_keys_allowed,
+        )
 
     def resize(self, lines: int | None = None, columns: int | None = None) -> None:
         # Save the dimensions.
@@ -5584,8 +5632,11 @@ class Screen:
         The colours that a program set stay: they are explicit asks,
         and a different base does not take them back. A reset does.
         """
+        if base == self.color_base:
+            return
         self.color_base = base
         self.colors.base = base
+        self.surroundings_func(self.surroundings)
 
     def set_icon_name(self, param: str) -> None:
         '"OSC 0" and "OSC 1": the label of the icon.'

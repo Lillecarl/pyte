@@ -49,7 +49,7 @@ from .cells import (
 from .keep import Keep
 from .page import Row
 
-__all__ = ["Freezer", "Frozen", "Thawer", "freeze", "merge", "thaw"]
+__all__ = ["Freezer", "Frozen", "Thawer", "freeze", "freeze_value", "merge", "thaw", "thaw_value"]
 
 #: A cell's kind in a frozen row. A protected cell adds its marks to
 #: `PROTECTED`, so the marks travel in the same number.
@@ -108,6 +108,26 @@ def _class(name: str) -> type:
 def freeze(root: object) -> Frozen:
     "Everything `root` saves, and everything that reaches, as plain data."
     return Freezer().freeze(root)
+
+
+def freeze_value(value: object) -> Any:
+    """
+    A value that holds no rows, such as `Surroundings`, as plain data.
+
+    The same encoding a freeze gives each field, for a value that goes
+    somewhere on its own. A buffer in it is refused: rows travel only
+    inside a `Frozen`.
+    """
+    walk = _Walk(Freezer(), None)
+    frozen = walk.value(value)
+    if walk.buffers:
+        raise TypeError("a value with rows freezes with freeze(), not freeze_value()")
+    return frozen
+
+
+def thaw_value(frozen: Any) -> Any:
+    "The value `freeze_value` gave the data of."
+    return _Thawer(Frozen(None, {}, [], [], {}), Thawer()).value(frozen)
 
 
 def merge(base: Frozen, later: Frozen) -> Frozen:

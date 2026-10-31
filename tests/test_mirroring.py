@@ -21,7 +21,9 @@ import pytest
 from a_screen import a_screen
 from test_freeze import AFTER, BEFORE, STEPS, _cells, _same
 
-from pyte.freeze import Freezer, Frozen, Thawer, freeze, thaw
+from pyte.colors import Color
+from pyte.freeze import Freezer, Frozen, Thawer, freeze, freeze_value, thaw, thaw_value
+from pyte.osc import COLOR_BASE, ColorBase
 from pyte.streams import Stream
 
 SIZE = (40, 12)
@@ -36,20 +38,37 @@ def _wire(frozen: Frozen) -> Frozen:
 class Mirror:
     "The far side: a screen that only ever takes what the wire carries."
 
-    def __init__(self, seed: Frozen, parser: Frozen) -> None:
+    def __init__(self, seed: Frozen, parser: Frozen, surroundings: object) -> None:
         self.screen = a_screen(*SIZE, history=HISTORY)
         self.stream = Stream(self.screen)
         self.thawer = Thawer()
-        self.catch_up(seed, parser)
+        self.catch_up(seed, parser, surroundings)
 
     def read(self, data: str, expired: bool) -> None:
         if expired:
             self.stream.ground_timer_expired()
         self.stream.feed(data)
 
-    def catch_up(self, delta: Frozen, parser: Frozen) -> None:
+    def surround(self, surroundings: object) -> None:
+        self.screen.surround(thaw_value(json.loads(json.dumps(surroundings))))
+
+    def catch_up(self, delta: Frozen, parser: Frozen, surroundings: object) -> None:
         self.thawer.thaw(_wire(delta), self.screen)
         thaw(_wire(parser), self.stream)
+        self.surround(surroundings)
+
+
+#: What an embedder may say between two reads.
+SURROUNDINGS = [
+    lambda screen: screen.set_cell_size(7, 15),
+    lambda screen: screen.set_cell_size(10, 20),
+    lambda screen: screen.set_keyboard_source(31, False, True),
+    lambda screen: screen.set_keyboard_source(0, True, False),
+    lambda screen: screen.set_color_base(
+        ColorBase(palette=COLOR_BASE.palette, defaults={**COLOR_BASE.defaults, "foreground": Color(1, 2, 3)})
+    ),
+    lambda screen: screen.set_color_base(COLOR_BASE),
+]
 
 
 def _pieces(program: str, choose: random.Random) -> list[str]:
@@ -70,8 +89,14 @@ def test_the_mirror_equals_the_screen_through_pauses_and_resizes(seed):
     stream.feed("".join(choose.choice(STEPS[:-1]) for _ in range(10)))
 
     freezer = Freezer()
-    mirror = Mirror(freezer.freeze(screen), freeze(stream))
+    mirror = Mirror(freezer.freeze(screen), freeze(stream), freeze_value(screen.surroundings))
     paused = False
+
+    def told(surroundings) -> None:
+        if not paused:
+            mirror.surround(freeze_value(surroundings))
+
+    screen.surroundings_func = told
 
     program = BEFORE + "".join(choose.choice([*STEPS[:-1], AFTER]) for _ in range(30))
     for number, piece in enumerate(_pieces(program, choose)):
@@ -85,8 +110,10 @@ def test_the_mirror_equals_the_screen_through_pauses_and_resizes(seed):
             freezer.caught_up(screen)
             paused = True
         elif roll < 0.15 and paused:
-            mirror.catch_up(freezer.freeze(screen), freeze(stream))
+            mirror.catch_up(freezer.freeze(screen), freeze(stream), freeze_value(screen.surroundings))
             paused = False
+        elif roll < 0.20:
+            choose.choice(SURROUNDINGS)(screen)
 
         expired = stream.ground_timer_active and choose.random() < 0.2
         if expired:
@@ -97,10 +124,11 @@ def test_the_mirror_equals_the_screen_through_pauses_and_resizes(seed):
             assert _cells(mirror.screen) == _cells(screen), "piece %d (%r)" % (number, piece)
 
     if paused:
-        mirror.catch_up(freezer.freeze(screen), freeze(stream))
+        mirror.catch_up(freezer.freeze(screen), freeze(stream), freeze_value(screen.surroundings))
     assert _cells(mirror.screen) == _cells(screen)
     _same(freeze(mirror.screen), freeze(screen))
     _same(freeze(mirror.stream), freeze(stream))
+    assert mirror.screen.surroundings == screen.surroundings
 
 
 def test_a_row_written_and_erased_during_a_pause_leaves_the_mirror():
@@ -111,14 +139,14 @@ def test_a_row_written_and_erased_during_a_pause_leaves_the_mirror():
     screen = a_screen(*SIZE, history=HISTORY)
     stream = Stream(screen)
     freezer = Freezer()
-    mirror = Mirror(freezer.freeze(screen), freeze(stream))
+    mirror = Mirror(freezer.freeze(screen), freeze(stream), freeze_value(screen.surroundings))
 
     for piece in ["a row\r\n" * 3]:
         stream.feed(piece)
         mirror.read(piece, False)
     freezer.caught_up(screen)
     stream.feed("\x1b[3J\x1b[2J\x1b[H")
-    mirror.catch_up(freezer.freeze(screen), freeze(stream))
+    mirror.catch_up(freezer.freeze(screen), freeze(stream), freeze_value(screen.surroundings))
     assert _cells(mirror.screen) == _cells(screen)
 
 

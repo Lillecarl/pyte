@@ -76,6 +76,7 @@ PURE = {
     "sgr",
     "sixel",
     "streams",
+    "surroundings",
     "terminfo",
     "titles",
     "xcms",
