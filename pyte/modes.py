@@ -149,6 +149,12 @@ class PrivateMode(IntEnum):
     #: Report the position of the mouse.
     MOUSE_REPORTING = 1000
 
+    #: Report a motion as well, while a button is down.
+    BUTTON_EVENT_MOUSE = 1002
+
+    #: Report every motion, with a button down or not.
+    ANY_EVENT_MOUSE = 1003
+
     #: Send "CSI I" when the screen gains the focus and "CSI O" when it
     #: loses it. Whoever shows the screen knows the focus and sends them.
     FOCUS_EVENTS = 1004
@@ -163,6 +169,9 @@ class PrivateMode(IntEnum):
 
     #: Report the mouse the way urxvt writes it.
     URXVT_MOUSE = 1015
+
+    #: The SGR form, with the position in pixels and not in cells.
+    SGR_PIXEL_MOUSE = 1016
 
     #: A backspace in the first column goes back to the line above,
     #: whether that line was wrapped or not, and from the first line
@@ -196,6 +205,10 @@ class PrivateMode(IntEnum):
     #: family emoji, a flag or a skin tone is two columns and not six,
     #: two or four. Reset, each code point takes its own width.
     GRAPHEME_CLUSTERS = 2027
+
+    #: Send "CSI ? 997 ; Ps n" whenever the terminal switches between a
+    #: dark and a light scheme.
+    COLOR_SCHEME_UPDATES = 2031
 
     #: Report a resize in the input of the program, instead of only
     #: through SIGWINCH.
