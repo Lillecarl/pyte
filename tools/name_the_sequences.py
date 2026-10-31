@@ -61,7 +61,7 @@ from pyte import escape
 from pyte.control import CSI
 from pyte.modes import AnsiMode, PrivateMode
 from pyte.osc import Osc
-from pyte.sequences.csi import Csi
+from pyte.sequences.csi import Csi, Marker
 from pyte.sequences.escapes import Escape, Sharp
 
 #: The suites that judge a writer. Their literals are the answer, so
@@ -420,7 +420,7 @@ def _a_csi_at(text: str, at: int) -> tuple[str, int] | str:
 
     arguments = [name] + [_written(value) for value in values]
     if private:
-        arguments.append("private=%r" % (private,))
+        arguments.append("private=Marker.%s" % (Marker(private).name,))
     return "csi(%s)" % ", ".join(arguments), length
 
 
@@ -659,6 +659,7 @@ def changes_in(source: str) -> tuple[list[Change], list[Skipped]]:
 _IMPORTS = {
     "csi": "pyte.sequences.csi",
     "Csi": "pyte.sequences.csi",
+    "Marker": "pyte.sequences.csi",
     "set_mode": "pyte.sequences.csi",
     "reset_mode": "pyte.sequences.csi",
     "esc": "pyte.sequences.escapes",
@@ -882,6 +883,7 @@ def _proven(changes: list[Change], where: Path) -> None:
         "set_mode": csi.set_mode,
         "reset_mode": csi.reset_mode,
         "Csi": Csi,
+        "Marker": Marker,
         "Escape": Escape,
         "Sharp": Sharp,
         "escape": escape,

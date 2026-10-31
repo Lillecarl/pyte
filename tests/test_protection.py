@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from pyte import escape
 from pyte.screen import Screen
-from pyte.sequences.csi import Csi, csi
+from pyte.sequences.csi import Csi, Marker, csi
 from pyte.sequences.escapes import Escape, esc
 from pyte.sequences.strings import decrqss
 from pyte.streams import Stream
@@ -65,7 +65,14 @@ def test_an_erase_of_the_whole_screen_takes_a_marked_cell():
 
 def test_a_selective_erase_of_the_whole_screen_leaves_a_marked_cell():
     screen, stream, _answers = _screen()
-    stream.feed("ab" + esc(Escape.SPA) + "c" + esc(Escape.EPA) + csi(escape.CUP, 1, 1) + csi(escape.ED, 2, private="?"))
+    stream.feed(
+        "ab"
+        + esc(Escape.SPA)
+        + "c"
+        + esc(Escape.EPA)
+        + csi(escape.CUP, 1, 1)
+        + csi(escape.ED, 2, private=Marker.QUESTION)
+    )
     assert _line(screen) == "  c"
 
 
@@ -84,7 +91,14 @@ def test_the_mark_ends_where_the_program_ends_it():
 def test_a_selective_erase_reads_the_mark_as_well():
     "xterm reads it, for the programs that came before DECSCA."
     screen, stream, _answers = _screen()
-    stream.feed("ab" + esc(Escape.SPA) + "c" + esc(Escape.EPA) + csi(escape.CUP, 1, 1) + csi(escape.EL, 2, private="?"))
+    stream.feed(
+        "ab"
+        + esc(Escape.SPA)
+        + "c"
+        + esc(Escape.EPA)
+        + csi(escape.CUP, 1, 1)
+        + csi(escape.EL, 2, private=Marker.QUESTION)
+    )
     assert _line(screen) == "  c"
 
 
@@ -95,7 +109,12 @@ def test_a_selective_erase_reads_the_mark_as_well():
 def test_a_selective_erase_in_line_leaves_a_marked_cell():
     screen, stream, _answers = _screen()
     stream.feed(
-        csi(Csi.DECSCA, 1) + "abc" + csi(Csi.DECSCA, 0) + "d" + csi(escape.CUP, 1, 1) + csi(escape.EL, 2, private="?")
+        csi(Csi.DECSCA, 1)
+        + "abc"
+        + csi(Csi.DECSCA, 0)
+        + "d"
+        + csi(escape.CUP, 1, 1)
+        + csi(escape.EL, 2, private=Marker.QUESTION)
     )
     assert _line(screen) == "abc"
 
@@ -103,7 +122,12 @@ def test_a_selective_erase_in_line_leaves_a_marked_cell():
 def test_a_selective_erase_in_display_leaves_a_marked_cell():
     screen, stream, _answers = _screen()
     stream.feed(
-        csi(Csi.DECSCA, 1) + "abc" + csi(Csi.DECSCA, 0) + "d" + csi(escape.CUP, 1, 1) + csi(escape.ED, 0, private="?")
+        csi(Csi.DECSCA, 1)
+        + "abc"
+        + csi(Csi.DECSCA, 0)
+        + "d"
+        + csi(escape.CUP, 1, 1)
+        + csi(escape.ED, 0, private=Marker.QUESTION)
     )
     assert _line(screen) == "abc"
 
@@ -118,20 +142,25 @@ def test_a_plain_erase_takes_a_cell_that_decsca_marked():
 def test_the_parameter_two_takes_the_mark_away():
     screen, stream, _answers = _screen()
     stream.feed(
-        csi(Csi.DECSCA, 1) + "ab" + csi(Csi.DECSCA, 2) + "cd" + csi(escape.CUP, 1, 1) + csi(escape.EL, 2, private="?")
+        csi(Csi.DECSCA, 1)
+        + "ab"
+        + csi(Csi.DECSCA, 2)
+        + "cd"
+        + csi(escape.CUP, 1, 1)
+        + csi(escape.EL, 2, private=Marker.QUESTION)
     )
     assert _line(screen) == "ab"
 
 
 def test_a_selective_erase_to_the_right_leaves_a_marked_cell():
     screen, stream, _answers = _screen()
-    stream.feed(csi(Csi.DECSCA, 1) + "abcde" + csi(escape.CUP, 1, 3) + csi(escape.EL, 0, private="?"))
+    stream.feed(csi(Csi.DECSCA, 1) + "abcde" + csi(escape.CUP, 1, 3) + csi(escape.EL, 0, private=Marker.QUESTION))
     assert _line(screen) == "abcde"
 
 
 def test_a_selective_erase_to_the_left_leaves_a_marked_cell():
     screen, stream, _answers = _screen()
-    stream.feed(csi(Csi.DECSCA, 1) + "abcde" + csi(escape.CUP, 1, 3) + csi(escape.EL, 1, private="?"))
+    stream.feed(csi(Csi.DECSCA, 1) + "abcde" + csi(escape.CUP, 1, 3) + csi(escape.EL, 1, private=Marker.QUESTION))
     assert _line(screen) == "abcde"
 
 
@@ -143,9 +172,9 @@ def test_the_mark_travels_with_a_scroll():
     screen, stream, _answers = _screen()
     stream.feed(csi(Csi.DECSCA, 1) + "keep" + csi(Csi.DECSCA, 0))
     stream.feed(csi(escape.CUP, 2, 1) + csi(Csi.SU))  # Scroll up by one.
-    stream.feed(csi(escape.CUP, 1, 1) + csi(escape.EL, 2, private="?"))
+    stream.feed(csi(escape.CUP, 1, 1) + csi(escape.EL, 2, private=Marker.QUESTION))
     assert _line(screen) == ""
-    stream.feed(csi(escape.CUP, 2, 1) + csi(escape.EL, 2, private="?"))
+    stream.feed(csi(escape.CUP, 2, 1) + csi(escape.EL, 2, private=Marker.QUESTION))
     assert _line(screen) == ""
 
 

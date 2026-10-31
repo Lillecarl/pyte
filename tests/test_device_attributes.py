@@ -12,7 +12,7 @@ import pytest
 from pyte import escape
 from pyte.parameters import ConformanceLevel
 from pyte.screen import Screen
-from pyte.sequences.csi import csi
+from pyte.sequences.csi import Marker, csi
 from pyte.sequences.escapes import Escape, esc
 from pyte.streams import Stream
 from pyte.terminfo import (
@@ -47,7 +47,9 @@ def test_da_answers_the_level_and_the_extensions(pane, sequence):
     ]
 
 
-@pytest.mark.parametrize("sequence", [csi(escape.DA, private=">"), csi(escape.DA, 0, private=">")])
+@pytest.mark.parametrize(
+    "sequence", [csi(escape.DA, private=Marker.GREATER), csi(escape.DA, 0, private=Marker.GREATER)]
+)
 def test_da2_answers_the_type_and_the_firmware(pane, sequence):
     _screen, stream, responses = pane
     stream.feed(sequence)
@@ -59,7 +61,7 @@ def test_the_two_answers_carry_different_prefixes(pane):
     # DA that answers in the DA2 shape is read as a DA2 reply, and
     # every answer after it lands one place out of step.
     _screen, stream, responses = pane
-    stream.feed(csi(escape.DA) + csi(escape.DA, private=">"))
+    stream.feed(csi(escape.DA) + csi(escape.DA, private=Marker.GREATER))
     assert responses[0].startswith("\x1b[?")
     assert responses[1].startswith("\x1b[>")
 

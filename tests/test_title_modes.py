@@ -18,7 +18,7 @@ import pytest
 from pyte import escape
 from pyte.parameters import TitleMode
 from pyte.screen import Screen
-from pyte.sequences.csi import Csi, csi
+from pyte.sequences.csi import Csi, Marker, csi
 from pyte.sequences.escapes import esc
 from pyte.streams import Stream
 
@@ -103,7 +103,7 @@ def test_the_marker_is_what_makes_it_a_title_mode():
         resize_func=lambda lines, columns: asks.append((lines, columns)),
     )
     stream = Stream(screen)
-    stream.feed(csi(Csi.XTWINOPS, 4, private=">"))
+    stream.feed(csi(Csi.XTWINOPS, 4, private=Marker.GREATER))
     assert asks == []
     assert screen.titles.modes == set()
 

@@ -16,7 +16,7 @@ from __future__ import annotations
 from pyte import escape
 from pyte.modes import PrivateMode
 from pyte.screen import Screen
-from pyte.sequences.csi import Csi, csi, reset_mode, set_mode
+from pyte.sequences.csi import Csi, Marker, csi, reset_mode, set_mode
 from pyte.sequences.escapes import esc
 from pyte.streams import Stream
 
@@ -66,10 +66,10 @@ def test_it_ends_with_the_alternate_screen():
 def test_decrqm_answers_for_it():
     "A mode this screen acts on has to be one it can report."
     _screen, stream, answers = make_screen()
-    stream.feed(csi(Csi.DECRQM, 1007, private="?"))
+    stream.feed(csi(Csi.DECRQM, 1007, private=Marker.QUESTION))
     assert answers == ["\x1b[?1007;1$y"]
     answers.clear()
-    stream.feed(OFF + csi(Csi.DECRQM, 1007, private="?"))
+    stream.feed(OFF + csi(Csi.DECRQM, 1007, private=Marker.QUESTION))
     assert answers == ["\x1b[?1007;2$y"]
 
 

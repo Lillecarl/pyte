@@ -11,7 +11,7 @@ from __future__ import annotations
 from pyte import escape
 from pyte.modes import AnsiMode, PrivateMode
 from pyte.screen import Screen
-from pyte.sequences.csi import Csi, csi, reset_mode, set_mode
+from pyte.sequences.csi import Csi, Marker, csi, reset_mode, set_mode
 from pyte.sequences.escapes import esc
 from pyte.sequences.strings import decrqss
 from pyte.streams import Stream
@@ -98,9 +98,9 @@ def test_the_margins_are_reported():
 
 def test_the_mode_is_answered_by_a_mode_query():
     _screen_, stream, answers = _screen()
-    stream.feed(csi(Csi.DECRQM, 69, private="?"))
+    stream.feed(csi(Csi.DECRQM, 69, private=Marker.QUESTION))
     stream.feed(set_mode(PrivateMode.LEFT_RIGHT_MARGIN))
-    stream.feed(csi(Csi.DECRQM, 69, private="?"))
+    stream.feed(csi(Csi.DECRQM, 69, private=Marker.QUESTION))
     assert answers == ["\x1b[?69;2$y", "\x1b[?69;1$y"]
 
 

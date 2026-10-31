@@ -12,7 +12,7 @@ from ..escape import RM as _RM
 from ..escape import SM as _SM
 from ..modes import AnsiMode, PrivateMode
 
-__all__ = ("Csi", "Mode", "Parameter", "csi", "reset_mode", "set_mode")
+__all__ = ("Csi", "Marker", "Mode", "Parameter", "csi", "reset_mode", "set_mode")
 
 
 class Csi(StrEnum):
@@ -144,13 +144,34 @@ class Csi(StrEnum):
 #: the colons join.
 Parameter = int | None | Sequence[int | None]
 
-#: The markers that go between the "[" and the parameters. The marker
-#: is the whole difference between some sequences that share a final
-#: byte, so it is named and never spelled into the final byte.
-MARKERS = ("?", ">", "<", "=")
+
+class Marker(StrEnum):
+    """
+    The private marker between the "[" and the parameters.
+
+    The marker is the whole difference between some sequences that
+    share a final byte, so it is named and never spelled into the final
+    byte: "CSI ? u" asks for the keyboard flags and "CSI > 1 u" pushes
+    them.
+    """
+
+    #: No marker: the sequence ECMA-48 defines.
+    NONE = ""
+
+    #: DEC's, and xterm's after it: the private modes and their reports.
+    QUESTION = "?"
+
+    #: The secondary device attributes, XTVERSION, and kitty's push.
+    GREATER = ">"
+
+    #: kitty's pop, and an SGR mouse report.
+    LESS = "<"
+
+    #: kitty's set, and the tertiary device attributes.
+    EQUALS = "="
 
 
-def csi(final: str, *params: Parameter, private: str = "") -> str:
+def csi(final: str, *params: Parameter, private: Marker = Marker.NONE) -> str:
     """
     A CSI sequence, from the name of its final byte.
 
@@ -177,10 +198,10 @@ def csi(final: str, *params: Parameter, private: str = "") -> str:
         >>> csi(escape.SGR, 38, (2, 1, 2, 3))
         '\\x1b[38;2:1:2:3m'
 
-    `private` is the marker between the "[" and the parameters: "?",
-    ">", "<" or "=". The marker is the whole difference between some
-    sequences that share a final byte, so it is named and not spelled
-    into `final`.
+    `private` is the `Marker` between the "[" and the parameters:
+
+        >>> csi(Csi.KITTY_KEYBOARD, private=Marker.QUESTION)
+        '\\x1b[?u'
     """
     return "%s%s%s%s" % (_CSI, private, _joined(params), final)
 
@@ -204,7 +225,7 @@ def _one(value: int | None) -> str:
 #: marker says whether a mode is private, the number does not, and a
 #: builder that guessed would write "CSI 1049 h" for a mode that only
 #: exists as "CSI ? 1049 h". `modes.py` names the modes a pane acts on;
-#: for any other number, write `csi(escape.SM, 2031, private="?")` and
+#: for any other number, write `csi(escape.SM, 2031, private=Marker.QUESTION)` and
 #: say the marker out loud.
 Mode = AnsiMode | PrivateMode
 
@@ -219,7 +240,7 @@ def reset_mode(*modes: Mode) -> str:
     return csi(_RM, *modes, private=_marker_of(modes))
 
 
-def _marker_of(modes: Sequence[Mode]) -> str:
+def _marker_of(modes: Sequence[Mode]) -> Marker:
     """
     The marker that these modes are written with.
 
@@ -243,4 +264,4 @@ def _marker_of(modes: Sequence[Mode]) -> str:
     private = [isinstance(mode, PrivateMode) for mode in modes]
     if any(private) and not all(private):
         raise ValueError("a private mode and an ANSI mode cannot go in one sequence: %r" % (modes,))
-    return "?" if any(private) else ""
+    return Marker.QUESTION if any(private) else Marker.NONE

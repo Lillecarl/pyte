@@ -13,13 +13,13 @@ from a_screen import display
 from pyte import escape
 from pyte.modes import PrivateMode
 from pyte.screen import Screen
-from pyte.sequences.csi import Csi, csi, reset_mode, set_mode
+from pyte.sequences.csi import Csi, Marker, csi, reset_mode, set_mode
 from pyte.sequences.escapes import esc
 from pyte.streams import Stream
 
 BEGIN = set_mode(PrivateMode.SYNCHRONIZED_OUTPUT)
 END = reset_mode(PrivateMode.SYNCHRONIZED_OUTPUT)
-ASK = csi(Csi.DECRQM, 2026, private="?")
+ASK = csi(Csi.DECRQM, 2026, private=Marker.QUESTION)
 
 
 def make_screen():

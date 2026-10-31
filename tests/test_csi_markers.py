@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pyte
 from pyte import escape
-from pyte.sequences.csi import Csi, csi
+from pyte.sequences.csi import Csi, Marker, csi
 
 
 class Recorder:
@@ -37,26 +37,32 @@ def feed(sequence):
 
 
 def test_kitty_push():
-    assert feed(csi(Csi.KITTY_KEYBOARD, 1, private=">")) == [("report_kitty_keyboard", (1,), {"private": ">"})]
+    assert feed(csi(Csi.KITTY_KEYBOARD, 1, private=Marker.GREATER)) == [
+        ("report_kitty_keyboard", (1,), {"private": ">"})
+    ]
 
 
 def test_kitty_push_without_flags():
     "A sequence with no parameter carries none. Lillecarl/pymux#178."
-    assert feed(csi(Csi.KITTY_KEYBOARD, private=">")) == [("report_kitty_keyboard", (), {"private": ">"})]
+    assert feed(csi(Csi.KITTY_KEYBOARD, private=Marker.GREATER)) == [("report_kitty_keyboard", (), {"private": ">"})]
 
 
 def test_kitty_pop():
-    assert feed(csi(Csi.KITTY_KEYBOARD, private="<")) == [("report_kitty_keyboard", (), {"private": "<"})]
-    assert feed(csi(Csi.KITTY_KEYBOARD, 2, private="<")) == [("report_kitty_keyboard", (2,), {"private": "<"})]
+    assert feed(csi(Csi.KITTY_KEYBOARD, private=Marker.LESS)) == [("report_kitty_keyboard", (), {"private": "<"})]
+    assert feed(csi(Csi.KITTY_KEYBOARD, 2, private=Marker.LESS)) == [("report_kitty_keyboard", (2,), {"private": "<"})]
 
 
 def test_kitty_set_flags():
-    assert feed(csi(Csi.KITTY_KEYBOARD, 1, 1, private="=")) == [("report_kitty_keyboard", (1, 1), {"private": "="})]
-    assert feed(csi(Csi.KITTY_KEYBOARD, 1, 2, private="=")) == [("report_kitty_keyboard", (1, 2), {"private": "="})]
+    assert feed(csi(Csi.KITTY_KEYBOARD, 1, 1, private=Marker.EQUALS)) == [
+        ("report_kitty_keyboard", (1, 1), {"private": "="})
+    ]
+    assert feed(csi(Csi.KITTY_KEYBOARD, 1, 2, private=Marker.EQUALS)) == [
+        ("report_kitty_keyboard", (1, 2), {"private": "="})
+    ]
 
 
 def test_kitty_query():
-    assert feed(csi(Csi.KITTY_KEYBOARD, private="?")) == [("report_kitty_keyboard", (), {"private": True})]
+    assert feed(csi(Csi.KITTY_KEYBOARD, private=Marker.QUESTION)) == [("report_kitty_keyboard", (), {"private": True})]
 
 
 def test_subparameters():
@@ -73,13 +79,13 @@ def test_large_parameters():
 
 def test_private_device_status_report():
     # "CSI ? 6 n" must not crash the parser.
-    assert feed(csi(escape.DSR, 6, private="?")) == [("report_device_status", (6,), {"private": True})]
+    assert feed(csi(escape.DSR, 6, private=Marker.QUESTION)) == [("report_device_status", (6,), {"private": True})]
 
 
 def test_secondary_da_marker_is_dispatched():
     # "CSI > c" (Secondary DA) dispatches like "CSI c", with the marker
     # passed through as ``private``.
-    assert feed(csi(escape.DA, private=">")) == [("report_device_attributes", (), {"private": ">"})]
+    assert feed(csi(escape.DA, private=Marker.GREATER)) == [("report_device_attributes", (), {"private": ">"})]
 
 
 # ----------------------------------------------------------------------
@@ -111,4 +117,4 @@ def test_a_custom_map_can_take_an_intermediate_sequence():
 
 
 def test_an_intermediate_byte_keeps_the_private_marker():
-    assert feed(csi(Csi.KITTY_UNSCROLL, 3, private="?")) == [("unscroll", (3,), {"private": True})]
+    assert feed(csi(Csi.KITTY_UNSCROLL, 3, private=Marker.QUESTION)) == [("unscroll", (3,), {"private": True})]

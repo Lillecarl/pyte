@@ -68,7 +68,7 @@ def test_the_intermediate_bytes_are_part_of_the_name():
 
 
 def test_a_private_marker_is_named():
-    assert rewritten("\x1b[?62;1;6c") == "csi(escape.DA, 62, 1, 6, private='?')"
+    assert rewritten("\x1b[?62;1;6c") == "csi(escape.DA, 62, 1, 6, private=Marker.QUESTION)"
 
 
 def test_a_mode_is_a_mode_before_it_is_a_sequence():
@@ -83,7 +83,7 @@ def test_a_mode_nobody_names_is_written_the_long_way():
     2031 is theme reports, which `modes.py` does not name. The long
     form says the marker out loud, so nothing is guessed.
     """
-    assert rewritten("\x1b[?2031h") == "csi(escape.SM, 2031, private='?')"
+    assert rewritten("\x1b[?2031h") == "csi(escape.SM, 2031, private=Marker.QUESTION)"
 
 
 def test_the_name_of_a_final_byte_is_the_csi_one():
@@ -442,7 +442,7 @@ def test_every_rewrite_writes_the_string_it_replaces():
     from pyte import escape  # noqa: F401
     from pyte.modes import AnsiMode, PrivateMode  # noqa: F401
     from pyte.osc import Osc  # noqa: F401
-    from pyte.sequences.csi import Csi, csi, reset_mode, set_mode  # noqa: F401
+    from pyte.sequences.csi import Csi, Marker, csi, reset_mode, set_mode  # noqa: F401
     from pyte.sequences.escapes import Escape, Sharp, announce, esc, sharp  # noqa: F401
     from pyte.sequences.strings import Terminator, apc, dcs, decrqss, osc  # noqa: F401
 
@@ -480,7 +480,7 @@ def test_every_rewrite_writes_the_string_it_replaces():
 @pytest.mark.parametrize("marker", ["?", ">", "<", "="])
 def test_every_marker_survives_the_round_trip(marker):
     from pyte import escape  # noqa: F401
-    from pyte.sequences.csi import Csi, csi  # noqa: F401
+    from pyte.sequences.csi import Csi, Marker, csi  # noqa: F401
 
     text = "\x1b[%s1u" % marker
     expression = rewritten(text)

@@ -15,7 +15,7 @@ from __future__ import annotations
 from pyte import escape
 from pyte.modes import PrivateMode
 from pyte.screen import Screen
-from pyte.sequences.csi import Csi, csi, reset_mode, set_mode
+from pyte.sequences.csi import Csi, Marker, csi, reset_mode, set_mode
 from pyte.sequences.escapes import esc
 from pyte.streams import Stream
 
@@ -102,10 +102,10 @@ def test_the_page_width_modes_answer_decrqm():
         resize_func=lambda lines, columns: None,
     )
     stream = Stream(screen)
-    stream.feed(ALLOW + csi(Csi.DECRQM, 40, private="?"))
+    stream.feed(ALLOW + csi(Csi.DECRQM, 40, private=Marker.QUESTION))
     assert answers == ["\x1b[?40;1$y"]
     answers.clear()
-    stream.feed(csi(Csi.DECRQM, 95, private="?"))
+    stream.feed(csi(Csi.DECRQM, 95, private=Marker.QUESTION))
     assert answers == ["\x1b[?95;2$y"]
 
 
@@ -145,7 +145,7 @@ def refusing_screen(allowed):
 def test_decncsm_is_unknown_where_the_embedder_gives_no_room():
     "A mode a pane cannot have is a mode it never heard of."
     screen, stream, answers = refusing_screen(lambda: False)
-    stream.feed(set_mode(PrivateMode.NO_CLEAR_ON_COLUMN_CHANGE) + csi(Csi.DECRQM, 95, private="?"))
+    stream.feed(set_mode(PrivateMode.NO_CLEAR_ON_COLUMN_CHANGE) + csi(Csi.DECRQM, 95, private=Marker.QUESTION))
     assert answers == ["\x1b[?95;0$y"]
     assert not screen._keeps_the_page_through_a_width_change()
 
@@ -159,12 +159,12 @@ def test_decncsm_comes_back_when_the_embedder_changes_its_mind():
     """
     allowed = [False]
     screen, stream, answers = refusing_screen(lambda: allowed[0])
-    stream.feed(csi(Csi.DECRQM, 95, private="?"))
+    stream.feed(csi(Csi.DECRQM, 95, private=Marker.QUESTION))
     assert answers == ["\x1b[?95;0$y"]
 
     allowed[0] = True
     answers.clear()
-    stream.feed(set_mode(PrivateMode.NO_CLEAR_ON_COLUMN_CHANGE) + csi(Csi.DECRQM, 95, private="?"))
+    stream.feed(set_mode(PrivateMode.NO_CLEAR_ON_COLUMN_CHANGE) + csi(Csi.DECRQM, 95, private=Marker.QUESTION))
     assert answers == ["\x1b[?95;1$y"]
 
 
@@ -179,7 +179,7 @@ def test_the_embedder_does_not_gate_the_other_page_modes():
     embedder still refuses it.
     """
     screen, stream, answers = refusing_screen(lambda: False)
-    stream.feed(ALLOW + csi(Csi.DECRQM, 40, private="?"))
+    stream.feed(ALLOW + csi(Csi.DECRQM, 40, private=Marker.QUESTION))
     assert answers == ["\x1b[?40;1$y"]
 
     stream.feed("abc" + WIDE)

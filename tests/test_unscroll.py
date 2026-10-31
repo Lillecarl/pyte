@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pyte import escape
 from pyte.screen import Screen
-from pyte.sequences.csi import Csi, csi
+from pyte.sequences.csi import Csi, Marker, csi
 from pyte.sequences.strings import apc
 from pyte.streams import Stream
 
@@ -152,7 +152,7 @@ def test_a_written_row_under_the_cursor_stops_it():
 def test_the_alternate_screen_is_left_alone():
     screen, stream = make_screen()
     prompt_high_up(screen, stream)
-    stream.feed(csi(escape.SM, 1049, private="?"))
+    stream.feed(csi(escape.SM, 1049, private=Marker.QUESTION))
     assert screen.scroll_cursor_to_bottom() == 0
 
 

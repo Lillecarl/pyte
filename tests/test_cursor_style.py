@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from pyte.modes import PrivateMode
 from pyte.screen import Screen
-from pyte.sequences.csi import Csi, csi, reset_mode, set_mode
+from pyte.sequences.csi import Csi, Marker, csi, reset_mode, set_mode
 from pyte.sequences.strings import decrqss
 from pyte.streams import Stream
 
@@ -90,12 +90,12 @@ def test_decrqm_answers_for_the_blinking():
     screen, stream, responses = make_screen()
     stream.feed(csi(Csi.DECSCUSR, 6))
     responses.clear()
-    stream.feed(csi(Csi.DECRQM, 12, private="?"))
+    stream.feed(csi(Csi.DECRQM, 12, private=Marker.QUESTION))
     assert responses == ["\x1b[?12;2$y"]  # Reset.
 
     stream.feed(csi(Csi.DECSCUSR, 5))
     responses.clear()
-    stream.feed(csi(Csi.DECRQM, 12, private="?"))
+    stream.feed(csi(Csi.DECRQM, 12, private=Marker.QUESTION))
     assert responses == ["\x1b[?12;1$y"]  # Set.
 
 

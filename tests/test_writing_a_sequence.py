@@ -25,7 +25,7 @@ import pytest
 from pyte import escape
 from pyte.modes import AnsiMode, PrivateMode
 from pyte.osc import Osc
-from pyte.sequences.csi import Csi, csi, reset_mode, set_mode
+from pyte.sequences.csi import Csi, Marker, csi, reset_mode, set_mode
 from pyte.sequences.escapes import Escape, Sharp, announce, esc, sharp
 from pyte.sequences.strings import Terminator, apc, dcs, decrqss, osc
 
@@ -72,9 +72,9 @@ def test_an_empty_subparameter_is_written_as_nothing():
 
 
 def test_the_private_marker_goes_before_the_parameters():
-    assert csi(escape.DA, 62, 1, 6, private="?") == "\x1b[?62;1;6c"
-    assert csi(escape.SGR, 4, 2, private=">") == "\x1b[>4;2m"
-    assert csi(Csi.KITTY_KEYBOARD, 1, private=">") == "\x1b[>1u"
+    assert csi(escape.DA, 62, 1, 6, private=Marker.QUESTION) == "\x1b[?62;1;6c"
+    assert csi(escape.SGR, 4, 2, private=Marker.GREATER) == "\x1b[>4;2m"
+    assert csi(Csi.KITTY_KEYBOARD, 1, private=Marker.GREATER) == "\x1b[>1u"
 
 
 # ----------------------------------------------------------------------
@@ -188,7 +188,7 @@ def test_a_bare_number_is_not_a_mode():
     with pytest.raises(ValueError):
         set_mode(1049)
 
-    assert csi(escape.SM, 2027, private="?") == "\x1b[?2027h"
+    assert csi(escape.SM, 2027, private=Marker.QUESTION) == "\x1b[?2027h"
 
 
 def test_no_mode_at_all_is_not_a_sequence():

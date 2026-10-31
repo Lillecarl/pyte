@@ -24,7 +24,7 @@ import pytest
 
 from pyte import escape
 from pyte.screen import Screen
-from pyte.sequences.csi import Csi, csi
+from pyte.sequences.csi import Csi, Marker, csi
 from pyte.sequences.escapes import announce, esc
 from pyte.sequences.strings import decrqss, osc
 from pyte.streams import Stream
@@ -146,7 +146,7 @@ def test_a_control_sequence_stays_two_bytes_without_the_mode():
 
 def test_a_device_control_string_carries_two_bytes():
     "DCS opens it and ST closes it, and both are C1 controls."
-    answer = answered(S8C1T + csi(Csi.XTVERSION, private=">"))
+    answer = answered(S8C1T + csi(Csi.XTVERSION, private=Marker.GREATER))
     assert answer == b"\x90>|" + TERMINAL_VERSION.encode("utf-8") + b"\x9c"
 
 
@@ -160,7 +160,7 @@ def test_the_answer_of_a_table_carries_one_byte():
     `_DEVICE_STATUS_ANSWERS` is a table of literals, and it holds the
     body of each answer without the control in front of it.
     """
-    assert answered(S8C1T + csi(escape.DSR, 15, private="?")) == b"\x9b?13n"
+    assert answered(S8C1T + csi(escape.DSR, 15, private=Marker.QUESTION)) == b"\x9b?13n"
 
 
 def test_the_position_report_carries_one_byte():
@@ -168,7 +168,7 @@ def test_the_position_report_carries_one_byte():
 
 
 def test_the_device_attributes_carry_one_byte():
-    assert answered(S8C1T + csi(escape.DA, private=">")) == b"\x9b>64;383;0c"
+    assert answered(S8C1T + csi(escape.DA, private=Marker.GREATER)) == b"\x9b>64;383;0c"
 
 
 # ----------------------------------------------------------------------
