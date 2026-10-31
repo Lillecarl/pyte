@@ -65,6 +65,7 @@ PURE = {
     "runs",
     "screen",
     "sequences",
+    "sgr",
     "sixel",
     "streams",
     "terminfo",
@@ -247,7 +248,7 @@ def test_the_reading_sees_an_import_where_there_is_one():
     found no import anywhere would pass every module.
     """
     outside, inside = _imports(MODULES["screen"])
-    assert {"cells", "colors", "images", "keys.events", "page"} <= inside
+    assert {"cells", "images", "keys.events", "page", "sgr"} <= inside
 
     # Inside `keys/`, a relative import names its neighbour in full.
     _outside, inside = _imports(MODULES["keys.encode"])
