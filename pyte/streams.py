@@ -864,11 +864,18 @@ class GroundTimer:
         #: is reading plain text.
         self.since: float | None = None
 
-    def feed(self, data: str) -> None:
-        "Feed the stream, dropping a sequence that stayed open too long."
+    def feed(self, data: str) -> bool:
+        """
+        Feed the stream, dropping a sequence that stayed open too long.
+
+        Answers whether it dropped one. A mirror of this stream applies
+        the same answer and keeps no clock of its own: the gaps between
+        reads are not the same on the far side of a network.
+        """
         now = self.now()
 
-        if self.since is not None and now - self.since >= self.timeout:
+        expired = self.since is not None and now - self.since >= self.timeout
+        if expired:
             self.stream.ground_timer_expired()
 
         self.stream.feed(data)
@@ -878,3 +885,4 @@ class GroundTimer:
                 self.since = now
         else:
             self.since = None
+        return expired

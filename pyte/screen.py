@@ -332,6 +332,10 @@ class Screen:
         "max_y": Keep.SAVED,
         "history_floor": Keep.SAVED,
         "reflow_floor": Keep.SAVED,
+        # Every hundredth line trims the history. A mirror of this
+        # screen trims on the same line only if it counts from the same
+        # number. Lillecarl/pymux#759.
+        "_history_cleanup_counter": Keep.SAVED,
         # The cursor and what it carries.
         "pt_cursor_position": Keep.SAVED,
         "pending_wrap": Keep.SAVED,
@@ -396,7 +400,6 @@ class Screen:
         "everything_at": Keep.DROPPED,
         "scrolls": Keep.DROPPED,
         "scroll_seq": Keep.DROPPED,
-        "_history_cleanup_counter": Keep.DROPPED,
     }
 
     def __init__(

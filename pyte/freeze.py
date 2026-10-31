@@ -49,7 +49,7 @@ from .cells import (
 from .keep import Keep
 from .page import Row
 
-__all__ = ["Frozen", "freeze", "thaw"]
+__all__ = ["Freezer", "Frozen", "Thawer", "freeze", "merge", "thaw"]
 
 #: A cell's kind in a frozen row. A protected cell adds its marks to
 #: `PROTECTED`, so the marks travel in the same number.
@@ -163,6 +163,25 @@ class Freezer:
         frozen = walk.run(root)
         self.mark = mark
         return frozen
+
+    def caught_up(self, root: object) -> None:
+        """
+        Say that the other side holds `root` as it is now, without
+        freezing it: the next freeze holds what changes after this.
+
+        A mirror applies a pane's reads as they come, so when it stops
+        taking them it holds the screen as it stands. A freeze sent then
+        would send it nothing new, and one sent later has to count from
+        here: a row written and then erased in between is gone from
+        `root` and still on the mirror, and only the rows removed since
+        this moment are named. Appearances are untouched, because a row
+        frozen later registers each one it needs.
+        """
+        self.mark = root.write_mark() if hasattr(root, "write_mark") else None  # type: ignore[attr-defined]
+        for buffer in self.held:
+            number = self.buffer_ids.get(id(buffer))
+            if number is not None and number in self.rows_frozen:
+                self.rows_frozen[number] = set(buffer)  # type: ignore[call-overload]
 
     def buffer_id(self, buffer: object) -> tuple[str, bool]:
         "The stable id of a buffer, and whether an earlier freeze gave it."
@@ -284,15 +303,39 @@ def thaw(frozen: Frozen, into: object) -> None:
     What derives from saved fields, an object rebuilds in its own
     `after_thaw`, which runs once its fields are written.
     """
-    _Thawer(frozen).fields(frozen.root, into)
+    Thawer().thaw(frozen, into)
+
+
+class Thawer:
+    """
+    Thaws one object, and then each later freeze of the same `Freezer`
+    onto it: the counterpart of `Freezer`.
+
+    It keeps the buffers it built and the appearances it read, so a
+    later freeze patches a buffer in place, the rows written since
+    replaced and the rows gone dropped, and a cell's appearance index
+    counts from the first freeze. Everything else of the root is thawed
+    again whole, which is small beside the rows. A mirrored pane takes
+    a delta this way instead of a screen thawed again from the start.
+    """
+
+    def __init__(self) -> None:
+        self.buffers: dict[str, defaultdict[int, Row]] = {}
+        self.appearances: list[Appearance] = []
+
+    def thaw(self, frozen: Frozen, into: object) -> None:
+        "Write `frozen` into `into`, patching the buffers an earlier thaw built."
+        _Thawer(frozen, self).fields(frozen.root, into)
 
 
 class _Thawer:
-    def __init__(self, frozen: Frozen) -> None:
+    def __init__(self, frozen: Frozen, thawer: Thawer) -> None:
         self.frozen = frozen
+        self.thawer = thawer
         self.made: dict[int, object] = {}
         self.made_buffers: dict[str, defaultdict[int, Row]] = {}
-        self.appearances = [self.appearance(*entry) for entry in frozen.appearances]
+        thawer.appearances.extend(self.appearance(*entry) for entry in frozen.appearances)
+        self.appearances = thawer.appearances
 
     def appearance(self, rendition: Any, hyperlink: str, hyperlink_id: str) -> Appearance:
         return appearance_of[self.value(rendition), hyperlink, hyperlink_id]
@@ -326,12 +369,18 @@ class _Thawer:
         if "bytes" in value:
             return base64.b64decode(value["bytes"])
         if "buffer" in value:
-            made = self.made_buffers.get(value["buffer"])
+            key = value["buffer"]
+            made = self.made_buffers.get(key)
             if made is not None:
                 return made
-            buffer: defaultdict[int, Row] = defaultdict(page_module.Row)
-            self.made_buffers[value["buffer"]] = buffer
-            for number, wrapped, cells, marks in self.frozen.buffers.get(value["buffer"], ()):
+            buffer = self.thawer.buffers.get(key)
+            if buffer is None or key in self.frozen.whole:
+                buffer = defaultdict(page_module.Row)
+            else:
+                for gone in self.frozen.removed.get(key, ()):
+                    buffer.pop(gone, None)
+            self.made_buffers[key] = self.thawer.buffers[key] = buffer
+            for number, wrapped, cells, marks in self.frozen.buffers.get(key, ()):
                 buffer[number] = self.row(wrapped, cells, marks)
             return buffer
         if "list" in value:
