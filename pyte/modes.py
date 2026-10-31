@@ -22,7 +22,7 @@ from enum import IntEnum
 __all__ = (
     "PRIVATE_MODE_SHIFT",
     "AnsiMode",
-    "ModeReport",
+    "ModeState",
     "PrivateMode",
     "flag_of",
 )
@@ -265,7 +265,7 @@ class AnsiMode(IntEnum):
     LINE_FEED_NEW_LINE = 20
 
 
-class ModeReport(IntEnum):
+class ModeState(IntEnum):
     """
     What DECRQM ("CSI Ps $ p") answers about a mode.
 

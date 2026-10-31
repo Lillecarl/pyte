@@ -68,7 +68,7 @@ from .keys.events import (
     ModifyOtherKeys,
 )
 from .keys.flags import current_flags, deliverable_flags, popped, pushed, with_flags_set
-from .modes import AnsiMode, ModeReport, PrivateMode, flag_of
+from .modes import AnsiMode, ModeState, PrivateMode, flag_of
 from .osc import (
     CLEAR_SCROLLBACK,
     COLOR_BASE,
@@ -5023,11 +5023,11 @@ class Screen:
             enabled = number in self.mode
 
         if permanent:
-            state = ModeReport.PERMANENTLY_RESET
+            state = ModeState.PERMANENTLY_RESET
         elif not known:
-            state = ModeReport.UNKNOWN
+            state = ModeState.UNKNOWN
         else:
-            state = ModeReport.SET if enabled else ModeReport.RESET
+            state = ModeState.SET if enabled else ModeState.RESET
 
         self.reply_csi("%s%i;%i$y" % ("?" if is_private else "", number, state))
 
