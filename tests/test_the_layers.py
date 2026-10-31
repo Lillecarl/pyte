@@ -68,6 +68,8 @@ PURE = {
     "sequences.csi",
     "sequences.escapes",
     "sequences.kitty_graphics",
+    "sequences.kitty_keyboard",
+    "sequences.rendition",
     "sequences.replies",
     "sequences.reports",
     "sequences.strings",

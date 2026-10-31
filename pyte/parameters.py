@@ -28,6 +28,7 @@ __all__ = (
     "AttributeExtent",
     "ConformanceLevel",
     "CursorShape",
+    "EraseExtent",
     "StatusDisplay",
     "StatusLineType",
     "TitleMode",
@@ -56,6 +57,18 @@ class CursorShape(IntEnum):
 
 #: The shape that a terminal starts with.
 DEFAULT_CURSOR_STYLE = CursorShape.BLINKING_BLOCK
+
+
+class EraseExtent(IntEnum):
+    'How much "CSI Ps K" (EL) and "CSI Ps J" (ED) erase, counted from the cursor.'
+
+    TO_END = 0
+    TO_START = 1
+    ALL = 2
+
+    #: ED alone: the history above the screen. xterm's, and every
+    #: terminal after it.
+    HISTORY = 3
 
 
 class AttributeExtent(IntEnum):

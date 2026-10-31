@@ -37,10 +37,13 @@ __all__ = (
     "KeyboardFlagsReport",
     "ModeReport",
     "SgrMouseReport",
+    "StatusQuery",
     "StatusReport",
     "TextAreaCellsReport",
     "TextAreaPixelsReport",
     "WindowReport",
+    "ask_cursor_position",
+    "ask_status",
 )
 
 
@@ -175,6 +178,26 @@ class DeviceAttributes:
         if kind is None or numbers is None:
             return None
         return cls(kind, tuple(number for number in numbers))
+
+
+class StatusQuery(IntEnum):
+    'What "CSI Ps n" asks.'
+
+    #: Is the terminal well? It answers with a `StatusReport`.
+    STATUS = 5
+
+    #: Where is the cursor? It answers with a `CursorPositionReport`.
+    CURSOR_POSITION = 6
+
+
+def ask_status() -> str:
+    '"CSI 5 n": the terminal answers once it read everything before it.'
+    return csi(_DSR, StatusQuery.STATUS)
+
+
+def ask_cursor_position() -> str:
+    '"CSI 6 n": where the cursor stands, after everything before it.'
+    return csi(_DSR, StatusQuery.CURSOR_POSITION)
 
 
 class DeviceStatus(IntEnum):
