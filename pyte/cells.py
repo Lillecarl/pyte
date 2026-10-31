@@ -24,6 +24,7 @@ from wcwidth import width as cluster_width
 
 from .cache import FastDictCache
 from .colors import SgrColor
+from .sequences.rendition import Sgr
 
 __all__ = (
     "BASELINE_PARAMETERS",
@@ -65,19 +66,19 @@ UNDERLINE_SHAPES = {
 
 #: The sub-parameter of "SGR 4" that each shape answers with.
 UNDERLINE_PARAMETERS = {
-    "": "4",
-    "double": "4:2",
-    "curly": "4:3",
-    "dotted": "4:4",
-    "dashed": "4:5",
+    "": "%d" % Sgr.UNDERLINE,
+    "double": "%d:2" % Sgr.UNDERLINE,
+    "curly": "%d:3" % Sgr.UNDERLINE,
+    "dotted": "%d:4" % Sgr.UNDERLINE,
+    "dashed": "%d:5" % Sgr.UNDERLINE,
 }
 
 #: The parameter that raises or lowers a glyph. "SGR 75" puts it back
 #: on the line and needs no parameter of its own: a report starts with
 #: a reset, which says the same thing.
 BASELINE_PARAMETERS = {
-    "superscript": "73",
-    "subscript": "74",
+    "superscript": "%d" % Sgr.SUPERSCRIPT,
+    "subscript": "%d" % Sgr.SUBSCRIPT,
 }
 
 

@@ -26,6 +26,7 @@ from .colors import (
     sgr_color,
     sgr_color_parameters,
 )
+from .sequences.rendition import ColorSpace, Sgr
 
 __all__ = ["after_sgr", "erased_appearance", "parameters_of"]
 
@@ -63,13 +64,13 @@ def _computed(rendition: Rendition, attrs_tuple: tuple[int, ...]) -> Rendition:
         # A parameter with colons in it arrives as a tuple, and
         # holds everything the colour needs.
         if isinstance(attr, tuple):
-            if attr[0] in (38, 48):
+            if attr[0] in (Sgr.FOREGROUND, Sgr.BACKGROUND):
                 color = sgr_color(list(attr))
                 if color is not None:
-                    replace["color" if attr[0] == 38 else "bgcolor"] = color
-            elif attr[0] == 58:
+                    replace["color" if attr[0] == Sgr.FOREGROUND else "bgcolor"] = color
+            elif attr[0] == Sgr.UNDERLINE_COLOR:
                 replace["underline_color"] = sgr_color(list(attr))
-            elif attr[0] == 4:
+            elif attr[0] == Sgr.UNDERLINE:
                 number = attr[1] if len(attr) > 1 else 1
                 shape = UNDERLINE_SHAPES.get(number)
                 if shape is not None:
@@ -81,69 +82,69 @@ def _computed(rendition: Rendition, attrs_tuple: tuple[int, ...]) -> Rendition:
             replace["color"] = COLOR_OF_A_FOREGROUND[attr]
         elif attr in COLOR_OF_A_BACKGROUND:
             replace["bgcolor"] = COLOR_OF_A_BACKGROUND[attr]
-        elif attr == 1:
+        elif attr == Sgr.BOLD:
             replace["bold"] = True
-        elif attr == 2:
+        elif attr == Sgr.DIM:
             replace["dim"] = True
-        elif attr == 3:
+        elif attr == Sgr.ITALIC:
             replace["italic"] = True
-        elif attr == 4:
+        elif attr == Sgr.UNDERLINE:
             replace["underline"] = True
             # A plain "4" draws a single line, whatever shape came
             # before it.
             replace["underline_style"] = ""
-        elif attr == 5:
+        elif attr == Sgr.BLINK:
             replace["blink"] = True
-        elif attr == 6:
+        elif attr == Sgr.RAPID_BLINK:
             replace["blink"] = True  # Fast blink.
-        elif attr == 7:
+        elif attr == Sgr.REVERSE:
             replace["reverse"] = True
-        elif attr == 8:
+        elif attr == Sgr.HIDDEN:
             replace["hidden"] = True
-        elif attr == 9:
+        elif attr == Sgr.STRIKE:
             replace["strike"] = True
-        elif attr == 29:
+        elif attr == Sgr.NOT_STRUCK:
             replace["strike"] = False
         # Where the glyph sits. A terminal draws a raised or a
         # lowered glyph smaller, and 75 puts it back on the line.
-        elif attr == 73:
+        elif attr == Sgr.SUPERSCRIPT:
             replace["baseline"] = "superscript"
-        elif attr == 74:
+        elif attr == Sgr.SUBSCRIPT:
             replace["baseline"] = "subscript"
-        elif attr == 75:
+        elif attr == Sgr.NEITHER_SCRIPT:
             replace["baseline"] = ""
-        elif attr == 22:
+        elif attr == Sgr.NORMAL_INTENSITY:
             replace["bold"] = False
             replace["dim"] = False
-        elif attr == 23:
+        elif attr == Sgr.NOT_ITALIC:
             replace["italic"] = False
-        elif attr == 21:
+        elif attr == Sgr.DOUBLE_UNDERLINE:
             replace["underline"] = True
             replace["underline_style"] = "double"
-        elif attr == 24:
+        elif attr == Sgr.NOT_UNDERLINED:
             # The colour of the line stays: a program that turns
             # the line on again writes no colour a second time.
             replace["underline"] = False
-        elif attr == 25:
+        elif attr == Sgr.NOT_BLINKING:
             replace["blink"] = False
-        elif attr == 27:
+        elif attr == Sgr.NOT_REVERSED:
             replace["reverse"] = False
         elif not attr:
             replace = {}
             rendition = PLAIN
 
-        elif attr == 59:
+        elif attr == Sgr.DEFAULT_UNDERLINE_COLOR:
             replace["underline_color"] = None
-        elif attr in (38, 48):
+        elif attr in (Sgr.FOREGROUND, Sgr.BACKGROUND):
             # The colour follows in the parameters that come next.
             parameters = [attr]
             while attrs and len(parameters) < sgr_color_parameters(parameters):
                 parameters.append(attrs.pop())
             color = sgr_color(parameters)
             if color is not None:
-                replace["color" if attr == 38 else "bgcolor"] = color
+                replace["color" if attr == Sgr.FOREGROUND else "bgcolor"] = color
 
-        elif attr == 58:
+        elif attr == Sgr.UNDERLINE_COLOR:
             parameters = [attr]
             while attrs and len(parameters) < sgr_color_parameters(parameters):
                 parameters.append(attrs.pop())
@@ -175,17 +176,17 @@ def parameters_of(rendition: Rendition) -> str:
     parts = ["0"]
 
     for flag, parameter in (
-        (rendition.bold, "1"),
-        (rendition.dim, "2"),
-        (rendition.italic, "3"),
+        (rendition.bold, "%d" % Sgr.BOLD),
+        (rendition.dim, "%d" % Sgr.DIM),
+        (rendition.italic, "%d" % Sgr.ITALIC),
         (
             rendition.underline,
             UNDERLINE_PARAMETERS[rendition.underline_style or ""],
         ),
-        (rendition.blink, "5"),
-        (rendition.reverse, "7"),
-        (rendition.hidden, "8"),
-        (rendition.strike, "9"),
+        (rendition.blink, "%d" % Sgr.BLINK),
+        (rendition.reverse, "%d" % Sgr.REVERSE),
+        (rendition.hidden, "%d" % Sgr.HIDDEN),
+        (rendition.strike, "%d" % Sgr.STRIKE),
         (
             rendition.baseline,
             BASELINE_PARAMETERS.get(rendition.baseline or "", ""),
@@ -195,8 +196,8 @@ def parameters_of(rendition: Rendition) -> str:
             parts.append(parameter)
 
     for color, code, background in (
-        (rendition.color, 38, False),
-        (rendition.bgcolor, 48, True),
+        (rendition.color, Sgr.FOREGROUND, False),
+        (rendition.bgcolor, Sgr.BACKGROUND, True),
     ):
         # The default colour has a single code of its own, 39 and
         # 49, and this does not write it: the answer opens with "0",
@@ -208,16 +209,16 @@ def parameters_of(rendition: Rendition) -> str:
             if short is not None:
                 parts.append("%i" % short)
             else:
-                parts.append("%i;5;%i" % (code, color.index))
+                parts.append("%i;%i;%i" % (code, ColorSpace.INDEXED, color.index))
         elif color.rgb is not None:
-            parts.append("%i;2;%i;%i;%i" % ((code, *color.rgb)))
+            parts.append("%i;%i;%i;%i;%i" % (code, ColorSpace.DIRECT, *color.rgb))
 
     underline_color = rendition.underline_color
     if rendition.underline and underline_color is not None:
         if underline_color.index is not None:
-            parts.append("58:5:%i" % underline_color.index)
+            parts.append("%i:%i:%i" % (Sgr.UNDERLINE_COLOR, ColorSpace.INDEXED, underline_color.index))
         elif underline_color.rgb is not None:
-            parts.append("58:2::%i:%i:%i" % underline_color.rgb)
+            parts.append("%i:%i::%i:%i:%i" % (Sgr.UNDERLINE_COLOR, ColorSpace.DIRECT, *underline_color.rgb))
 
     return ";".join(parts)
 
