@@ -101,6 +101,8 @@ def _computed(rendition: Rendition, attrs_tuple: tuple[int, ...]) -> Rendition:
             replace["reverse"] = True
         elif attr == Sgr.HIDDEN:
             replace["hidden"] = True
+        elif attr == Sgr.NOT_HIDDEN:
+            replace["hidden"] = False
         elif attr == Sgr.STRIKE:
             replace["strike"] = True
         elif attr == Sgr.NOT_STRUCK:
