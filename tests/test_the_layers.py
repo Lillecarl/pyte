@@ -61,6 +61,7 @@ PURE = {
     "parameters",
     "placeholders",
     "png",
+    "reflow",
     "runs",
     "screen",
     "sequences",

@@ -31,6 +31,7 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from test_row_versions import a_chunk
 
+from pyte.reflow import highest_row_held
 from pyte.streams import Stream
 
 LINES = 6
@@ -72,7 +73,7 @@ def say_nothing_sits_above_the_screen(screen) -> None:
     # and it also has to be what reading the whole buffer says.
     # Lillecarl/pymux#145.
     if buffer:
-        found = screen._highest_row_the_buffer_holds(last)
+        found = highest_row_held(screen.page.data_buffer, last, screen.lines)
         assert found == max(buffer), "the buffer top was read as %d and the whole buffer says %d (%s)" % (
             found,
             max(buffer),
