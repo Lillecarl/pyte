@@ -7,7 +7,7 @@ moves, and the place the cursor stands.
 
 None of it decides anything. `screen.py` reads a sequence and writes
 here. What reads it back is a front end drawing a frame —
-`_TerminalControl.create_content` in ptterm and `Terminal.render_line`
+`TerminalControl.create_content` in ptterm and `Terminal.render_line`
 in txterm — and copy mode, which walks the whole buffer.
 Lillecarl/pymux#129.
 """
