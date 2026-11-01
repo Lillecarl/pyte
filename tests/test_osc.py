@@ -7,6 +7,8 @@ an answer: without it, it waits forever.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from pyte.colors import DEFAULT_COLORS, PALETTE, Color
@@ -16,6 +18,8 @@ from pyte.osc import (
     ColorOverrides,
     Osc,
     a_key_an_answer_may_carry,
+    color_base_data,
+    color_base_of,
     parse_kitty_color_query,
 )
 from pyte.screen import Screen
@@ -377,3 +381,17 @@ def test_a_hyperlink_does_not_reach_the_screen():
     stream.feed(osc(Osc.HYPERLINK, "", "https://example.com") + "link" + osc(Osc.HYPERLINK, "", ""))
     row = screen.page.data_buffer[0]
     assert "".join(row[i].char for i in range(4)) == "link"
+
+
+def test_a_color_base_reads_back_from_its_named_data():
+    base = ColorBase(list(reversed(PALETTE)), {**DEFAULT_COLORS, "foreground": Color(1, 2, 3)})
+    assert color_base_of(json.loads(json.dumps(color_base_data(base)))) == base
+
+
+def test_a_color_base_from_another_build_keeps_what_it_cannot_read():
+    "A short palette, a bad entry and a bad default: each keeps the answer a pane gives without it."
+    read = color_base_of({"palette": [[9, 9, 9], "red"], "defaults": {"foreground": [1, 2, 3], "cursor": "x"}, "x": 1})
+    assert read.palette[0] == Color(9, 9, 9)
+    assert read.palette[1:] == list(COLOR_BASE.palette[1:])
+    assert read.defaults == {"foreground": Color(1, 2, 3)}
+    assert color_base_of(None) == ColorBase(list(COLOR_BASE.palette), {})

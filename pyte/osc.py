@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from enum import StrEnum
-from typing import ClassVar, Final, NamedTuple
+from typing import Any, ClassVar, Final, NamedTuple
 
 from .colors import DEFAULT_COLORS, PALETTE, Color, parse_color
 from .keep import Keep
@@ -59,6 +59,8 @@ __all__ = [
     "PointerShapeRead",
     "PointerShapes",
     "asks_for_the_clipboard",
+    "color_base_data",
+    "color_base_of",
     "parse_hyperlink",
     "parse_kitty_color_query",
     "pointer_shape_name",
@@ -622,6 +624,46 @@ class ColorBase(NamedTuple):
 #: an embedder asks for the theme of the terminal and not for every
 #: entry.
 COLOR_BASE = ColorBase(PALETTE, DEFAULT_COLORS)
+
+
+def color_base_data(base: ColorBase) -> dict[str, Any]:
+    """
+    A base as named data, for a pymux server that tells another one
+    what its terminals hold. The two may run different builds, so
+    nothing names a class. Lillecarl/pymux#759.
+    """
+    return {
+        "palette": [list(color) for color in base.palette],
+        "defaults": {name: list(color) for name, color in base.defaults.items()},
+    }
+
+
+def color_base_of(data: object) -> ColorBase:
+    """
+    The base `color_base_data` describes. An entry it cannot read keeps
+    the colour of `COLOR_BASE`, and a default it cannot read is left
+    out, so a pane answers that one the way `colors.py` does.
+    """
+    fields = data if isinstance(data, dict) else {}
+    named = fields.get("palette")
+    given = named if isinstance(named, list) else []
+    palette = [_color_of(given[index]) if index < len(given) else None for index in range(len(COLOR_BASE.palette))]
+    named_defaults = fields.get("defaults")
+    defaults = {
+        str(name): color
+        for name, value in (named_defaults.items() if isinstance(named_defaults, dict) else ())
+        if (color := _color_of(value)) is not None
+    }
+    return ColorBase(
+        [color or fallback for color, fallback in zip(palette, COLOR_BASE.palette, strict=True)],
+        defaults,
+    )
+
+
+def _color_of(value: object) -> Color | None:
+    if isinstance(value, (list, tuple)) and len(value) == 3 and all(isinstance(part, int) for part in value):
+        return Color(*(min(max(part, 0), 255) for part in value))
+    return None
 
 
 class ColorOverrides:
