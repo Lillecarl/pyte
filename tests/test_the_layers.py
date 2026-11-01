@@ -112,6 +112,8 @@ MAY_IMPORT = {
     "dataclasses",
     "enum",
     "functools",
+    # A digest is arithmetic: `grid.py` names an image by its content.
+    "hashlib",
     # `html.escape`, which is a table and three replacements. `html.py`
     # writes a document and every character a program wrote goes into
     # it, so the escaping is the one thing there that must not be

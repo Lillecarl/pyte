@@ -16,6 +16,7 @@ import pytest
 from a_screen import a_screen
 from test_freeze import AFTER, BEFORE, CSI, ESC, OSC, ST, STEPS
 
+from pyte import grid
 from pyte.cells import PLAIN, ErasedCell, Rendition
 from pyte.colors import SgrColor
 from pyte.grid import GridWriter, put_frame, row_data, row_of
@@ -62,15 +63,16 @@ def _carried(frame: dict | None) -> dict | None:
 
 
 class Peer:
-    def __init__(self, screen: Screen) -> None:
-        self.writer = GridWriter()
+    def __init__(self, screen: Screen, by_hash: bool = False) -> None:
+        self.writer = GridWriter(by_hash)
         self.copy = a_screen(screen.columns, screen.lines)
+        self.store: dict = {}
         self.sync(screen)
 
     def sync(self, screen: Screen) -> dict | None:
         frame = _carried(self.writer.frame(screen))
         if frame is not None:
-            put_frame(self.copy, frame)
+            put_frame(self.copy, frame, self.store)
         return frame
 
 
@@ -275,17 +277,68 @@ def test_a_screen_drawn_over_the_page_keeps_its_images_at_the_peer():
     Stream(screen).feed(_image(7))
     peer = Peer(screen)
     over = a_screen(40, 12)
-    peer.writer = GridWriter(held=peer.writer.images, kept=peer.writer.images)
+    peer.writer = peer.writer.after(keep=True)
     frame = peer.sync(over)
     assert frame is not None
     assert frame["placements"] == []
     assert "images" not in frame
     assert 7 in peer.copy.graphics.images_by_id
-    peer.writer = GridWriter(held=peer.writer.images)
+    peer.writer = peer.writer.after()
     frame = peer.sync(screen)
     assert frame is not None
     assert "images" not in frame
     assert _pictures(peer.copy) == _pictures(screen)
+
+
+ALTERNATE = CSI + "?1049h"
+MAIN = CSI + "?1049l"
+
+
+def test_an_image_back_from_the_alternate_page_is_named_by_its_hash():
+    screen = a_screen(40, 12)
+    stream = Stream(screen)
+    stream.feed(_image(7))
+    peer = Peer(screen, by_hash=True)
+    stream.feed(ALTERNATE + "help")
+    peer.sync(screen)
+    assert peer.copy.graphics.images_by_id == {}
+    stream.feed(MAIN)
+    frame = peer.sync(screen)
+    assert frame is not None
+    (image,) = frame["images"]
+    assert "data" not in image
+    assert _pictures(peer.copy) == _pictures(screen)
+
+
+def test_a_peer_that_reads_no_hash_is_sent_the_image_again():
+    screen = a_screen(40, 12)
+    stream = Stream(screen)
+    stream.feed(_image(7))
+    peer = Peer(screen)
+    stream.feed(ALTERNATE + "help")
+    peer.sync(screen)
+    stream.feed(MAIN)
+    frame = peer.sync(screen)
+    assert frame is not None
+    (image,) = frame["images"]
+    assert "data" in image
+    assert "hash" not in image
+    assert "stored" not in frame
+
+
+def test_the_store_drops_the_image_used_longest_ago(monkeypatch):
+    monkeypatch.setattr(grid, "STORE_BYTES", 5)
+    screen = a_screen(40, 12)
+    stream = Stream(screen)
+    peer = Peer(screen, by_hash=True)
+    stream.feed(_image(7))
+    peer.sync(screen)
+    stream.feed(_image(8, b"\x00\xff\x00"))
+    frame = peer.sync(screen)
+    assert frame is not None
+    assert len(frame["stored"]) == 1
+    assert list(peer.store) == frame["stored"]
+    assert peer.store[frame["stored"][0]].data == b"\x00\xff\x00"
 
 
 def test_a_fresh_writer_tells_the_peer_which_images_to_keep():

@@ -18,12 +18,17 @@ the width of a character differently, and the owner's count is the
 one the program drew to.
 
 An image crosses once, under its id, and the placements name it. The
-peer draws it as its own terminal can.
+peer draws it as its own terminal can. A writer `by_hash` also has the
+peer store recent images by content (`stored`, the owner's choice
+within `STORE_BYTES`), so one that comes back, as the main page's do
+after the alternate page, is named by its hash and not sent again.
 """
 
 from __future__ import annotations
 
 import base64
+import hashlib
+from collections import OrderedDict
 from typing import TYPE_CHECKING, Any
 
 from .cells import _CHAR_CACHE, _ERASED_CACHE, UNWRITTEN, ErasedCell, appearance_of
@@ -39,6 +44,10 @@ __all__ = ["GridWriter", "put_frame", "row_data", "row_of"]
 
 #: The SGR parameters of a plain pen, which a run leaves out.
 _PLAIN_SGR = "0"
+
+#: The bytes of image data a writer has the peer store beyond the
+#: images it shows, the oldest used going first.
+STORE_BYTES = 64 << 20
 
 
 def row_data(row: Row | None, columns: int) -> dict[str, Any]:
@@ -144,6 +153,13 @@ def _placement_of(data: dict[str, Any]) -> GraphicsPlacement:
     )
 
 
+def _digest(image: GraphicsImage) -> str:
+    "What names an image by content: its pixels and the shape they are read in."
+    digest = hashlib.blake2b(b"%d,%d,%d," % (image.format, image.width, image.height), digest_size=16)
+    digest.update(image.data)
+    return digest.hexdigest()
+
+
 def _image_data(image_id: int, image: GraphicsImage) -> dict[str, Any]:
     return {
         "id": image_id,
@@ -171,15 +187,9 @@ class GridWriter:
     only what differs.
     """
 
-    def __init__(
-        self, held: dict[int, GraphicsImage] | None = None, kept: dict[int, GraphicsImage] | None = None
-    ) -> None:
-        """
-        `held` are images the peer holds already, from a writer before
-        this one. `kept` stay with the peer although this screen shows
-        none of them: a screen drawn over the page for a while, such as
-        copy mode, keeps the page's images for when it goes.
-        """
+    def __init__(self, by_hash: bool = False) -> None:
+        "`by_hash` when the peer reads an image named by its hash (`stored`)."
+        self.by_hash = by_hash
         self.sent: list[dict[str, Any] | None] = []
         self.size: tuple[int, int] | None = None
         self.cursor: dict[str, Any] | None = None
@@ -187,11 +197,27 @@ class GridWriter:
         self.placements: list[dict[str, Any]] | None = None
         #: The image the peer holds under each id. Held, not compared by
         #: content: a program may send new pixels under an old id.
-        self.images: dict[int, GraphicsImage] = dict(held or {})
-        self.kept: dict[int, GraphicsImage] = dict(kept or {})
+        self.images: dict[int, GraphicsImage] = {}
+        #: Images the peer keeps although the screen shows none of them.
+        self.kept: dict[int, GraphicsImage] = {}
+        #: The hashes of the images the peer stores, by bytes, the oldest used first.
+        self.stored: OrderedDict[str, int] = OrderedDict()
         self.top = -1
         self.writes = -1
         self.everything_at = -1
+
+    def after(self, keep: bool = False) -> GridWriter:
+        """
+        A writer for another screen to the same peer, which knows the
+        images the peer holds. With `keep` the peer keeps this screen's
+        images while the next one shows: copy mode, drawn over the page
+        for a while.
+        """
+        writer = GridWriter(self.by_hash)
+        writer.images = dict(self.images)
+        writer.kept = dict(self.images) if keep else {}
+        writer.stored = OrderedDict(self.stored)
+        return writer
 
     def frame(self, screen: Screen) -> dict[str, Any] | None:
         "The rows and the cursor that changed since the last frame, or `None` when nothing did."
@@ -241,21 +267,40 @@ class GridWriter:
         wanted = {placement.image_id: by_id[placement.image_id] for placement in shown if placement.image_id in by_id}
         wanted = {**self.kept, **wanted}
         pictures: dict[str, Any] = {"placements": placements}
+        stored = list(self.stored)
         new = [
-            _image_data(image_id, image) for image_id, image in wanted.items() if self.images.get(image_id) is not image
+            self._sent(image_id, image) for image_id, image in wanted.items() if self.images.get(image_id) is not image
         ]
         if new:
             pictures["images"] = new
         if new or wanted.keys() != self.images.keys() or whole:
             pictures["image_ids"] = sorted(wanted)
+        if self.by_hash and (list(self.stored) != stored or whole):
+            pictures["stored"] = list(self.stored)
         self.images = wanted
         return pictures
 
+    def _sent(self, image_id: int, image: GraphicsImage) -> dict[str, Any]:
+        "What names `image` to the peer under `image_id`: its hash alone when the peer stores it."
+        if not self.by_hash:
+            return _image_data(image_id, image)
+        digest = _digest(image)
+        if digest in self.stored:
+            self.stored.move_to_end(digest)
+            return {"id": image_id, "hash": digest}
+        self.stored[digest] = len(image.data)
+        total = sum(self.stored.values())
+        while total > STORE_BYTES and len(self.stored) > 1:
+            total -= self.stored.popitem(last=False)[1]
+        return {**_image_data(image_id, image), "hash": digest}
 
-def put_frame(screen: Screen, frame: dict[str, Any]) -> None:
+
+def put_frame(screen: Screen, frame: dict[str, Any], store: dict[str, GraphicsImage] | None = None) -> None:
     """
     Put a frame a `GridWriter` made on a screen that shows nothing else.
-    Its page is rows 0 to `lines - 1`, with no history over it.
+    Its page is rows 0 to `lines - 1`, with no history over it. `store`
+    holds the images the owner had the peer store, by hash, from one
+    frame to the next.
     """
     lines = int(frame.get("lines", screen.lines))
     columns = int(frame.get("columns", screen.columns))
@@ -294,19 +339,34 @@ def put_frame(screen: Screen, frame: dict[str, Any]) -> None:
     if "pointer" in frame:
         pointer = str(frame["pointer"])
         screen.pointer_shapes.stack = [pointer] if pointer else []
-    _put_pictures(screen, frame)
+    _put_pictures(screen, frame, {} if store is None else store)
 
 
-def _put_pictures(screen: Screen, frame: dict[str, Any]) -> None:
+def _put_pictures(screen: Screen, frame: dict[str, Any], store: dict[str, GraphicsImage]) -> None:
     graphics = screen.graphics
     for data in frame.get("images") or ():
-        try:
-            pixels = base64.b64decode(str(data.get("data", "")))
-        except ValueError:
-            continue
-        graphics.images_by_id[int(data.get("id", 0))] = GraphicsImage(
-            int(data.get("format", 0)), int(data.get("width", 0)), int(data.get("height", 0)), pixels
-        )
+        digest = data.get("hash")
+        if "data" in data:
+            try:
+                pixels = base64.b64decode(str(data["data"]))
+            except ValueError:
+                continue
+            image = GraphicsImage(
+                int(data.get("format", 0)), int(data.get("width", 0)), int(data.get("height", 0)), pixels
+            )
+            if digest is not None:
+                store[str(digest)] = image
+        else:
+            stored = store.get(str(digest))
+            if stored is None:
+                continue
+            image = stored
+        graphics.images_by_id[int(data.get("id", 0))] = image
+    if "stored" in frame:
+        named = [str(digest) for digest in frame["stored"] or ()]
+        kept = {digest: store[digest] for digest in named if digest in store}
+        store.clear()
+        store.update(kept)
     if "image_ids" in frame:
         kept = {int(image_id) for image_id in frame["image_ids"] or ()}
         for image_id in [image_id for image_id in graphics.images_by_id if image_id not in kept]:
