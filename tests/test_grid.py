@@ -269,6 +269,25 @@ def test_the_image_a_placeholder_shows_crosses():
     assert [run.image_id for run in peer.copy.placeholder_runs(0, 0)] == [5]
 
 
+def test_a_screen_drawn_over_the_page_keeps_its_images_at_the_peer():
+    "Copy mode draws over the page; its images stay with the peer and do not cross again after."
+    screen = a_screen(40, 12)
+    Stream(screen).feed(_image(7))
+    peer = Peer(screen)
+    over = a_screen(40, 12)
+    peer.writer = GridWriter(held=peer.writer.images, kept=peer.writer.images)
+    frame = peer.sync(over)
+    assert frame is not None
+    assert frame["placements"] == []
+    assert "images" not in frame
+    assert 7 in peer.copy.graphics.images_by_id
+    peer.writer = GridWriter(held=peer.writer.images)
+    frame = peer.sync(screen)
+    assert frame is not None
+    assert "images" not in frame
+    assert _pictures(peer.copy) == _pictures(screen)
+
+
 def test_a_fresh_writer_tells_the_peer_which_images_to_keep():
     "A peer that held images from an earlier writer drops the ones the new one does not send."
     screen = a_screen(40, 12)

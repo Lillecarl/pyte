@@ -171,7 +171,15 @@ class GridWriter:
     only what differs.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self, held: dict[int, GraphicsImage] | None = None, kept: dict[int, GraphicsImage] | None = None
+    ) -> None:
+        """
+        `held` are images the peer holds already, from a writer before
+        this one. `kept` stay with the peer although this screen shows
+        none of them: a screen drawn over the page for a while, such as
+        copy mode, keeps the page's images for when it goes.
+        """
         self.sent: list[dict[str, Any] | None] = []
         self.size: tuple[int, int] | None = None
         self.cursor: dict[str, Any] | None = None
@@ -179,7 +187,8 @@ class GridWriter:
         self.placements: list[dict[str, Any]] | None = None
         #: The image the peer holds under each id. Held, not compared by
         #: content: a program may send new pixels under an old id.
-        self.images: dict[int, GraphicsImage] = {}
+        self.images: dict[int, GraphicsImage] = dict(held or {})
+        self.kept: dict[int, GraphicsImage] = dict(kept or {})
         self.top = -1
         self.writes = -1
         self.everything_at = -1
@@ -230,6 +239,7 @@ class GridWriter:
         self.placements = placements
         by_id = screen.graphics.images_by_id
         wanted = {placement.image_id: by_id[placement.image_id] for placement in shown if placement.image_id in by_id}
+        wanted = {**self.kept, **wanted}
         pictures: dict[str, Any] = {"placements": placements}
         new = [
             _image_data(image_id, image) for image_id, image in wanted.items() if self.images.get(image_id) is not image
