@@ -1012,7 +1012,7 @@ class Screen:
 
         # The marks that SPA and DECSCA put on the cells that a
         # program draws next. Nothing is marked to start with.
-        self.protection = 0
+        self.protection = Protection.NONE
 
         # The character that REP repeats. Nothing is drawn yet, so a
         # repeat now draws nothing.
@@ -1167,7 +1167,7 @@ class Screen:
 
         # A soft reset takes the mark off what a program draws next.
         # The cells that carry one already keep it.
-        self.protection = 0
+        self.protection = Protection.NONE
 
         self._reset_rendition()
 

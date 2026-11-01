@@ -13,6 +13,7 @@ programs that came before DECSCA.
 from __future__ import annotations
 
 from pyte import escape
+from pyte.cells import Protection
 from pyte.screen import Screen
 from pyte.sequences.csi import Csi, Marker, csi
 from pyte.sequences.escapes import Escape, esc
@@ -214,3 +215,12 @@ def test_a_save_and_a_restore_carry_the_mark():
     assert screen.protection == 2
     stream.feed("a" + csi(Csi.DECSERA, 1, 1, 1, 1))
     assert _line(screen) == "a"
+
+
+def test_no_mark_is_the_same_value_before_and_after_one():
+    "A copy compares the pen by value and kind, so an unmarked pen is one value."
+    screen, stream, _answers = _screen()
+    fresh = screen.protection
+    stream.feed(esc(Escape.SPA) + esc(Escape.EPA))
+    assert type(screen.protection) is type(fresh)
+    assert screen.protection == fresh == Protection.NONE
