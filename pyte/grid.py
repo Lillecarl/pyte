@@ -100,6 +100,11 @@ def _cursor_of(screen: Screen) -> dict[str, Any]:
     return cursor
 
 
+def _about(screen: Screen) -> dict[str, Any]:
+    "What a program set that the peer shows beside the page: the title and the pointer's shape."
+    return {"title": screen.titles.window, "pointer": screen.pointer_shapes.shape}
+
+
 class GridWriter:
     """
     What one peer was last sent of one screen, so the next frame holds
@@ -110,6 +115,7 @@ class GridWriter:
         self.sent: list[dict[str, Any] | None] = []
         self.size: tuple[int, int] | None = None
         self.cursor: dict[str, Any] | None = None
+        self.about: dict[str, Any] | None = None
         self.top = -1
         self.writes = -1
         self.everything_at = -1
@@ -140,11 +146,12 @@ class GridWriter:
                 self.sent[y] = data
                 rows.append([y, data])
         cursor = _cursor_of(screen)
+        about = _about(screen)
         self.size, self.top, self.writes, self.everything_at = (lines, columns), top, screen.writes, everything_at
-        if not rows and cursor == self.cursor and not whole:
+        if not rows and cursor == self.cursor and about == self.about and not whole:
             return None
-        self.cursor = cursor
-        return {"lines": lines, "columns": columns, "rows": rows, "cursor": cursor}
+        self.cursor, self.about = cursor, about
+        return {"lines": lines, "columns": columns, "rows": rows, "cursor": cursor, **about}
 
 
 def put_frame(screen: Screen, frame: dict[str, Any]) -> None:
@@ -184,3 +191,8 @@ def put_frame(screen: Screen, frame: dict[str, Any]) -> None:
         screen.cursor_style_asked = style is not None
         if style is not None and int(style) in iter(CursorShape):
             screen.cursor_style = CursorShape(int(style))
+    if "title" in frame:
+        screen.titles.window = str(frame["title"])
+    if "pointer" in frame:
+        pointer = str(frame["pointer"])
+        screen.pointer_shapes.stack = [pointer] if pointer else []

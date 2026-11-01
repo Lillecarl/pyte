@@ -43,6 +43,8 @@ def _page(screen: Screen) -> dict:
         "rows": rows,
         "cursor": (position.x, position.y - top, screen.pending_wrap, screen.page.show_cursor),
         "style": screen.cursor_style if screen.cursor_style_asked else None,
+        "title": screen.titles.window,
+        "pointer": screen.pointer_shapes.shape,
     }
 
 
@@ -105,6 +107,8 @@ CORNERS = {
     "a pending wrap": CSI + "12;1H" + "x" * 40,
     "a hidden cursor": CSI + "?25l",
     "a cursor shape": CSI + "4 q",
+    "a title": OSC + "2;the title" + ST,
+    "a pointer": OSC + "22;>wait,text" + ST,
     "the alternate page": "first\r\n" + CSI + "?1049h" + "second" + CSI + "3;3H",
     "history": "".join("line %d\r\n" % number for number in range(60)),
 }
@@ -131,6 +135,17 @@ def test_a_frame_holds_what_changed():
     assert frame is not None
     assert [y for y, _row in frame["rows"]] == [1]
     _same(screen, peer.copy)
+
+
+def test_a_new_title_alone_sends_a_frame():
+    screen = a_screen(40, 12)
+    stream = Stream(screen)
+    peer = Peer(screen)
+    stream.feed(OSC + "2;renamed" + ST)
+    frame = peer.sync(screen)
+    assert frame is not None
+    assert frame["rows"] == []
+    assert peer.copy.titles.window == "renamed"
 
 
 def test_a_row_written_again_the_same_sends_nothing():
