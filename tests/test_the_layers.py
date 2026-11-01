@@ -63,7 +63,6 @@ PURE = {
     "placeholders",
     "png",
     "reflow",
-    "repaint",
     "runs",
     "screen",
     "sequences.__init__",

@@ -184,25 +184,6 @@ class Freezer:
         self.mark = mark
         return frozen
 
-    def caught_up(self, root: object) -> None:
-        """
-        Say that the other side holds `root` as it is now, without
-        freezing it: the next freeze holds what changes after this.
-
-        A mirror applies a pane's reads as they come, so when it stops
-        taking them it holds the screen as it stands. A freeze sent then
-        would send it nothing new, and one sent later has to count from
-        here: a row written and then erased in between is gone from
-        `root` and still on the mirror, and only the rows removed since
-        this moment are named. Appearances are untouched, because a row
-        frozen later registers each one it needs.
-        """
-        self.mark = root.write_mark() if hasattr(root, "write_mark") else None  # type: ignore[attr-defined]
-        for buffer in self.held:
-            number = self.buffer_ids.get(id(buffer))
-            if number is not None and number in self.rows_frozen:
-                self.rows_frozen[number] = set(buffer)  # type: ignore[call-overload]
-
     def buffer_id(self, buffer: object) -> tuple[str, bool]:
         "The stable id of a buffer, and whether an earlier freeze gave it."
         known = self.buffer_ids.get(id(buffer))
@@ -335,8 +316,7 @@ class Thawer:
     later freeze patches a buffer in place, the rows written since
     replaced and the rows gone dropped, and a cell's appearance index
     counts from the first freeze. Everything else of the root is thawed
-    again whole, which is small beside the rows. A mirrored pane takes
-    a delta this way instead of a screen thawed again from the start.
+    again whole, which is small beside the rows.
     """
 
     def __init__(self) -> None:
