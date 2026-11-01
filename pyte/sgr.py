@@ -28,7 +28,7 @@ from .colors import (
 )
 from .sequences.rendition import ColorSpace, Sgr
 
-__all__ = ["after_sgr", "erased_appearance", "parameters_of"]
+__all__ = ["after_sgr", "erased_appearance", "parameters_of", "rendition_of"]
 
 #: `after_sgr`'s answers, by the rendition before and the parameters.
 #: Shared by every screen: the answer depends on nothing else.
@@ -223,6 +223,25 @@ def parameters_of(rendition: Rendition) -> str:
             parts.append("%i:%i::%i:%i:%i" % (Sgr.UNDERLINE_COLOR, ColorSpace.DIRECT, *underline_color.rgb))
 
     return ";".join(parts)
+
+
+def rendition_of(parameters: str) -> Rendition:
+    """
+    The rendition that SGR parameters set from a plain pen: the way back
+    from `parameters_of`. A parameter with colons becomes the tuple the
+    parser makes of it, and a part that is no number counts as zero.
+    """
+    attrs: list[int | tuple[int, ...]] = []
+    for part in parameters.split(";"):
+        if ":" in part:
+            attrs.append(tuple(_number(piece) for piece in part.split(":")))
+        else:
+            attrs.append(_number(part))
+    return after_sgr(PLAIN, tuple(attrs))  # type: ignore[arg-type]
+
+
+def _number(text: str) -> int:
+    return int(text) if text.isdigit() else 0
 
 
 def erased_appearance(rendition: Rendition) -> Appearance | None:

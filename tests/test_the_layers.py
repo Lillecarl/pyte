@@ -42,6 +42,7 @@ PURE = {
     "control",
     "escape",
     "freeze",
+    "grid",
     "html",
     "images",
     "keep",
