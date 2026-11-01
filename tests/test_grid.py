@@ -8,17 +8,19 @@ Lillecarl/pymux#759.
 
 from __future__ import annotations
 
+import base64
 import json
 import random
 
 import pytest
 from a_screen import a_screen
-from test_freeze import AFTER, BEFORE, CSI, OSC, ST, STEPS
+from test_freeze import AFTER, BEFORE, CSI, ESC, OSC, ST, STEPS
 
 from pyte.cells import PLAIN, ErasedCell, Rendition
 from pyte.colors import SgrColor
 from pyte.grid import GridWriter, put_frame, row_data, row_of
 from pyte.page import Row
+from pyte.placeholders import DIACRITICS, PLACEHOLDER
 from pyte.screen import Screen
 from pyte.sgr import parameters_of, rendition_of
 from pyte.streams import Stream
@@ -171,6 +173,113 @@ def test_a_character_keeps_the_owners_column():
     "The peer may count a width differently; the owner's column wins."
     copy = row_of({"runs": [{"x": 0, "cells": ["中", "", "x"]}]})
     assert copy[2].char == "x"
+
+
+def _image(image_id: int, pixel: bytes = b"\xff\x00\x00", keys: str = "c=2,r=2") -> str:
+    data = base64.b64encode(pixel).decode()
+    return ESC + "_Ga=T,f=24,s=1,v=1,i=%d,%s;%s" % (image_id, keys, data) + ST
+
+
+def _pictures(screen: Screen) -> tuple:
+    graphics = screen.graphics
+    placements = [
+        (p.image_id, p.placement_id, p.x, p.y - screen.line_offset, p.columns, p.rows, p.virtual, p.crop)
+        for p in graphics.placements
+    ]
+    shown = {p.image_id for p in graphics.placements}
+    images = {
+        i: (image.format, image.width, image.height, image.data)
+        for i, image in graphics.images_by_id.items()
+        if i in shown
+    }
+    return placements, images
+
+
+def test_an_image_crosses_once():
+    screen = a_screen(40, 12)
+    stream = Stream(screen)
+    peer = Peer(screen)
+    stream.feed(_image(7))
+    frame = peer.sync(screen)
+    assert frame is not None
+    assert [image["id"] for image in frame["images"]] == [7]
+    assert _pictures(peer.copy) == _pictures(screen)
+    stream.feed(CSI + "5;1Hmore")
+    frame = peer.sync(screen)
+    assert frame is not None
+    assert "images" not in frame
+    assert "placements" not in frame
+
+
+def test_new_pixels_under_an_old_id_cross_again():
+    screen = a_screen(40, 12)
+    stream = Stream(screen)
+    peer = Peer(screen)
+    stream.feed(_image(7))
+    peer.sync(screen)
+    stream.feed(_image(7, b"\x00\xff\x00"))
+    frame = peer.sync(screen)
+    assert frame is not None
+    assert [image["id"] for image in frame["images"]] == [7]
+    assert peer.copy.graphics.images_by_id[7].data == b"\x00\xff\x00"
+
+
+def test_an_image_deleted_leaves_the_peer():
+    screen = a_screen(40, 12)
+    stream = Stream(screen)
+    peer = Peer(screen)
+    stream.feed(_image(7))
+    peer.sync(screen)
+    stream.feed(ESC + "_Ga=d,d=A" + ST)
+    peer.sync(screen)
+    assert peer.copy.graphics.placements == []
+    assert peer.copy.graphics.images_by_id == {}
+
+
+def test_an_image_counts_its_rows_from_the_top_of_the_page():
+    screen = a_screen(40, 12, history=50)
+    stream = Stream(screen)
+    peer = Peer(screen)
+    stream.feed("".join("line %d\r\n" % number for number in range(30)) + _image(7))
+    peer.sync(screen)
+    assert screen.line_offset
+    assert _pictures(peer.copy) == _pictures(screen)
+    # Two rows from the last row: the page scrolls by one.
+    assert peer.copy.graphics.placements[0].y == 10
+
+
+def test_an_image_scrolled_into_the_history_leaves_the_peer():
+    screen = a_screen(40, 12, history=50)
+    stream = Stream(screen)
+    peer = Peer(screen)
+    stream.feed(_image(7) + "\r\n" * 20)
+    peer.sync(screen)
+    assert peer.copy.graphics.placements == []
+    assert peer.copy.graphics.images_by_id == {}
+
+
+def test_the_image_a_placeholder_shows_crosses():
+    screen = a_screen(40, 12)
+    stream = Stream(screen)
+    peer = Peer(screen)
+    stream.feed(_image(5, keys="U=1,c=3,r=1"))
+    stream.feed(CSI + "38;2;0;0;5m" + PLACEHOLDER + chr(DIACRITICS[0]) + chr(DIACRITICS[0]) + CSI + "0m")
+    peer.sync(screen)
+    assert _pictures(peer.copy) == _pictures(screen)
+    assert [run.image_id for run in peer.copy.placeholder_runs(0, 0)] == [5]
+
+
+def test_a_fresh_writer_tells_the_peer_which_images_to_keep():
+    "A peer that held images from an earlier writer drops the ones the new one does not send."
+    screen = a_screen(40, 12)
+    stream = Stream(screen)
+    peer = Peer(screen)
+    stream.feed(_image(7))
+    peer.sync(screen)
+    stream.feed(ESC + "_Ga=d,d=A" + ST)
+    peer.writer = GridWriter()
+    peer.sync(screen)
+    assert peer.copy.graphics.images_by_id == {}
 
 
 @pytest.mark.parametrize(

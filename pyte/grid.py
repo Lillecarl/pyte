@@ -16,13 +16,18 @@ has a default, so a newer owner may add one and an older peer reads on
 past it. Each character carries its own column: two builds may count
 the width of a character differently, and the owner's count is the
 one the program drew to.
+
+An image crosses once, under its id, and the placements name it. The
+peer draws it as its own terminal can.
 """
 
 from __future__ import annotations
 
+import base64
 from typing import TYPE_CHECKING, Any
 
 from .cells import _CHAR_CACHE, _ERASED_CACHE, UNWRITTEN, ErasedCell, appearance_of
+from .images import GraphicsImage, GraphicsPlacement
 from .page import Row
 from .parameters import CursorShape
 from .sgr import parameters_of, rendition_of
@@ -105,6 +110,61 @@ def _about(screen: Screen) -> dict[str, Any]:
     return {"title": screen.titles.window, "pointer": screen.pointer_shapes.shape}
 
 
+def _placement_data(placement: GraphicsPlacement, top: int) -> dict[str, Any]:
+    data: dict[str, Any] = {
+        "image": placement.image_id,
+        "placement": placement.placement_id,
+        "x": placement.x,
+        "y": placement.y - top,
+        "columns": placement.columns,
+        "rows": placement.rows,
+        "z": placement.z,
+        "asked": placement.asked_for_the_box,
+    }
+    if placement.virtual:
+        data["virtual"] = True
+    if placement.crop is not None:
+        data["crop"] = list(placement.crop)
+    return data
+
+
+def _placement_of(data: dict[str, Any]) -> GraphicsPlacement:
+    crop = data.get("crop")
+    return GraphicsPlacement(
+        int(data.get("image", 0)),
+        int(data.get("placement", 0)),
+        int(data.get("x", 0)),
+        int(data.get("y", 0)),
+        int(data.get("columns", 0)),
+        int(data.get("rows", 0)),
+        int(data.get("z", 0)),
+        bool(data.get("virtual")),
+        bool(data.get("asked", True)),
+        None if crop is None else (int(crop[0]), int(crop[1]), int(crop[2]), int(crop[3])),
+    )
+
+
+def _image_data(image_id: int, image: GraphicsImage) -> dict[str, Any]:
+    return {
+        "id": image_id,
+        "format": int(image.format),
+        "width": image.width,
+        "height": image.height,
+        "data": base64.b64encode(image.data).decode("ascii"),
+    }
+
+
+def _shown_placements(screen: Screen) -> list[GraphicsPlacement]:
+    "The placements a person can see on the page, and every one the placeholders of a row may point at."
+    top = screen.line_offset
+    bottom = top + screen.lines
+    return [
+        placement
+        for placement in screen.graphics.placements
+        if placement.virtual or (placement.y < bottom and placement.y + placement.rows > top)
+    ]
+
+
 class GridWriter:
     """
     What one peer was last sent of one screen, so the next frame holds
@@ -116,6 +176,10 @@ class GridWriter:
         self.size: tuple[int, int] | None = None
         self.cursor: dict[str, Any] | None = None
         self.about: dict[str, Any] | None = None
+        self.placements: list[dict[str, Any]] | None = None
+        #: The image the peer holds under each id. Held, not compared by
+        #: content: a program may send new pixels under an old id.
+        self.images: dict[int, GraphicsImage] = {}
         self.top = -1
         self.writes = -1
         self.everything_at = -1
@@ -148,10 +212,34 @@ class GridWriter:
         cursor = _cursor_of(screen)
         about = _about(screen)
         self.size, self.top, self.writes, self.everything_at = (lines, columns), top, screen.writes, everything_at
-        if not rows and cursor == self.cursor and about == self.about and not whole:
+        pictures = self._pictures(screen, whole)
+        if not rows and cursor == self.cursor and about == self.about and not pictures and not whole:
             return None
         self.cursor, self.about = cursor, about
-        return {"lines": lines, "columns": columns, "rows": rows, "cursor": cursor, **about}
+        return {"lines": lines, "columns": columns, "rows": rows, "cursor": cursor, **about, **pictures}
+
+    def _pictures(self, screen: Screen, whole: bool) -> dict[str, Any]:
+        """
+        The placements, when they changed, and each image they show
+        that the peer does not hold yet. An image crosses once.
+        """
+        shown = _shown_placements(screen) if screen.graphics.placements or self.placements else []
+        placements = [_placement_data(placement, screen.line_offset) for placement in shown]
+        if placements == self.placements and not whole:
+            return {}
+        self.placements = placements
+        by_id = screen.graphics.images_by_id
+        wanted = {placement.image_id: by_id[placement.image_id] for placement in shown if placement.image_id in by_id}
+        pictures: dict[str, Any] = {"placements": placements}
+        new = [
+            _image_data(image_id, image) for image_id, image in wanted.items() if self.images.get(image_id) is not image
+        ]
+        if new:
+            pictures["images"] = new
+        if new or wanted.keys() != self.images.keys() or whole:
+            pictures["image_ids"] = sorted(wanted)
+        self.images = wanted
+        return pictures
 
 
 def put_frame(screen: Screen, frame: dict[str, Any]) -> None:
@@ -196,3 +284,22 @@ def put_frame(screen: Screen, frame: dict[str, Any]) -> None:
     if "pointer" in frame:
         pointer = str(frame["pointer"])
         screen.pointer_shapes.stack = [pointer] if pointer else []
+    _put_pictures(screen, frame)
+
+
+def _put_pictures(screen: Screen, frame: dict[str, Any]) -> None:
+    graphics = screen.graphics
+    for data in frame.get("images") or ():
+        try:
+            pixels = base64.b64decode(str(data.get("data", "")))
+        except ValueError:
+            continue
+        graphics.images_by_id[int(data.get("id", 0))] = GraphicsImage(
+            int(data.get("format", 0)), int(data.get("width", 0)), int(data.get("height", 0)), pixels
+        )
+    if "image_ids" in frame:
+        kept = {int(image_id) for image_id in frame["image_ids"] or ()}
+        for image_id in [image_id for image_id in graphics.images_by_id if image_id not in kept]:
+            del graphics.images_by_id[image_id]
+    if "placements" in frame:
+        graphics.placements = [_placement_of(data) for data in frame["placements"] or ()]
