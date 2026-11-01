@@ -310,3 +310,13 @@ def test_a_column_change_keeps_every_line_with_a_short_history(chunks, widths):
     for width in widths:
         screen.resize(screen.lines, width)
         assert logical_lines(screen) == before
+
+
+def test_a_resize_of_a_screen_with_nothing_written_keeps_the_cursor_on_it():
+    "A scroll raises `max_y` with no row written, and a taller screen then starts above the cursor."
+    screen = a_screen(87, 23)
+    stream = Stream(screen)
+    stream.feed(csi(Csi.SU, 3))
+    assert not screen.data_buffer
+    screen.resize(14, 33)
+    assert screen.line_offset <= screen.pt_cursor_position.y < screen.line_offset + screen.lines

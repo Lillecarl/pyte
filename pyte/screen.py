@@ -5825,8 +5825,11 @@ class Screen:
         cursor_position = self.pt_cursor_position
         cy, cx = (cursor_position.y, cursor_position.x)
 
-        # A screen that nobody has written on has nothing to lay out.
+        # A screen that nobody has written on has nothing to lay out,
+        # and the cursor still stays on it: a scroll raises `max_y` with
+        # no row written, so a new height can move the top past it.
         if not data_buffer:
+            cursor_position.y = max(cursor_position.y, self.line_offset)
             return
 
         # The character the cursor stands on, for the check at the end.
