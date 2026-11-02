@@ -106,6 +106,7 @@ from .parameters import (
     AttributeExtent,
     ConformanceLevel,
     CursorShape,
+    EraseExtent,
     StatusDisplay,
     StatusLineType,
     WindowOp,
@@ -4160,6 +4161,26 @@ class Screen:
         self.repair_wide_char(line, columns.start)
         self.repair_wide_char(line, columns.stop)
 
+    def _move_the_screen_into_history(self) -> bool:
+        """
+        Slide the screen down the buffer past its last row that holds
+        anything, so those rows become history. Whether any moved.
+
+        kitty's `screen_move_into_scrollback`: only the first screen,
+        and only with no region, keeps a history to move into.
+        """
+        whole = self.margins in (None, Margins(0, self.lines - 1))
+        if self._original_screen is not None or not whole or self.horizontal_margins is not None:
+            return False
+        top = self.line_offset
+        held = [row for row in range(top, top + self.lines) if self.data_buffer.get(row)]
+        if not held:
+            return False
+        bottom = held[-1] - top
+        # The cursor stays on its row of the screen: the slide moves it with the buffer.
+        self._slide_the_screen_under_the_region(bottom, bottom + 1)
+        return True
+
     def erase_in_display(self, type_of: int = 0, private: bool = False) -> None:
         """Erases display in a specific way.
 
@@ -4172,10 +4193,20 @@ class Screen:
             * ``2`` -- Erases complete display. All lines are erased
               and changed to single-width. Cursor does not move.
             * ``3`` -- Erase saved lines. (Xterm) Clears the history.
+            * ``22`` -- kitty's: the screen goes into the history,
+              images too, and then ``2``.
         :param bool private: when ``True`` character attributes aren left
                              unchanged **not implemented**.
         """
-        if type_of in (2, 3):
+        if type_of == EraseExtent.INTO_HISTORY:
+            if self._move_the_screen_into_history():
+                # The images went with their rows. What still reaches
+                # the screen goes with the erase, as kitty clears it.
+                self.graphics.prune_below(self.line_offset - 1)
+            else:
+                self.graphics.remove_all_placements()
+            type_of = EraseExtent.ALL
+        elif type_of in (2, 3):
             # Clearing the screen (ED 2) or the history (ED 3) removes
             # all graphics placements. (The image data is kept.)
             self.graphics.remove_all_placements()

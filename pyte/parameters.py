@@ -70,6 +70,10 @@ class EraseExtent(IntEnum):
     #: terminal after it.
     HISTORY = 3
 
+    #: ED alone, kitty's: the screen moves into the history, images
+    #: too, and is then left as ALL leaves it.
+    INTO_HISTORY = 22
+
 
 class AttributeExtent(IntEnum):
     """
