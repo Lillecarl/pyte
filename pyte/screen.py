@@ -224,6 +224,31 @@ _Savepoint = namedtuple(
 )
 
 
+#: What "CSI ? s" and "CSI ? r" with no number save and bring back:
+#: kitty's `copy_specific_modes` (kitty/screen.c), the modes whose change
+#: moves nothing on the screen. kitty also takes DECARM (8), visibility
+#: reports (2033), paste events (5522) and UTF-8 mouse (1005), which a
+#: pane does not carry.
+SAVED_WITHOUT_NUMBERS: tuple[AnsiMode | PrivateMode, ...] = (
+    AnsiMode.LINE_FEED_NEW_LINE,
+    AnsiMode.INSERT_REPLACE,
+    PrivateMode.APPLICATION_CURSOR_KEYS,
+    PrivateMode.REVERSE_VIDEO,
+    PrivateMode.AUTOWRAP,
+    PrivateMode.SHOW_CURSOR,
+    PrivateMode.MOUSE_REPORTING,
+    PrivateMode.BUTTON_EVENT_MOUSE,
+    PrivateMode.ANY_EVENT_MOUSE,
+    PrivateMode.FOCUS_EVENTS,
+    PrivateMode.SGR_MOUSE,
+    PrivateMode.URXVT_MOUSE,
+    PrivateMode.SGR_PIXEL_MOUSE,
+    PrivateMode.BRACKETED_PASTE,
+    PrivateMode.COLOR_SCHEME_UPDATES,
+    PrivateMode.INBAND_RESIZE,
+)
+
+
 class RegionCounts(NamedTuple):
     """
     The write counts of a scrolled region's rows, top first.
@@ -348,6 +373,7 @@ class Screen:
         # Modes and character sets, the raw numbers included.
         "mode": Keep.SAVED,
         "saved_modes": Keep.SAVED,
+        "saved_ansi_modes": Keep.SAVED,
         "gl": Keep.SAVED,
         "g_charsets": Keep.SAVED,
         "single_shift": Keep.SAVED,
@@ -1022,6 +1048,9 @@ class Screen:
         # never saved is not here, and a restore of it changes
         # nothing.
         self.saved_modes: dict[int, bool] = {}
+        # The ANSI modes of `SAVED_WITHOUT_NUMBERS`, by number. They
+        # have no place above, where 4 is a private mode.
+        self.saved_ansi_modes: dict[int, bool] = {}
 
         # The colours that a program set with "OSC 4", "OSC 5" and
         # "OSC 10". A pane starts with nothing set and answers a query
@@ -5419,7 +5448,17 @@ class Screen:
         it found it saves it here first. It is the pair of XTRESTORE.
         A mode that a pane does not know is remembered as off, which is
         what a query of it answers.
+
+        With no number it is kitty's form ("CSI ? s"): every mode of
+        `SAVED_WITHOUT_NUMBERS`, into the same places.
         """
+        if not params:
+            for mode in SAVED_WITHOUT_NUMBERS:
+                if isinstance(mode, AnsiMode):
+                    self.saved_ansi_modes[mode] = mode in self.mode
+                else:
+                    self.saved_modes[mode] = mode.flag in self.mode
+            return
         for number in params:
             mode = flag_of(number)
             self.saved_modes[number] = mode in self.mode
@@ -5429,15 +5468,38 @@ class Screen:
         XTRESTORE ("CSI ? Pm r"): bring back what XTSAVE put away.
 
         A mode that was never saved is left as it is. xterm does the
-        same: a restore of nothing changes nothing.
+        same: a restore of nothing changes nothing. With no number it
+        brings back `SAVED_WITHOUT_NUMBERS`, as kitty does.
+
+        The modes that go off go first. The three mouse modes are one
+        choice in a terminal, so a restore that turns one on after
+        another went off leaves the one that was saved.
         """
-        for number in params:
-            if number not in self.saved_modes:
-                continue
-            if self.saved_modes[number]:
-                self.set_mode(number, private=True)
-            else:
-                self.reset_mode(number, private=True)
+        ansi = {}
+        if params:
+            private = {number: self.saved_modes[number] for number in params if number in self.saved_modes}
+        else:
+            private = {
+                mode.value: self.saved_modes[mode]
+                for mode in SAVED_WITHOUT_NUMBERS
+                if isinstance(mode, PrivateMode) and mode in self.saved_modes
+            }
+            ansi = {
+                mode.value: self.saved_ansi_modes[mode]
+                for mode in SAVED_WITHOUT_NUMBERS
+                if isinstance(mode, AnsiMode) and mode in self.saved_ansi_modes
+            }
+        for on in (False, True):
+            for number in [number for number, was in private.items() if was is on]:
+                if number == PrivateMode.INBAND_RESIZE:
+                    # kitty copies it with no report: a restore is no resize.
+                    (self.mode.add if on else self.mode.discard)(PrivateMode.INBAND_RESIZE.flag)
+                elif on:
+                    self.set_mode(number, private=True)
+                else:
+                    self.reset_mode(number, private=True)
+            for number in [number for number, was in ansi.items() if was is on]:
+                (self.set_mode if on else self.reset_mode)(number)
 
     def report_device_attributes(self, *params: int, **kwargs) -> None:
         """

@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 
 from pyte import escape
-from pyte.modes import PrivateMode, flag_of
+from pyte.modes import AnsiMode, PrivateMode, flag_of
 from pyte.screen import Screen
 from pyte.sequences.csi import Csi, Marker, csi, reset_mode, set_mode
 from pyte.streams import Stream
@@ -72,6 +72,42 @@ def test_restoring_a_mode_that_was_never_saved_changes_nothing(pane):
     stream.feed(set_mode(PrivateMode.AUTOWRAP))
     stream.feed(csi(escape.DECSTBM, 7, private=Marker.QUESTION))
     assert is_set(screen, 7)
+
+
+def test_no_number_saves_and_restores_kittys_set(pane):
+    "kitty's form: every mode that moves nothing, ANSI ones included."
+    screen, stream, _responses = pane
+    on = [PrivateMode.BRACKETED_PASTE, PrivateMode.SGR_MOUSE, PrivateMode.BUTTON_EVENT_MOUSE]
+    stream.feed("".join(set_mode(mode) for mode in on) + reset_mode(PrivateMode.SHOW_CURSOR))
+    stream.feed(csi(escape.SM, AnsiMode.INSERT_REPLACE))
+    stream.feed(csi(Csi.DECSLRM, private=Marker.QUESTION))
+    stream.feed("".join(reset_mode(mode) for mode in on) + set_mode(PrivateMode.SHOW_CURSOR))
+    stream.feed(set_mode(PrivateMode.ANY_EVENT_MOUSE) + csi(escape.RM, AnsiMode.INSERT_REPLACE))
+    stream.feed(csi(escape.DECSTBM, private=Marker.QUESTION))
+    assert all(is_set(screen, mode) for mode in on)
+    assert not is_set(screen, PrivateMode.ANY_EVENT_MOUSE)
+    assert not is_set(screen, PrivateMode.SHOW_CURSOR)
+    assert not screen.page.show_cursor
+    assert AnsiMode.INSERT_REPLACE in screen.mode
+
+
+def test_no_number_leaves_a_mode_that_moves_the_screen(pane):
+    "Origin mode homes the cursor, so kitty leaves it out of the set."
+    screen, stream, _responses = pane
+    stream.feed(csi(Csi.DECSLRM, private=Marker.QUESTION))
+    stream.feed(set_mode(PrivateMode.ORIGIN))
+    stream.feed(csi(escape.DECSTBM, private=Marker.QUESTION))
+    assert is_set(screen, PrivateMode.ORIGIN)
+
+
+def test_restoring_inband_resize_sends_no_report(pane):
+    screen, stream, responses = pane
+    stream.feed(set_mode(PrivateMode.INBAND_RESIZE) + csi(Csi.DECSLRM, private=Marker.QUESTION))
+    stream.feed(reset_mode(PrivateMode.INBAND_RESIZE))
+    responses.clear()
+    stream.feed(csi(escape.DECSTBM, private=Marker.QUESTION))
+    assert is_set(screen, PrivateMode.INBAND_RESIZE)
+    assert responses == []
 
 
 def test_the_private_marker_tells_a_save_from_a_region(pane):
