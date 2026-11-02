@@ -5648,10 +5648,26 @@ class Screen:
             answer = self.colors.answer_kitty(param)
             if answer is not None:
                 self.reply(answer)
+        elif code == Osc.PUSH_COLORS:
+            self.push_colors()
+        elif code == Osc.POP_COLORS:
+            self.pop_colors()
         elif code in FORWARDED_OSC:
             if code == Osc.TERMINAL_EXTENSION:
                 self._read_terminal_extension(param)
             self._forward_osc(code, param)
+
+    def push_colors(self, *params: int, **kwargs) -> None:
+        'XTPUSHCOLORS ("CSI Ps # P") and kitty\'s "OSC 30001": put the colours a program set away.'
+        self.colors.push(_param(params, 0))
+
+    def pop_colors(self, *params: int, **kwargs) -> None:
+        'XTPOPCOLORS ("CSI Ps # Q") and kitty\'s "OSC 30101": bring them back.'
+        self.colors.pop(_param(params, 0))
+
+    def report_colors(self, *params: int, **kwargs) -> None:
+        'XTREPORTCOLORS ("CSI # R"): "CSI top ; count # Q".'
+        self.reply(CsiSequence(Csi.XTPOPCOLORS, self.colors.stack_report()))
 
     def _read_terminal_extension(self, param: str) -> None:
         "The subcommands of OSC 1337 that are the screen's own state."

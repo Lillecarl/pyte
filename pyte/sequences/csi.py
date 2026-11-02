@@ -87,6 +87,12 @@ class Csi(StrEnum):
     #: Select attribute change extent: what DECCARA and DECRARA reach.
     DECSACE = "*x"
 
+    #: xterm's colour stack, which kitty reads too: push the colours a
+    #: program set, pop them back, and report how deep the stack is.
+    XTPUSHCOLORS = "#P"
+    XTPOPCOLORS = "#Q"
+    XTREPORTCOLORS = "#R"
+
     #: Select active status display: send the output to the status
     #: line, or to the screen.
     DECSASD = "$}"

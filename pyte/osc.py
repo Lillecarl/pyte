@@ -86,6 +86,9 @@ class Osc(StrEnum):
     SPECIAL_COLOR = "5"
     #: "OSC 21": the colours, in the form that kitty reads.
     KITTY_COLORS = "21"
+    #: kitty's colour stack: "CSI # P" and "CSI # Q" as OSC codes.
+    PUSH_COLORS = "30001"
+    POP_COLORS = "30101"
     #: "OSC 22": the shape of the pointer over the pane.
     POINTER_SHAPE = "22"
     #: "OSC 52": the clipboard of the user.
@@ -666,6 +669,10 @@ def _color_of(value: object) -> Color | None:
     return None
 
 
+#: How many entries the colour stack holds: kitty's 10 (kitty/colors.c), xterm's too.
+COLOR_STACK_DEPTH = 10
+
+
 class ColorOverrides:
     """
     The colours that a program set, over the ones a pane starts with.
@@ -686,13 +693,15 @@ class ColorOverrides:
     what a program set.
     """
 
-    __slots__ = ("base", "by_code", "by_index")
+    __slots__ = ("base", "by_code", "by_index", "stack", "stack_top")
 
     #: The base is the embedder's, and it pushes it again after a load.
     KEEP: ClassVar[dict[str, Keep]] = {
         "base": Keep.REBUILT,
         "by_code": Keep.SAVED,
         "by_index": Keep.SAVED,
+        "stack": Keep.SAVED,
+        "stack_top": Keep.SAVED,
     }
 
     def __init__(self, base: ColorBase = COLOR_BASE) -> None:
@@ -712,6 +721,10 @@ class ColorOverrides:
         #: What "OSC 10" and the codes after it set, by the code that
         #: set it.
         self.by_code: dict[str, Color] = {}
+
+        #: What a push put away, oldest first: both tables each time.
+        self.stack: list[tuple[dict[int, Color], dict[str, Color]]] = []
+        self.stack_top = 0
 
     def color_of(self, index: int) -> Color | None:
         """
@@ -826,6 +839,48 @@ class ColorOverrides:
     def reset_dynamic(self, code: str) -> None:
         'Read "OSC 110" and the codes after it: put one colour back.'
         self.by_code.pop(code, None)
+
+    # -- the stack: XTPUSHCOLORS, XTPOPCOLORS, XTREPORTCOLORS, OSC 30001/30101
+
+    # kitty's arithmetic (`colorprofile_push_colors`, `_pop_colors` and
+    # `_report_stack`, kitty/colors.c): `stack` is up to
+    # `COLOR_STACK_DEPTH` slots, and `stack_top` counts what slot 0
+    # pushed. A numbered push or pop reaches a slot and leaves the count.
+
+    def push(self, slot: int = 0) -> None:
+        "Put what a program set on the stack: on top for slot 0, a full stack dropping its oldest; else in slot N."
+        if slot > COLOR_STACK_DEPTH:
+            return
+        size = min(COLOR_STACK_DEPTH, slot or self.stack_top + 1)
+        self.stack.extend(({}, {}) for _ in range(size - len(self.stack)))
+        saved = (dict(self.by_index), dict(self.by_code))
+        if slot:
+            self.stack[slot - 1] = saved
+        elif self.stack_top >= len(self.stack):
+            del self.stack[0]
+            self.stack.append(saved)
+        else:
+            self.stack[self.stack_top] = saved
+            self.stack_top += 1
+
+    def pop(self, slot: int = 0) -> bool:
+        "Bring back the top entry, which leaves, or slot N, which stays. Whether anything came back."
+        if not slot:
+            if not self.stack_top:
+                return False
+            self.stack_top -= 1
+            by_index, by_code = self.stack[self.stack_top]
+            self.stack[self.stack_top] = ({}, {})
+        elif slot <= len(self.stack):
+            by_index, by_code = self.stack[slot - 1]
+        else:
+            return False
+        self.by_index, self.by_code = dict(by_index), dict(by_code)
+        return True
+
+    def stack_report(self) -> tuple[int, int]:
+        "What XTREPORTCOLORS answers: the top entry's number, and how many slot 0 pushed."
+        return max(self.stack_top - 1, 0), self.stack_top
 
     def answer_kitty(self, param: str) -> OscString | None:
         """
