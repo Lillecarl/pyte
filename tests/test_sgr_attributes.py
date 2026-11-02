@@ -38,6 +38,15 @@ def test_an_attribute_ends_at_its_own_number(on, off, attribute):
     assert not getattr(after_sgr(turned_on, (off,)), attribute)
 
 
+@pytest.mark.parametrize(("off", "gone", "kept"), [(221, "bold", "dim"), (222, "dim", "bold")])
+def test_kitty_ends_bold_and_dim_one_at_a_time(off, gone, kept):
+    "kitty's 221 and 222 are the two halves of 22 (`kitty/cursor.c`)."
+    both = after_sgr(PLAIN, (1, 2))
+    after = after_sgr(both, (off,))
+    assert not getattr(after, gone)
+    assert getattr(after, kept)
+
+
 def test_revealing_leaves_the_other_attributes():
     hidden = after_sgr(PLAIN, (1, 8))
     revealed = after_sgr(hidden, (28,))

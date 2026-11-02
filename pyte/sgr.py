@@ -118,6 +118,10 @@ def _computed(rendition: Rendition, attrs_tuple: tuple[int, ...]) -> Rendition:
         elif attr == Sgr.NORMAL_INTENSITY:
             replace["bold"] = False
             replace["dim"] = False
+        elif attr == Sgr.NOT_BOLD:
+            replace["bold"] = False
+        elif attr == Sgr.NOT_DIM:
+            replace["dim"] = False
         elif attr == Sgr.NOT_ITALIC:
             replace["italic"] = False
         elif attr == Sgr.DOUBLE_UNDERLINE:

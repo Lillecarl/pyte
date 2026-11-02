@@ -55,6 +55,11 @@ class Sgr(IntEnum):
     SUBSCRIPT = 74
     NEITHER_SCRIPT = 75
 
+    #: kitty's halves of 22: bold off and dim on, or the other way.
+    #: https://sw.kovidgoyal.net/kitty/misc-protocol/
+    NOT_BOLD = 221
+    NOT_DIM = 222
+
 
 class ColorSpace(IntEnum):
     'What follows "38", "48" or "58": a number of the palette, or the components.'
