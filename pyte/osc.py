@@ -95,6 +95,8 @@ class Osc(StrEnum):
     CLIPBOARD = "52"
     #: "OSC 5522": kitty's clipboard, every MIME type, both ways.
     KITTY_CLIPBOARD = "5522"
+    #: "OSC 72": kitty's drag and drop, both ways.
+    KITTY_DND = "72"
     #: "OSC 99": a desktop notification.
     NOTIFICATION = "99"
     #: "OSC 777 ; notify ; title ; body": the plain desktop notification

@@ -73,6 +73,7 @@ from .keys.events import (
 )
 from .keys.flags import current_flags, deliverable_flags, popped, pushed, with_flags_set
 from .kitty_clipboard import ClipboardRequest, KittyClipboard, answer_to
+from .kitty_dnd import KittyDnd
 from .modes import AnsiMode, ModeState, PrivateMode, flag_of
 from .osc import (
     CLEAR_SCROLLBACK,
@@ -120,6 +121,7 @@ from .reflow import first_row_to_lay_out, highest_row_held, lay_out
 from .sequences.csi import Csi, CsiReport, CsiSequence, Marker, Parameter
 from .sequences.kitty_clipboard import ClipboardPacket
 from .sequences.kitty_clipboard import Status as ClipboardStatus
+from .sequences.kitty_dnd import DndPacket
 from .sequences.reports import (
     AttributesKind,
     CellSizeReport,
@@ -403,6 +405,7 @@ class Screen:
         "colors": Keep.SAVED,
         "pointer_shapes": Keep.SAVED,
         "kitty_clipboard": Keep.SAVED,
+        "kitty_dnd": Keep.SAVED,
         "extra_cursors": Keep.SAVED,
         "graphics": Keep.SAVED,
         "attribute_extent": Keep.SAVED,
@@ -428,6 +431,7 @@ class Screen:
         "may_resize": Keep.REBUILT,
         "surroundings_func": Keep.REBUILT,
         "clipboard_func": Keep.REBUILT,
+        "dnd_func": Keep.REBUILT,
         "version": Keep.REBUILT,
         # Caches of what the cells say.
         "_cell_caches": Keep.REBUILT,
@@ -532,6 +536,14 @@ class Screen:
         self.clipboard_func: Callable[[ClipboardRequest], None] | None = None
         #: A write that is still arriving. A reset leaves it, as kitty does.
         self.kitty_clipboard = KittyClipboard()
+        #: Whoever serves kitty's drag and drop (OSC 72): told each
+        #: packet the program sends. None ignores them all, so a query
+        #: goes unanswered and the program sees no support.
+        #: Lillecarl/pymux#892.
+        self.dnd_func: Callable[[DndPacket], None] | None = None
+        #: A chain of chunks still arriving, and what the program
+        #: registered for. A reset leaves both, as kitty's window does.
+        self.kitty_dnd = KittyDnd()
 
         # The colours a pane starts with, before a program sets any. The
         # embedder replaces it when it learns the theme of the terminal
@@ -5843,6 +5855,10 @@ class Screen:
             self.pop_colors()
         elif code == Osc.KITTY_CLIPBOARD:
             self._kitty_clipboard(param)
+        elif code == Osc.KITTY_DND:
+            packet = self.kitty_dnd.take(param)
+            if packet is not None and self.dnd_func is not None:
+                self.dnd_func(packet)
         elif code in FORWARDED_OSC:
             if code == Osc.TERMINAL_EXTENSION:
                 self._read_terminal_extension(param)
