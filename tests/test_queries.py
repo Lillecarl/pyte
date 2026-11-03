@@ -93,17 +93,17 @@ def test_a_mode_that_is_on_by_default_reports_one():
 def test_a_mode_that_the_screen_does_not_act_on_reports_zero():
     "A program that reads zero falls back, instead of trusting us."
     _screen, stream, answers = make_screen()
-    query_mode(stream, 1003)  # Any-event mouse tracking.
+    query_mode(stream, 1001)  # Highlight mouse tracking.
     query_mode(stream, 9999)
-    assert answers == ["\x1b[?1003;0$y", "\x1b[?9999;0$y"]
+    assert answers == ["\x1b[?1001;0$y", "\x1b[?9999;0$y"]
 
 
 def test_setting_a_mode_that_we_do_not_act_on_still_reports_zero():
     "The set holds every mode, but the answer says what we serve."
     _screen, stream, answers = make_screen()
-    stream.feed("\x1b[?1003h")
-    query_mode(stream, 1003)
-    assert answers == ["\x1b[?1003;0$y"]
+    stream.feed("\x1b[?1001h")
+    query_mode(stream, 1001)
+    assert answers == ["\x1b[?1001;0$y"]
 
 
 def test_the_alternate_screen_mode_is_reported():

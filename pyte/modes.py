@@ -221,6 +221,20 @@ class PrivateMode(IntEnum):
     PASTE_EVENTS = 5522
 
 
+#: The modes of which a terminal holds one value, as flags. A set takes
+#: the place of the rest of its group, and a reset of any one turns the
+#: group off. kitty, Ghostty, libvterm and xterm.js do both. WezTerm
+#: keeps 1000, 1002 and 1003 apart. Alacritty acts on a reset only when
+#: it names the mode that is on, and xterm does so for the formats.
+#: Lillecarl/pymux#901.
+ONE_OF_A_GROUP: tuple[frozenset[int], ...] = (
+    frozenset(
+        mode.flag for mode in (PrivateMode.MOUSE_REPORTING, PrivateMode.BUTTON_EVENT_MOUSE, PrivateMode.ANY_EVENT_MOUSE)
+    ),
+    frozenset(mode.flag for mode in (PrivateMode.SGR_MOUSE, PrivateMode.URXVT_MOUSE, PrivateMode.SGR_PIXEL_MOUSE)),
+)
+
+
 class AnsiMode(IntEnum):
     """
     A mode that "CSI Ps h" carries, with no private marker.

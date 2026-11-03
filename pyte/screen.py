@@ -74,7 +74,7 @@ from .keys.events import (
 from .keys.flags import current_flags, deliverable_flags, popped, pushed, with_flags_set
 from .kitty_clipboard import ClipboardRequest, KittyClipboard, answer_to
 from .kitty_dnd import KittyDnd
-from .modes import AnsiMode, ModeState, PrivateMode, flag_of
+from .modes import ONE_OF_A_GROUP, AnsiMode, ModeState, PrivateMode, flag_of
 from .osc import (
     CLEAR_SCROLLBACK,
     COLOR_BASE,
@@ -2074,6 +2074,12 @@ class Screen:
         if kwargs.get("private"):
             modes = tuple(flag_of(mode) for mode in modes if self._carries(mode))
 
+        for group in ONE_OF_A_GROUP:
+            chosen = [mode for mode in modes if mode in group]
+            if chosen:
+                self.mode.difference_update(group)
+                modes = (*(mode for mode in modes if mode not in group), chosen[-1])
+
         self.mode.update(modes)
 
         if PrivateMode.CURSOR_BLINK.flag in modes:
@@ -2208,6 +2214,9 @@ class Screen:
             self.frames_drawn += 1
 
         self.mode.difference_update(modes)
+        for group in ONE_OF_A_GROUP:
+            if not group.isdisjoint(modes):
+                self.mode.difference_update(group)
 
         if PrivateMode.CURSOR_BLINK.flag in modes:
             self.set_cursor_blink(False)
@@ -5185,10 +5194,13 @@ class Screen:
             PrivateMode.NO_CLEAR_ON_COLUMN_CHANGE,
             PrivateMode.REVERSE_WRAP_ANYWHERE,
             PrivateMode.MOUSE_REPORTING,
+            PrivateMode.BUTTON_EVENT_MOUSE,
+            PrivateMode.ANY_EVENT_MOUSE,
             PrivateMode.FOCUS_EVENTS,
             PrivateMode.SGR_MOUSE,
             PrivateMode.ALTERNATE_SCROLL,
             PrivateMode.URXVT_MOUSE,
+            PrivateMode.SGR_PIXEL_MOUSE,
             PrivateMode.ALTERNATE_SCREEN_AGAIN,
             PrivateMode.SAVE_CURSOR,
             PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR,
@@ -5703,9 +5715,8 @@ class Screen:
         same: a restore of nothing changes nothing. With no number it
         brings back `SAVED_WITHOUT_NUMBERS`, as kitty does.
 
-        The modes that go off go first. The three mouse modes are one
-        choice in a terminal, so a restore that turns one on after
-        another went off leaves the one that was saved.
+        The modes that go off go first. A reset of one mouse mode turns
+        its group off, so the one that was saved goes on after.
         """
         ansi = {}
         if params:

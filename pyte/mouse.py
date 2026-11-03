@@ -117,9 +117,8 @@ class _Tracking(IntEnum):
 
 def _tracking(screen: Screen) -> _Tracking:
     """
-    Which events the program asked for. kitty holds one mode, set by the
-    last of 1000, 1002 and 1003; pyte holds three flags, so the widest
-    one set wins.
+    Which events the program asked for: the one of 1000, 1002 and 1003
+    that is set, as `ONE_OF_A_GROUP` keeps it.
     """
     if PrivateMode.ANY_EVENT_MOUSE.flag in screen.mode:
         return _Tracking.ANY
