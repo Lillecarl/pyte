@@ -17,7 +17,7 @@ Lillecarl/pymux#892.
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from .keep import Keep
 from .sequences.kitty_dnd import MACHINE_ID, START_OFFERING, STOP_OFFERING, DndPacket, DndType, Malformed
@@ -58,6 +58,26 @@ class KittyDnd:
         self.offering = False
         self.drag_client_id = 0
         self.offer_machine_id = ""
+
+    def registration(self, machine_id: str) -> dict[str, Any]:
+        "What a mirror's frame says the program registered, with `machine_id` where it named none."
+        return {
+            "accepting": self.accepting,
+            "mimes": self.accepted_mimes,
+            "machine_id": self.machine_id or machine_id,
+            "offering": self.offering,
+            "offer_machine_id": self.offer_machine_id or machine_id,
+        }
+
+    def register(self, data: dict[str, Any]) -> bool:
+        "Take a frame's registration on a mirror. True when what the terminals register for changed."
+        before = (self.accepting, self.accepted_mimes, self.offering)
+        self.accepting = bool(data.get("accepting"))
+        self.accepted_mimes = str(data.get("mimes") or "")
+        self.machine_id = str(data.get("machine_id") or "")
+        self.offering = bool(data.get("offering"))
+        self.offer_machine_id = str(data.get("offer_machine_id") or "")
+        return (self.accepting, self.accepted_mimes, self.offering) != before
 
     def take(self, param: str) -> DndPacket | None:
         "The packet an OSC 72 carries, whole; None for one kitty drops."

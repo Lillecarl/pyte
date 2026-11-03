@@ -91,6 +91,10 @@ class DndPacket(StringReport):
     payload: str = ""
 
     def sequence(self) -> StringSequence:
+        return OscString(Osc.KITTY_DND, self.param()).sequence()
+
+    def param(self) -> str:
+        "What the OSC carries after its code, as `decode` reads it."
         fields = ["t=" + self.type] if self.type else []
         located = self.type in _LOCATED
         for key, name in _INT_KEYS.items():
@@ -103,7 +107,7 @@ class DndPacket(StringReport):
         if self.more:
             fields.append("m=%d" % self.more)
         metadata = ":".join(fields)
-        return OscString(Osc.KITTY_DND, metadata + ";" + self.payload if self.payload else metadata).sequence()
+        return metadata + ";" + self.payload if self.payload else metadata
 
     @classmethod
     def decode(cls, param: str) -> DndPacket:
