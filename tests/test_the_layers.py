@@ -72,6 +72,7 @@ PURE = {
     "sequences.csi",
     "sequences.escapes",
     "sequences.kitty_clipboard",
+    "sequences.file_transfer",
     "sequences.kitty_dnd",
     "sequences.kitty_graphics",
     "sequences.kitty_keyboard",

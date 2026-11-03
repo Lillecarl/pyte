@@ -121,6 +121,8 @@ from .placeholders import PlaceholderRun, merge_runs, runs_in_line
 from .reflow import first_row_to_lay_out, highest_row_held, lay_out
 from .sequences.csi import Csi, CsiReport, CsiSequence, Marker, Parameter
 from .sequences.escapes import Sharp
+from .sequences.file_transfer import Malformed as MalformedTransfer
+from .sequences.file_transfer import TransferCommand
 from .sequences.kitty_clipboard import ClipboardPacket
 from .sequences.kitty_clipboard import Status as ClipboardStatus
 from .sequences.kitty_dnd import DndPacket
@@ -441,6 +443,7 @@ class Screen:
         "surroundings_func": Keep.REBUILT,
         "clipboard_func": Keep.REBUILT,
         "dnd_func": Keep.REBUILT,
+        "file_transfer_func": Keep.REBUILT,
         "version": Keep.REBUILT,
         # Caches of what the cells say.
         "_cell_caches": Keep.REBUILT,
@@ -553,6 +556,11 @@ class Screen:
         #: A chain of chunks still arriving, and what the program
         #: registered for. A reset leaves both, as kitty's window does.
         self.kitty_dnd = KittyDnd()
+        #: Whoever serves kitty's file transfer (OSC 5113): told each
+        #: command the program sends. None ignores them all, so a
+        #: transfer waits for an answer that never comes.
+        #: Lillecarl/pymux#912.
+        self.file_transfer_func: Callable[[TransferCommand], None] | None = None
 
         # The colours a pane starts with, before a program sets any. The
         # embedder replaces it when it learns the theme of the terminal
@@ -6161,6 +6169,13 @@ class Screen:
             packet = self.kitty_dnd.take(param)
             if packet is not None and self.dnd_func is not None:
                 self.dnd_func(packet)
+        elif code == Osc.FILE_TRANSFER:
+            if self.file_transfer_func is not None:
+                try:
+                    command = TransferCommand.decode(param)
+                except MalformedTransfer:
+                    return
+                self.file_transfer_func(command)
         elif code in FORWARDED_OSC:
             if code == Osc.TERMINAL_EXTENSION:
                 self._read_terminal_extension(param)

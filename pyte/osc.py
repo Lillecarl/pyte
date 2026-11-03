@@ -99,6 +99,8 @@ class Osc(StrEnum):
     KITTY_DND = "72"
     #: "OSC 66": kitty's text sizing, text in a block of cells.
     TEXT_SIZE = "66"
+    #: "OSC 5113": kitty's file transfer, both ways.
+    FILE_TRANSFER = "5113"
     #: "OSC 99": a desktop notification.
     NOTIFICATION = "99"
     #: "OSC 777 ; notify ; title ; body": the plain desktop notification
