@@ -2275,6 +2275,9 @@ class Screen:
                 setattr(self, k, v)
             self.page = self._original_screen
             self.touch_everything()
+            # Any of the three gives the page back, so none of them is
+            # set after. Lillecarl/pymux#856.
+            self.mode.difference_update(self._ALTERNATE_SCREEN_MODES)
 
             self._original_screen = None
             self._original_screen_vars = {}
@@ -5322,11 +5325,17 @@ class Screen:
             known = (
                 number in self._known_private_modes or number in self._remembered_private_modes
             ) and self._embedder_carries(number)
-            # DECSCUSR writes this one as well, and the alternate
+            # DECSCUSR writes the blink as well, and the alternate
             # screen carries a `mode` of its own. So the answer
             # comes from the shape, which is the one value that
             # both sequences write.
-            enabled = self.cursor_blinks if number == PrivateMode.CURSOR_BLINK else flag_of(number) in self.mode
+            if number == PrivateMode.CURSOR_BLINK:
+                enabled = self.cursor_blinks
+            elif flag_of(number) in self._ALTERNATE_SCREEN_MODES:
+                # xterm reads all three from the one page in front.
+                enabled = self.in_alternate_screen
+            else:
+                enabled = flag_of(number) in self.mode
         else:
             permanent = number in self._permanently_reset_ansi_modes
             known = number in self._known_ansi_modes or number in self._remembered_ansi_modes

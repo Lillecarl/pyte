@@ -114,6 +114,22 @@ def test_the_alternate_screen_mode_is_reported():
     assert answers == ["\x1b[?1049;2$y", "\x1b[?1049;1$y"]
 
 
+def test_another_page_mode_gives_the_page_back_and_clears_all_three():
+    "xterm reads 47, 1047 and 1049 from one page. Lillecarl/pymux#856."
+    screen, stream, answers = make_screen()
+    stream.feed("\x1b[?1049h\x1b[?47h")
+    for mode in (47, 1047, 1049):
+        query_mode(stream, mode)
+    stream.feed("\x1b[?47l")
+    for mode in (47, 1047, 1049):
+        query_mode(stream, mode)
+    assert not screen.in_alternate_screen
+    assert answers == [
+        *("\x1b[?%d;1$y" % mode for mode in (47, 1047, 1049)),
+        *("\x1b[?%d;2$y" % mode for mode in (47, 1047, 1049)),
+    ]
+
+
 def test_a_mode_without_a_private_marker_is_answered_without_one():
     _screen, stream, answers = make_screen()
     stream.feed("\x1b[4h")  # IRM: insert mode.
