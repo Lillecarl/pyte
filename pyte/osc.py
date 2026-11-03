@@ -58,6 +58,7 @@ __all__ = [
     "Osc",
     "PointerShapeRead",
     "PointerShapes",
+    "ProgramPalette",
     "asks_for_the_clipboard",
     "color_base_data",
     "color_base_of",
@@ -681,6 +682,21 @@ def _color_of(value: object) -> Color | None:
 COLOR_STACK_DEPTH = 10
 
 
+class ProgramPalette:
+    """
+    Palette entries a program set, as the "#rrggbb" a renderer draws.
+
+    Hashed and compared by identity, which runs in C: a render cache
+    takes it as a key once per run.
+    """
+
+    __slots__ = ("entries", "words")
+
+    def __init__(self, entries: tuple[tuple[int, str], ...]) -> None:
+        self.entries = entries
+        self.words: dict[int, str] = dict(entries)
+
+
 class ColorOverrides:
     """
     The colours that a program set, over the ones a pane starts with.
@@ -701,10 +717,11 @@ class ColorOverrides:
     what a program set.
     """
 
-    __slots__ = ("base", "by_code", "by_index", "stack", "stack_top")
+    __slots__ = ("_palette", "base", "by_code", "by_index", "stack", "stack_top")
 
     #: The base is the embedder's, and it pushes it again after a load.
     KEEP: ClassVar[dict[str, Keep]] = {
+        "_palette": Keep.DROPPED,
         "base": Keep.REBUILT,
         "by_code": Keep.SAVED,
         "by_index": Keep.SAVED,
@@ -733,6 +750,26 @@ class ColorOverrides:
         #: What a push put away, oldest first: both tables each time.
         self.stack: list[tuple[dict[int, Color], dict[str, Color]]] = []
         self.stack_top = 0
+
+        self._palette: ProgramPalette | None = None
+
+    def after_thaw(self) -> None:
+        self._palette = None
+
+    def program_palette(self) -> ProgramPalette | None:
+        """
+        The palette entries a program set, for a renderer that draws
+        with them, or None when it set none.
+
+        The same entries give back the same object, so a cache keyed on
+        it hits by identity. A frame asks once, not once per cell.
+        """
+        words = tuple((index, color.hex) for index, color in sorted(self.by_index.items()) if index < len(PALETTE))
+        if not words:
+            return None
+        if self._palette is None or self._palette.entries != words:
+            self._palette = ProgramPalette(words)
+        return self._palette
 
     def color_of(self, index: int) -> Color | None:
         """
