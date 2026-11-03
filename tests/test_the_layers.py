@@ -79,11 +79,13 @@ PURE = {
     "sequences.replies",
     "sequences.reports",
     "sequences.strings",
+    "sequences.text_sizing",
     "sgr",
     "sixel",
     "streams",
     "surroundings",
     "terminfo",
+    "text_sizes",
     "titles",
     "xcms",
 }

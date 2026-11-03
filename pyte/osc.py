@@ -97,6 +97,8 @@ class Osc(StrEnum):
     KITTY_CLIPBOARD = "5522"
     #: "OSC 72": kitty's drag and drop, both ways.
     KITTY_DND = "72"
+    #: "OSC 66": kitty's text sizing, text in a block of cells.
+    TEXT_SIZE = "66"
     #: "OSC 99": a desktop notification.
     NOTIFICATION = "99"
     #: "OSC 777 ; notify ; title ; body": the plain desktop notification

@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from collections import defaultdict, namedtuple
 from collections.abc import Callable, Iterable, Sequence
+from dataclasses import replace
 from typing import ClassVar, NamedTuple
 
 from . import charsets as cs
@@ -119,6 +120,7 @@ from .parameters import (
 from .placeholders import PlaceholderRun, merge_runs, runs_in_line
 from .reflow import first_row_to_lay_out, highest_row_held, lay_out
 from .sequences.csi import Csi, CsiReport, CsiSequence, Marker, Parameter
+from .sequences.escapes import Sharp
 from .sequences.kitty_clipboard import ClipboardPacket
 from .sequences.kitty_clipboard import Status as ClipboardStatus
 from .sequences.kitty_dnd import DndPacket
@@ -153,6 +155,8 @@ from .sequences.strings import (
     TitleReport,
     VersionReport,
 )
+from .sequences.text_sizing import Malformed as MalformedTextSize
+from .sequences.text_sizing import TextSize
 from .sgr import after_sgr, erased_appearance, parameters_of
 from .surroundings import Surroundings
 from .terminfo import (
@@ -162,6 +166,7 @@ from .terminfo import (
     XTERM_PATCH_LEVEL,
     XTERM_TYPE,
 )
+from .text_sizes import DecLine, SizedBlock, TextSizes, graphemes
 from .titles import Titles
 
 __all__ = ("Screen",)
@@ -352,6 +357,8 @@ class Screen:
         # screen gets a fresh GraphicsState, the main screen one is
         # restored when leaving the alternate screen.
         "graphics",
+        # The text at another size lies on the cells of one screen.
+        "text_sizes",
     ]
 
     #: What a hot upgrade does with each attribute. `pyte.keep` says
@@ -409,6 +416,7 @@ class Screen:
         "kitty_dnd": Keep.SAVED,
         "extra_cursors": Keep.SAVED,
         "graphics": Keep.SAVED,
+        "text_sizes": Keep.SAVED,
         "attribute_extent": Keep.SAVED,
         "active_display": Keep.SAVED,
         "status_line": Keep.SAVED,
@@ -602,6 +610,10 @@ class Screen:
         # placements. (Reset and alternate screen switching replace the
         # whole state; see `reset` and `set_mode`.)
         self.graphics = GraphicsState()
+
+        #: kitty's text sizing, OSC 66, and the DEC line attributes.
+        #: Lillecarl/pymux#890.
+        self.text_sizes = TextSizes()
 
         #: The size of one cell, in pixels. A screen holds no pixels of
         #: its own, so this is what the thing that draws it says a cell
@@ -1048,6 +1060,7 @@ class Screen:
         # full terminal reset. It also clears all graphics.)
         self.kitty_flags_stack = ()
         self.graphics.clear()
+        self.text_sizes.clear()
 
         # XTMODKEYS goes back to where it started too, and so does
         # XTFMTKEYS. Neither swaps with the alternate screen, the way
@@ -1633,6 +1646,13 @@ class Screen:
             self.columns = columns
             self.extra_cursors.crop(lines, columns)
 
+            # A reflow moves rows and cuts lines, and a block is cells on
+            # rows. kitty loses a block that no longer fits; this loses
+            # every one, and its cells keep the text.
+            self.text_sizes.clear()
+            if stashed_vars is not None and "text_sizes" in stashed_vars:
+                stashed_vars["text_sizes"].clear()
+
             self._reset_offset_and_margins()
 
             # A height that was reduced used to hold `max_y` down to
@@ -2184,6 +2204,7 @@ class Screen:
                 # the alternate screen.)
                 self.kitty_flags_stack = ()
                 self.graphics = GraphicsState()
+                self.text_sizes = TextSizes()
 
             self.margins = margins
             self.horizontal_margins = horizontal_margins
@@ -2398,6 +2419,11 @@ class Screen:
         `chars` is supposed to *not* contain any special characters.
         No newlines or control codes.
         """
+        sizes = self.text_sizes
+        if (sizes.blocks or sizes.dec_line is not None) and not sizes.drawing:
+            self._draw_among_blocks(chars)
+            return
+
         # Aliases for variables that are used more than once in this function.
         # Local lookups are always faster.
         # (This draw function is called for every printable character that a
@@ -3017,6 +3043,7 @@ class Screen:
             # where they land, so that one on the last row is not read
             # as having scrolled out.
             self.graphics.scroll(bottom + line_offset + 1, lines + line_offset, -1)
+            self.text_sizes.scroll(bottom + line_offset + 1, lines + line_offset, -1)
 
             # Only the first screen reaches here, so this is the count
             # `index` keeps and never the alternate screen's prune on
@@ -3127,6 +3154,7 @@ class Screen:
             # Graphics placements scroll with the text. An image sits on
             # whole lines, so it moves only when whole lines move.
             self.graphics.scroll(top + line_offset, bottom + line_offset, amount)
+            self.text_sizes.scroll(top + line_offset, bottom + line_offset, amount)
 
             # Whole lines moved, so readers can move with them: the
             # region in buffer rows, the signed distance (up positive),
@@ -3206,6 +3234,7 @@ class Screen:
             self._forget(line)
         self.history_floor = max(self.history_floor, remove_above)
         self.graphics.prune_above(remove_above)
+        self.text_sizes.prune_above(remove_above)
 
     def _forget(self, row: int) -> None:
         """
@@ -3660,6 +3689,9 @@ class Screen:
         line = self.data_buffer[self.pt_cursor_position.y]
         self.touch(self.pt_cursor_position.y)
 
+        if self.text_sizes.blocks:
+            self.text_sizes.shift(self, self.pt_cursor_position.y, cursor_x, count, edge)
+
         # Move what sits at and after the cursor to the right. What
         # falls off the right edge is lost.
         moved = {}
@@ -3698,6 +3730,9 @@ class Screen:
         edge = right + 1
         line = self.data_buffer[self.pt_cursor_position.y]
         self.touch(self.pt_cursor_position.y)
+
+        if self.text_sizes.blocks:
+            self.text_sizes.shift(self, self.pt_cursor_position.y, cursor_x, -count, edge)
 
         # Move what sits after the deleted characters to the left.
         moved = {}
@@ -4011,6 +4046,8 @@ class Screen:
         erased = _ERASED_CACHE[" ", self.erase_appearance() or PLAIN_APPEARANCE]
 
         end = min(cursor_position.x + count, self.columns)
+        if self.text_sizes.blocks:
+            self.text_sizes.cover(self, cursor_position.y, cursor_position.y, cursor_position.x, end)
         for column in range(cursor_position.x, end):
             # ECH leaves a cell that SPA marked alone.
             cell = row.get(column)
@@ -4173,6 +4210,8 @@ class Screen:
         self.touch(pt_cursor_position.y)
         if self.graphics.placements:
             self.graphics.cover(pt_cursor_position.y, pt_cursor_position.y, columns.start, columns.stop)
+        if self.text_sizes.blocks:
+            self.text_sizes.cover(self, pt_cursor_position.y, pt_cursor_position.y, columns.start, columns.stop)
         holds = self._erase_holds
         erased = _ERASED_CACHE[" ", appearance] if appearance else None
 
@@ -4265,6 +4304,7 @@ class Screen:
                 # The images went with their rows. What still reaches
                 # the screen goes with the erase, as kitty clears it.
                 self.graphics.prune_below(self.line_offset - 1)
+                self.text_sizes.prune_below(self.line_offset - 1)
             else:
                 self.graphics.remove_all_placements()
             type_of = EraseExtent.ALL
@@ -4272,6 +4312,10 @@ class Screen:
             # Clearing the screen (ED 2) or the history (ED 3) removes
             # all graphics placements. (The image data is kept.)
             self.graphics.remove_all_placements()
+            if type_of == EraseExtent.HISTORY:
+                self.text_sizes.prune_above(self.line_offset)
+        if type_of == EraseExtent.ALL:
+            self.text_sizes.dec_line = None
 
         line_offset = self.line_offset
         pt_cursor_position = self.pt_cursor_position
@@ -4347,6 +4391,9 @@ class Screen:
                 # interval stops above.
                 bottom = max(interval.stop, line_offset + self.lines) if type_of == 0 else interval.stop
                 self.graphics.cover(interval.start, bottom - 1, 0, self.columns)
+            if self.text_sizes.blocks:
+                bottom = max(interval.stop, line_offset + self.lines) if type_of == 0 else interval.stop
+                self.text_sizes.cover(self, interval.start, bottom - 1, 0, self.columns)
 
             for line in interval:
                 if reads_the_marks:
@@ -4474,6 +4521,8 @@ class Screen:
         if corners is None:
             return
         top, left, bottom, right = corners
+        if self.text_sizes.blocks:
+            self.text_sizes.cover(self, top + self.line_offset, bottom + self.line_offset, left, right + 1)
 
         protection = self.protection
         if protection:
@@ -4536,6 +4585,8 @@ class Screen:
         if corners is None:
             return
         top, left, bottom, right = corners
+        if self.text_sizes.blocks:
+            self.text_sizes.cover(self, top + self.line_offset, bottom + self.line_offset, left, right + 1)
 
         appearance = self.erase_appearance()
         erased = _ERASED_CACHE[" ", appearance] if appearance else None
@@ -4838,10 +4889,233 @@ class Screen:
         self.pending_wrap = False
 
     # ------------------------------------------------------------------
+    # Text at another size: kitty's OSC 66, and the DEC line attributes
+    # that become it. `text_sizes.py` says what a block is and why
+    # DECDWL draws wrong in kitty.
+
+    def text_size(self, size: TextSize, line: str = "") -> None:
+        """
+        OSC 66: draw `size.text` in blocks of cells at the cursor, as
+        kitty's `screen_handle_multicell_command` does. A width puts the
+        whole text in one block; with none, each grapheme takes its own.
+        kitty drops the control characters, and so does this.
+        """
+        text = "".join(character for character in size.text if character >= " " and not "\x7f" <= character <= "\x9f")
+        if not text:
+            return
+        if size.width:
+            self._put_block(replace(size, text=text), size.width * size.scale, line)
+            return
+        for piece in graphemes(text):
+            self._put_block(replace(size, text=piece), character_width(piece) * size.scale, line)
+
+    def _put_block(self, size: TextSize, columns: int, line: str) -> None:
+        rows = size.scale
+        top, bottom = self.margins or Margins(0, self.lines - 1)
+        if columns > self.columns or rows > bottom - top + 1:
+            return
+        self._move_past_tall_blocks(columns)
+        cursor = self.pt_cursor_position
+        row = cursor.y - self.line_offset
+        if rows > 1:
+            if row <= bottom:
+                extra = rows - (bottom - row + 1)
+                if extra > 0:
+                    self._scroll_region(extra)
+                    cursor.y -= extra
+            elif rows > self.lines - row:
+                cursor.y -= rows - (self.lines - row)
+        self.text_sizes.put(self, SizedBlock(cursor.x, cursor.y, columns, rows, size, self._appearance, line))
+        if self.graphics.placements:
+            self.graphics.cover(cursor.y, cursor.y + rows - 1, cursor.x, cursor.x + columns)
+        cursor.x += columns
+        self.pending_wrap = cursor.x >= self.columns
+        self.max_y = max(self.max_y, cursor.y + rows - 1)
+
+    def _tall_block_in(self, x: int, y: int, width: int) -> bool:
+        return any(block.rows > 1 and block.meets(y, y, x, x + width) for block in self.text_sizes.blocks)
+
+    def _move_past_tall_blocks(self, width: int) -> None:
+        """
+        Take the cursor to where a block `width` wide fits: past every
+        block of more than one row on its line, and on to the next line
+        when this one is full and autowrap is on. kitty's
+        `move_cursor_past_multicell`, which also goes on to the next line
+        with autowrap off when a tall block holds the end of this one.
+        """
+        columns = self.columns
+        for _ in range(self.lines + 1):
+            cursor = self.pt_cursor_position
+            x = columns if self.pending_wrap else cursor.x
+            while x + width <= columns:
+                if not self._tall_block_in(x, cursor.y, width):
+                    cursor.x = x
+                    self.pending_wrap = False
+                    return
+                x += 1
+            if PrivateMode.AUTOWRAP.flag in self.mode or self._tall_block_in(columns - width, cursor.y, width):
+                self.carriage_return()
+                self.linefeed()
+                self.set_wrapped(self.pt_cursor_position.y)
+            else:
+                cursor.x = columns - width
+                self.pending_wrap = False
+                return
+
+    def _draw_among_blocks(self, chars: str) -> None:
+        """
+        `draw`, one character at a time, on a screen that holds a block
+        or a DEC line attribute. The spec's rules for text that lands on
+        a block, in its order: a mark joins the block, text on the top
+        row takes the block away, and text on a lower row goes past it.
+        """
+        sizes = self.text_sizes
+        sizes.drawing = True
+        try:
+            for char in chars:
+                cursor = self.pt_cursor_position
+                dec = sizes.dec_line
+                if dec is not None and dec.row != cursor.y:
+                    sizes.dec_line = dec = None
+                if dec is not None:
+                    self._draw_on_a_dec_line(char, dec.kind)
+                    continue
+                if character_width(char) == 0:
+                    if self._join_the_block(char):
+                        continue
+                else:
+                    self._clear_the_way(character_width(char))
+                self.draw(char)
+        finally:
+            sizes.drawing = False
+
+    def _join_the_block(self, mark: str) -> bool:
+        cursor = self.pt_cursor_position
+        block = self.text_sizes.block_at(cursor.x - 1, cursor.y)
+        if block is None:
+            return False
+        block.size = replace(block.size, text=block.size.text + mark)
+        self.touch_rows(range(block.y, block.y + block.rows))
+        return True
+
+    def _clear_the_way(self, width: int) -> None:
+        "Make room for a character `width` wide at the cursor, by the spec's rules."
+        sizes = self.text_sizes
+        if self.pending_wrap and PrivateMode.AUTOWRAP.flag in self.mode:
+            self.carriage_return()
+            self.linefeed()
+            self.set_wrapped(self.pt_cursor_position.y)
+        cursor = self.pt_cursor_position
+        for _ in range(self.columns):
+            block = next(
+                (found for x in range(cursor.x, cursor.x + width) if (found := sizes.block_at(x, cursor.y))), None
+            )
+            if block is None:
+                return
+            if block.y == cursor.y:
+                sizes.remove(self, block, spaces=cursor.x != block.x)
+            else:
+                cursor.x = block.x + block.columns
+
+    def _translate_one(self, char: str) -> str:
+        "`char` through the character set that `draw` would use for it."
+        if self.single_shift is None:
+            return char.translate(self.g_charsets[self.gl])
+        shift, self.single_shift = self.single_shift, None
+        return char.translate(self.g_charsets[shift])
+
+    def _dec_size(self, text: str, kind: str, row: int) -> TextSize:
+        """
+        The OSC 66 that draws `text` on a line of `kind` at buffer row
+        `row`. DECDHL's top half takes two rows, and on the last row of
+        the region it has only one, so it draws as double width.
+        """
+        _top, bottom = self.margins or Margins(0, self.lines - 1)
+        if kind == Sharp.DECDHL_TOP and row - self.line_offset < bottom:
+            return TextSize(text, scale=2)
+        return TextSize(text, width=2 * character_width(text))
+
+    def _draw_on_a_dec_line(self, char: str, kind: str) -> None:
+        text = self._translate_one(char)
+        self.last_character = char
+        if character_width(text) == 0:
+            self._join_the_block(text)
+            return
+        cursor = self.pt_cursor_position
+        if kind == Sharp.DECDHL_BOTTOM:
+            block = self.text_sizes.block_at(cursor.x, cursor.y)
+            if block is not None and block.y < cursor.y:
+                # The top half above already draws this text.
+                cursor.x = min(cursor.x + 2 * character_width(text), self.columns)
+                self.pending_wrap = cursor.x >= self.columns
+                return
+        self.text_size(self._dec_size(text, kind, cursor.y), line=kind)
+
+    def double_height_top(self) -> None:
+        'DECDHL ("ESC # 3"): the line is the top half of text twice as high.'
+        self._line_attribute(Sharp.DECDHL_TOP)
+
+    def double_height_bottom(self) -> None:
+        'DECDHL ("ESC # 4"): the line is the bottom half of text twice as high.'
+        self._line_attribute(Sharp.DECDHL_BOTTOM)
+
+    def single_width(self) -> None:
+        'DECSWL ("ESC # 5"): the line goes back to text of one size.'
+        self._line_attribute(Sharp.DECSWL)
+
+    def double_width(self) -> None:
+        'DECDWL ("ESC # 6"): the line is text twice as wide. kitty draws it wrong; `text_sizes.py` says why.'
+        self._line_attribute(Sharp.DECDWL)
+
+    def _line_attribute(self, kind: Sharp) -> None:
+        """
+        Turn the text of the cursor's line into blocks of `kind`, and
+        hold `kind` for what the program writes on the line next. The
+        first half of the line is what a VT100 shows on a line twice as
+        wide, and the rest goes. DECSWL turns the blocks back into text.
+        """
+        sizes = self.text_sizes
+        y = self.pt_cursor_position.y
+        self._single_width_line(y)
+        if kind == Sharp.DECSWL:
+            sizes.dec_line = None
+            return
+        row = self.data_buffer[y]
+        half = self.columns // 2
+        texts = []
+        for column, cell in sorted(row.items()):
+            if sizes.block_at(column, y) is not None:
+                continue
+            del row[column]
+            if column < half and cell.char:
+                texts.append((column, cell))
+        for column, cell in texts:
+            size = self._dec_size(cell.char, kind, y)
+            columns = 2 * character_width(cell.char)
+            if 2 * column + columns <= self.columns:
+                sizes.put(self, SizedBlock(2 * column, y, columns, size.scale, size, cell.appearance, kind))
+        sizes.dec_line = DecLine(y, kind)
+        self.touch(y)
+
+    def _single_width_line(self, y: int) -> None:
+        "Put the text of the DEC blocks on line `y` back in its cells, at one size."
+        sizes = self.text_sizes
+        row = self.data_buffer[y]
+        for block in [block for block in sizes.blocks if block.line and block.y == y]:
+            sizes.remove(self, block)
+            column = block.x // 2
+            for piece in graphemes(block.size.text):
+                row[column] = _CHAR_CACHE[piece, block.appearance]
+                if character_width(piece) > 1:
+                    row[column + 1] = _CHAR_CACHE["", block.appearance]
+                column += character_width(piece)
+        self.touch(y)
+
+    # ------------------------------------------------------------------
     # The pattern that shows the shape of a screen.
     #
-    # DECALN is the one "ESC #" sequence this screen acts on. The four
-    # DEC line attributes are read and dropped; `streams.py` says why.
+    # DECALN, "ESC # 8". The other four are the line attributes, which
+    # become text at another size.
 
     def alignment_display(self) -> None:
         """
@@ -4856,6 +5130,7 @@ class Screen:
         a cell that nobody wrote, which is what an erase leaves, and
         anything that tells the two apart then reads a blank screen.
         """
+        self.text_sizes.clear()
         for y in range(self.lines):
             line = self.data_buffer[y + self.line_offset]
             self.touch(y + self.line_offset)
@@ -5083,6 +5358,7 @@ class Screen:
 
         self.max_y -= count
         self.graphics.prune_below(self.max_y)
+        self.text_sizes.prune_below(self.max_y)
 
         # The screen slides down over rows that a prune took away, and
         # a program may write on them again. `history_floor` says that
@@ -5875,6 +6151,12 @@ class Screen:
             self.pop_colors()
         elif code == Osc.KITTY_CLIPBOARD:
             self._kitty_clipboard(param)
+        elif code == Osc.TEXT_SIZE:
+            try:
+                size = TextSize.decode(param)
+            except MalformedTextSize:
+                return
+            self.text_size(size)
         elif code == Osc.KITTY_DND:
             packet = self.kitty_dnd.take(param)
             if packet is not None and self.dnd_func is not None:

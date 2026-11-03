@@ -32,7 +32,7 @@ from . import control as ctrl
 from . import escape as esc
 from .keep import Keep
 from .sequences.csi import Csi
-from .sequences.escapes import Escape
+from .sequences.escapes import Escape, Sharp
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Mapping
@@ -238,18 +238,14 @@ class Stream:
 
     #: "sharp" escape sequences -- ``ESC # <N>``.
     #:
-    #: **The four DEC line attributes are read and dropped.** "ESC # 3",
-    #: "ESC # 4", "ESC # 5" and "ESC # 6" draw a line at twice the width
-    #: or twice the height on a VT100. kitty, Ghostty and Alacritty
-    #: implement none of them, esctest has no test for them, and no
-    #: recorded program in this repository sends one; xterm and libvterm
-    #: are the two that do. So this screen reads the byte and draws the
-    #: line the plain way. Lillecarl/pymux#141.
-    #:
-    #: Reading the byte is what matters. The dispatch answers an unknown
-    #: one with `debug`, which eats it, and a byte nobody reads would
-    #: land on the screen as text.
+    #: The four DEC line attributes become kitty's text sizing, OSC 66:
+    #: `text_sizes.py` says how, and why DECDWL draws wrong in kitty.
+    #: Lillecarl/pymux#890.
     sharp = {
+        Sharp.DECDHL_TOP: "double_height_top",
+        Sharp.DECDHL_BOTTOM: "double_height_bottom",
+        Sharp.DECSWL: "single_width",
+        Sharp.DECDWL: "double_width",
         esc.DECALN: "alignment_display",
     }
 

@@ -18,9 +18,9 @@ Nothing between VT100 and VT500 is skipped, and esctest2's
 
 **The DEC line attributes are the one exception.** "ESC # 3",
 "ESC # 4", "ESC # 5" and "ESC # 6" draw a line at twice the width or
-twice the height on a VT100. This screen reads each of them and holds
-the line the plain way, the way kitty, Ghostty and Alacritty do.
-Lillecarl/pymux#141 holds the reasons and the vote.
+twice the height on a VT100. This screen turns each into kitty's text
+sizing, OSC 66, which has no glyph twice as wide: a double width line
+draws wrong in kitty. `text_sizes.py` says how. Lillecarl/pymux#890.
 
 On top of that are the things no DEC terminal had: 256 colours,
 truecolour, the kitty keyboard and graphics protocols, sixels,

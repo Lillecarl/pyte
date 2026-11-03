@@ -86,11 +86,8 @@ class Sharp(StrEnum):
     which.
 
     Four of the five draw a line at twice the width or twice the
-    height on a VT100. This screen reads them and draws neither, which
-    `tests/test_line_attributes.py` says why: kitty, Ghostty and
-    Alacritty implement none of them and no recorded program sends
-    one. What has to be true is that the bytes go away.
-    Lillecarl/pymux#141.
+    height on a VT100. A screen turns them into kitty's text sizing,
+    as `text_sizes.py` says. Lillecarl/pymux#890.
     """
 
     #: Double height, top half.
