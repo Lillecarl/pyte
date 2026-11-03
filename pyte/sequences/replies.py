@@ -28,6 +28,9 @@ from .reports import (
     ColorSchemeReport,
     CursorPositionReport,
     DeviceAttributes,
+    ExtraCursorColorsReport,
+    ExtraCursorsReport,
+    ExtraCursorsSupport,
     FocusReport,
     InBandSizeReport,
     KeyboardFlagsReport,
@@ -59,6 +62,9 @@ Reply = (
     | ColorSchemeReport
     | CursorPositionReport
     | DeviceAttributes
+    | ExtraCursorColorsReport
+    | ExtraCursorsReport
+    | ExtraCursorsSupport
     | FocusReport
     | GraphicsReply
     | InBandSizeReport
@@ -95,6 +101,9 @@ _CSI_REPLIES = (
     KeyOptionReport,
     FocusReport,
     SgrMouseReport,
+    ExtraCursorsReport,
+    ExtraCursorColorsReport,
+    ExtraCursorsSupport,
 )
 
 #: The readers of a string reply.

@@ -53,6 +53,7 @@ from .cells import (
     protection_of,
 )
 from .escape import DSR
+from .extra_cursors import SUPPORTED, ExtraCommand, ExtraCursors, ExtraShape
 from .images import (
     ASSUMED_CELL_HEIGHT,
     ASSUMED_CELL_WIDTH,
@@ -115,7 +116,7 @@ from .parameters import (
 )
 from .placeholders import PlaceholderRun, merge_runs, runs_in_line
 from .reflow import first_row_to_lay_out, highest_row_held, lay_out
-from .sequences.csi import Csi, CsiReport, CsiSequence, Marker
+from .sequences.csi import Csi, CsiReport, CsiSequence, Marker, Parameter
 from .sequences.reports import (
     AttributesKind,
     CellSizeReport,
@@ -124,6 +125,9 @@ from .sequences.reports import (
     CursorPositionReport,
     DeviceAttributes,
     DeviceStatus,
+    ExtraCursorColorsReport,
+    ExtraCursorsReport,
+    ExtraCursorsSupport,
     InBandSizeReport,
     KeyboardFlagsReport,
     KeyOptionReport,
@@ -395,6 +399,7 @@ class Screen:
         "tab_color": Keep.SAVED,
         "colors": Keep.SAVED,
         "pointer_shapes": Keep.SAVED,
+        "extra_cursors": Keep.SAVED,
         "graphics": Keep.SAVED,
         "attribute_extent": Keep.SAVED,
         "active_display": Keep.SAVED,
@@ -1038,6 +1043,14 @@ class Screen:
         # takes away the one they chose.
         self.cursor_style_asked = False
 
+        # kitty's extra cursors and their colours. The object stays, so
+        # that its count of changes goes on rising for whoever draws it.
+        extra_cursors = getattr(self, "extra_cursors", None)
+        if extra_cursors is None:
+            self.extra_cursors = ExtraCursors()
+        else:
+            extra_cursors.reset()
+
         # The marks that SPA and DECSCA put on the cells that a
         # program draws next. Nothing is marked to start with.
         self.protection = Protection.NONE
@@ -1191,6 +1204,8 @@ class Screen:
         # A list of its own, because a save writes into the list that
         # is there rather than making a new one.
         self.savepoints = []
+
+        self.extra_cursors.reset()
 
         self.gl = 0
         self.g_charsets = [cs.LAT1_MAP] * 4
@@ -1588,6 +1603,7 @@ class Screen:
 
             self.lines = lines
             self.columns = columns
+            self.extra_cursors.crop(lines, columns)
 
             self._reset_offset_and_margins()
 
@@ -2064,6 +2080,7 @@ class Screen:
         # program that predates "?1049" sends.
         taken_by = self._alternate_screen_modes(modes)
         if taken_by and not self._original_screen:
+            self.extra_cursors.clear()
             # "?1049" saves the cursor of the first screen, the same
             # way "ESC 7" does: the place, the rendition and the
             # character sets all come back with it. The two older modes
@@ -2192,6 +2209,7 @@ class Screen:
         # "?1047" give the screen back as well.
         given_back = self._alternate_screen_modes(modes)
         if self._original_screen and given_back:
+            self.extra_cursors.clear()
             restores_the_cursor = PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR.flag in given_back
             row = self.pt_cursor_position.y - self.line_offset
             column = self.pt_cursor_position.x
@@ -4200,6 +4218,8 @@ class Screen:
         :param bool private: when ``True`` character attributes aren left
                              unchanged **not implemented**.
         """
+        if type_of in (EraseExtent.ALL, EraseExtent.HISTORY, EraseExtent.INTO_HISTORY):
+            self.extra_cursors.clear()
         if type_of == EraseExtent.INTO_HISTORY:
             if self._move_the_screen_into_history():
                 # The images went with their rows. What still reaches
@@ -5289,7 +5309,12 @@ class Screen:
         `cursor_style` and puts the shape on the terminal of the user,
         so a pane that asks for a bar gets one. A program that sets a
         shape also asks for it back, and it reads what it wrote.
+
+        With ">" it is kitty's multiple cursors protocol instead.
         """
+        if kwargs.get("private") == Marker.GREATER:
+            self.multiple_cursors(*params)
+            return
         style = _param(params, 0)
         if style == 0:
             self.cursor_style = DEFAULT_CURSOR_STYLE
@@ -5300,6 +5325,44 @@ class Screen:
             # changes, and the ask below would be a lie.
             return
         self.cursor_style_asked = True
+
+    def multiple_cursors(self, *params: Parameter) -> None:
+        """
+        kitty's multiple cursors ("CSI > SHAPE ; WHERE : COORDINATES ...
+        SP q"): set or clear extra cursors, set their colours, or answer
+        what is set. Lillecarl/pymux#891.
+
+        Each parameter after the first is one group, as kitty's parser
+        splits them: a kind, then its coordinates as subparameters.
+        """
+        if not params:
+            self.reply(ExtraCursorsSupport(SUPPORTED))
+            return
+        first, groups = params[0], params[1:]
+        if not isinstance(first, int):
+            return
+        extra = self.extra_cursors
+        if not groups:
+            if first == ExtraCommand.ASK_CURSORS:
+                self.reply(ExtraCursorsReport(tuple(extra.listed())))
+            elif first == ExtraCommand.ASK_COLORS:
+                self.reply(ExtraCursorColorsReport(extra.text_color, extra.cursor_color))
+            return
+        try:
+            shape: ExtraShape | ExtraCommand = (
+                ExtraCommand(first)
+                if first in (ExtraCommand.TEXT_COLOR, ExtraCommand.CURSOR_COLOR)
+                else ExtraShape(first)
+            )
+        except ValueError:
+            return
+        main = (self.pt_cursor_position.y - self.line_offset, self.pt_cursor_position.x)
+        for group in groups:
+            numbers = [0 if number is None else number for number in (group if isinstance(group, tuple) else (group,))]
+            if isinstance(shape, ExtraCommand):
+                extra.set_color(shape, numbers)
+            else:
+                extra.set_shape(shape, numbers[0], numbers[1:], self.lines, self.columns, main)
 
     def set_cursor_blink(self, blinking: bool) -> None:
         """

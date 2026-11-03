@@ -20,6 +20,7 @@ from typing import ClassVar
 
 from ..escape import DA as _DA
 from ..escape import DSR as _DSR
+from ..extra_cursors import UNSET_COLOR, CursorColor, ExtraCommand, ExtraShape, Where
 from ..keys.events import KeyboardFlag
 from ..modes import AnsiMode, ModeState, PrivateMode
 from .csi import Csi, CsiReport, CsiSequence, Marker, csi, mode_named
@@ -32,6 +33,9 @@ __all__ = (
     "CursorPositionReport",
     "DeviceAttributes",
     "DeviceStatus",
+    "ExtraCursorColorsReport",
+    "ExtraCursorsReport",
+    "ExtraCursorsSupport",
     "FocusReport",
     "InBandSizeReport",
     "KeyOptionReport",
@@ -564,3 +568,114 @@ class SgrMouseReport(CsiReport):
         if numbers is None or len(numbers) != 3:
             return None
         return cls(*numbers, released=sequence.final == cls.RELEASE)
+
+
+_ASKS = (ExtraCommand.ASK_CURSORS, ExtraCommand.ASK_COLORS)
+
+
+@dataclass(frozen=True)
+class ExtraCursorsSupport(CsiReport):
+    """
+    kitty's answer to "CSI > SP q": "CSI > 1;2;3;29;30;40;100;101 SP q",
+    the shapes and commands of the multiple cursors protocol it reads.
+    No numbers says it reads none. Lillecarl/pymux#891.
+    """
+
+    supported: tuple[int, ...]
+
+    def sequence(self) -> CsiSequence:
+        return CsiSequence(Csi.DECSCUSR, tuple(int(item) for item in self.supported), Marker.GREATER)
+
+    @classmethod
+    def parse(cls, text: str) -> ExtraCursorsSupport | None:
+        return cls.read(CsiSequence.parse(text))
+
+    @classmethod
+    def read(cls, sequence: CsiSequence | None) -> ExtraCursorsSupport | None:
+        if sequence is None or sequence.final != Csi.DECSCUSR or sequence.private is not Marker.GREATER:
+            return None
+        numbers = sequence.numbers()
+        if numbers is None or (numbers and numbers[0] in _ASKS):
+            return None
+        return cls(numbers)
+
+
+@dataclass(frozen=True)
+class ExtraCursorsReport(CsiReport):
+    """
+    The answer to "CSI > 100 SP q": "CSI > 100 ; SHAPE:2:Y:X ; ... SP q",
+    each extra cursor as a point counted from one. `cursors` holds a
+    row, a column and a shape each, counted from zero.
+    """
+
+    cursors: tuple[tuple[int, int, ExtraShape], ...] = ()
+
+    def sequence(self) -> CsiSequence:
+        points = tuple((shape, Where.POINTS, row + 1, column + 1) for row, column, shape in self.cursors)
+        return CsiSequence(Csi.DECSCUSR, (ExtraCommand.ASK_CURSORS, *points), Marker.GREATER)
+
+    @classmethod
+    def parse(cls, text: str) -> ExtraCursorsReport | None:
+        return cls.read(CsiSequence.parse(text))
+
+    @classmethod
+    def read(cls, sequence: CsiSequence | None) -> ExtraCursorsReport | None:
+        if sequence is None or sequence.final != Csi.DECSCUSR or sequence.private is not Marker.GREATER:
+            return None
+        if not sequence.params or sequence.params[0] != ExtraCommand.ASK_CURSORS:
+            return None
+        cursors = []
+        for point in sequence.params[1:]:
+            if not isinstance(point, tuple) or len(point) != 4 or None in point or point[1] != Where.POINTS:
+                return None
+            shape, _where, y, x = point
+            try:
+                cursors.append((y - 1, x - 1, ExtraShape(shape)))
+            except ValueError:
+                return None
+        return cls(tuple(cursors))
+
+
+@dataclass(frozen=True)
+class ExtraCursorColorsReport(CsiReport):
+    """
+    The answer to "CSI > 101 SP q":
+    "CSI > 101 ; 30:SPACE:VALUES ; 40:SPACE:VALUES SP q", the colour of
+    the text under the extra cursors and of the cursors themselves.
+    """
+
+    text: CursorColor = UNSET_COLOR
+    cursor: CursorColor = UNSET_COLOR
+
+    def sequence(self) -> CsiSequence:
+        return CsiSequence(
+            Csi.DECSCUSR,
+            (
+                ExtraCommand.ASK_COLORS,
+                (ExtraCommand.TEXT_COLOR, *self.text.parameters()),
+                (ExtraCommand.CURSOR_COLOR, *self.cursor.parameters()),
+            ),
+            Marker.GREATER,
+        )
+
+    @classmethod
+    def parse(cls, text: str) -> ExtraCursorColorsReport | None:
+        return cls.read(CsiSequence.parse(text))
+
+    @classmethod
+    def read(cls, sequence: CsiSequence | None) -> ExtraCursorColorsReport | None:
+        if sequence is None or sequence.final != Csi.DECSCUSR or sequence.private is not Marker.GREATER:
+            return None
+        if len(sequence.params) != 3 or sequence.params[0] != ExtraCommand.ASK_COLORS:
+            return None
+        colors = {}
+        for group in sequence.params[1:]:
+            if not isinstance(group, tuple) or None in group:
+                return None
+            color = CursorColor.read(group[1:])
+            if color is None:
+                return None
+            colors[group[0]] = color
+        if set(colors) != {ExtraCommand.TEXT_COLOR, ExtraCommand.CURSOR_COLOR}:
+            return None
+        return cls(colors[ExtraCommand.TEXT_COLOR], colors[ExtraCommand.CURSOR_COLOR])

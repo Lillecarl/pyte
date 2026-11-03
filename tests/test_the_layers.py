@@ -41,6 +41,7 @@ PURE = {
     "compact_html",
     "control",
     "escape",
+    "extra_cursors",
     "freeze",
     "grid",
     "html",
