@@ -34,6 +34,7 @@ from typing import TYPE_CHECKING, Any
 from .cells import _CHAR_CACHE, _ERASED_CACHE, UNWRITTEN, ErasedCell, appearance_of
 from .extra_cursors import UNSET_COLOR, CursorColor, ExtraShape
 from .images import GraphicsImage, GraphicsPlacement
+from .modes import PrivateMode, flag_of
 from .page import Row
 from .parameters import CursorShape
 from .sgr import parameters_of, rendition_of
@@ -45,6 +46,8 @@ __all__ = ["GridWriter", "put_frame", "row_data", "row_of"]
 
 #: The SGR parameters of a plain pen, which a run leaves out.
 _PLAIN_SGR = "0"
+
+_PASTE_EVENTS = flag_of(PrivateMode.PASTE_EVENTS)
 
 #: The bytes of image data a writer has the peer store beyond the
 #: images it shows, the oldest used going first.
@@ -141,8 +144,16 @@ def _put_extra_cursors(screen: Screen, data: dict[str, Any]) -> None:
 
 
 def _about(screen: Screen) -> dict[str, Any]:
-    "What a program set that the peer shows beside the page: the title and the pointer's shape."
-    return {"title": screen.titles.window, "pointer": screen.pointer_shapes.shape}
+    """
+    What a program set that the peer shows beside the page: the title and
+    the pointer's shape; and kitty's paste events mode, which the peer
+    sets on its own terminal while the pane has the focus there.
+    """
+    return {
+        "title": screen.titles.window,
+        "pointer": screen.pointer_shapes.shape,
+        "paste_events": _PASTE_EVENTS in screen.mode,
+    }
 
 
 def _placement_data(placement: GraphicsPlacement, top: int) -> dict[str, Any]:
@@ -370,6 +381,11 @@ def put_frame(screen: Screen, frame: dict[str, Any], store: dict[str, GraphicsIm
     if "pointer" in frame:
         pointer = str(frame["pointer"])
         screen.pointer_shapes.stack = [pointer] if pointer else []
+    if "paste_events" in frame:
+        if frame["paste_events"]:
+            screen.mode.add(_PASTE_EVENTS)
+        else:
+            screen.mode.discard(_PASTE_EVENTS)
     if "extra_cursors" in frame:
         _put_extra_cursors(screen, frame["extra_cursors"])
     _put_pictures(screen, frame, {} if store is None else store)

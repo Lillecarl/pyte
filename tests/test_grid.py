@@ -20,6 +20,7 @@ from pyte import grid
 from pyte.cells import PLAIN, ErasedCell, Rendition
 from pyte.colors import SgrColor
 from pyte.grid import GridWriter, put_frame, row_data, row_of
+from pyte.modes import PrivateMode, flag_of
 from pyte.page import Row
 from pyte.placeholders import DIACRITICS, PLACEHOLDER
 from pyte.screen import Screen
@@ -48,6 +49,7 @@ def _page(screen: Screen) -> dict:
         "style": screen.cursor_style if screen.cursor_style_asked else None,
         "title": screen.titles.window,
         "pointer": screen.pointer_shapes.shape,
+        "paste events": flag_of(PrivateMode.PASTE_EVENTS) in screen.mode,
     }
 
 
@@ -106,6 +108,7 @@ CORNERS = {
     "wide": "中文 é",
     "a coloured erase": CSI + "41m" + CSI + "K" + CSI + "0m",
     "an erase": "abc" + CSI + "2D" + CSI + "X",
+    "paste events": CSI + "?5522h",
     "gaps": "a" + CSI + "5Cb" + CSI + "10Cc",
     "a wrapped line": "w" * 100,
     "a pending wrap": CSI + "12;1H" + "x" * 40,
