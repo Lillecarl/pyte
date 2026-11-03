@@ -37,7 +37,9 @@ from .images import GraphicsImage, GraphicsPlacement
 from .modes import PrivateMode, flag_of
 from .page import Row
 from .parameters import CursorShape
+from .sequences.text_sizing import TextSize
 from .sgr import parameters_of, rendition_of
+from .text_sizes import SizedBlock
 
 if TYPE_CHECKING:
     from .screen import Screen
@@ -156,6 +158,58 @@ def _about(screen: Screen) -> dict[str, Any]:
     }
 
 
+def _text_sizes_of(screen: Screen) -> list[dict[str, Any]]:
+    """
+    The blocks of text at another size that lie wholly on the page,
+    which is all a renderer draws. The cells under them cross as rows.
+    Lillecarl/pymux#910.
+    """
+    top = screen.line_offset
+    bottom = top + screen.lines
+    blocks = []
+    for block in sorted(screen.text_sizes.blocks, key=lambda block: (block.y, block.x)):
+        if block.y < top or block.y + block.rows > bottom:
+            continue
+        data: dict[str, Any] = {
+            "x": block.x,
+            "y": block.y - top,
+            "columns": block.columns,
+            "rows": block.rows,
+            "size": block.sent,
+        }
+        appearance = block.appearance
+        sgr = parameters_of(appearance.rendition)
+        if sgr != _PLAIN_SGR:
+            data["sgr"] = sgr
+        if appearance.hyperlink:
+            data["link"] = appearance.hyperlink
+        if appearance.hyperlink_id:
+            data["link_id"] = appearance.hyperlink_id
+        blocks.append(data)
+    return blocks
+
+
+def _put_text_sizes(screen: Screen, blocks: list[dict[str, Any]]) -> None:
+    "Lay the blocks over the cells the rows already put there."
+    kept = []
+    for data in blocks:
+        try:
+            size = TextSize.decode(str(data.get("size", "")))
+            x, y = int(data.get("x", 0)), int(data.get("y", 0))
+            columns, rows = int(data.get("columns", 0)), int(data.get("rows", 0))
+        except TypeError, ValueError:
+            continue
+        if x < 0 or y < 0 or columns < 1 or rows < 1 or x + columns > screen.columns or y + rows > screen.lines:
+            continue
+        appearance = appearance_of[
+            rendition_of(str(data.get("sgr", _PLAIN_SGR))), str(data.get("link", "")), str(data.get("link_id", ""))
+        ]
+        kept.append(SizedBlock(x, y, columns, rows, size, appearance))
+    sizes = screen.text_sizes
+    screen.touch_rows({row for block in [*sizes.blocks, *kept] for row in range(block.y, block.y + block.rows)})
+    sizes.blocks = kept
+
+
 def _placement_data(placement: GraphicsPlacement, top: int) -> dict[str, Any]:
     data: dict[str, Any] = {
         "image": placement.image_id,
@@ -233,6 +287,7 @@ class GridWriter:
         self.about: dict[str, Any] | None = None
         self.extra: dict[str, Any] | None = None
         self.placements: list[dict[str, Any]] | None = None
+        self.text_sizes: list[dict[str, Any]] | None = None
         #: The image the peer holds under each id. Held, not compared by
         #: content: a program may send new pixels under an old id.
         self.images: dict[int, GraphicsImage] = {}
@@ -290,6 +345,10 @@ class GridWriter:
         if extra != self.extra or whole:
             self.extra = extra
             pictures["extra_cursors"] = extra
+        text_sizes = _text_sizes_of(screen) if screen.text_sizes.blocks or self.text_sizes else []
+        if text_sizes != self.text_sizes or whole:
+            self.text_sizes = text_sizes
+            pictures["text_sizes"] = text_sizes
         if not rows and cursor == self.cursor and about == self.about and not pictures and not whole:
             return None
         self.cursor, self.about = cursor, about
@@ -389,6 +448,8 @@ def put_frame(screen: Screen, frame: dict[str, Any], store: dict[str, GraphicsIm
     if "extra_cursors" in frame:
         _put_extra_cursors(screen, frame["extra_cursors"])
     _put_pictures(screen, frame, {} if store is None else store)
+    if "text_sizes" in frame:
+        _put_text_sizes(screen, frame["text_sizes"] or [])
 
 
 def _put_pictures(screen: Screen, frame: dict[str, Any], store: dict[str, GraphicsImage]) -> None:

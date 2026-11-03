@@ -50,6 +50,11 @@ def _page(screen: Screen) -> dict:
         "title": screen.titles.window,
         "pointer": screen.pointer_shapes.shape,
         "paste events": flag_of(PrivateMode.PASTE_EVENTS) in screen.mode,
+        "text sizes": sorted(
+            (block.x, block.y - top, block.columns, block.rows, block.sent, block.appearance)
+            for block in screen.text_sizes.blocks
+            if top <= block.y and block.y + block.rows <= top + screen.lines
+        ),
     }
 
 
@@ -118,7 +123,27 @@ CORNERS = {
     "a pointer": OSC + "22;>wait,text" + ST,
     "the alternate page": "first\r\n" + CSI + "?1049h" + "second" + CSI + "3;3H",
     "history": "".join("line %d\r\n" % number for number in range(60)),
+    "text at another size": CSI + "3;5H" + CSI + "31m" + OSC + "66;s=2:w=3;big" + ST,
+    "a double height line": CSI + "5;1H" + ESC + "#3" + "tall",
+    "text at another size in the history": OSC + "66;s=2;up" + ST + "".join("\r\n" for _ in range(30)),
 }
+
+
+def test_text_at_another_size_crosses_when_it_changes():
+    "Lillecarl/pymux#910."
+    screen = a_screen(40, 12)
+    stream = Stream(screen)
+    peer = Peer(screen)
+    stream.feed(OSC + "66;s=2:w=3;big" + ST)
+    frame = peer.sync(screen)
+    assert frame is not None
+    assert frame["text_sizes"] == [{"x": 0, "y": 0, "columns": 6, "rows": 2, "size": "s=2:w=3;big"}]
+    _same(screen, peer.copy)
+    stream.feed(CSI + "6;1Hplain")
+    assert "text_sizes" not in peer.sync(screen), "the blocks did not change, so they do not go again"
+    stream.feed(CSI + "2J")
+    assert peer.sync(screen)["text_sizes"] == []
+    assert peer.copy.text_sizes.blocks == []
 
 
 @pytest.mark.parametrize("name", CORNERS)
