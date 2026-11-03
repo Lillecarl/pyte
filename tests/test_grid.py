@@ -128,6 +128,23 @@ def test_each_corner_shows_the_same(name):
     _same(screen, peer.copy)
 
 
+def test_the_copy_holds_kittys_extra_cursors():
+    "Lillecarl/pymux#891."
+    screen = a_screen(40, 12)
+    stream = Stream(screen)
+    peer = Peer(screen)
+    stream.feed(CSI + ">1;2:1:1;2:3:4 q" + CSI + ">40;2:1:2:3 q" + CSI + ">30;1 q")
+    frame = peer.sync(screen)
+    assert frame is not None and "extra_cursors" in frame
+    extra, copied = screen.extra_cursors, peer.copy.extra_cursors
+    assert copied.cells == extra.cells
+    assert (copied.text_color, copied.cursor_color) == (extra.text_color, extra.cursor_color)
+    assert peer.sync(screen) is None, "nothing changed, so nothing goes"
+    stream.feed(CSI + ">0;4 q")
+    assert "extra_cursors" in peer.sync(screen)
+    assert copied.cells == {}
+
+
 def test_a_frame_holds_what_changed():
     screen = a_screen(40, 12)
     stream = Stream(screen)

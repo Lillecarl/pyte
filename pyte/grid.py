@@ -32,6 +32,7 @@ from collections import OrderedDict
 from typing import TYPE_CHECKING, Any
 
 from .cells import _CHAR_CACHE, _ERASED_CACHE, UNWRITTEN, ErasedCell, appearance_of
+from .extra_cursors import UNSET_COLOR, CursorColor, ExtraShape
 from .images import GraphicsImage, GraphicsPlacement
 from .page import Row
 from .parameters import CursorShape
@@ -114,6 +115,31 @@ def _cursor_of(screen: Screen) -> dict[str, Any]:
     return cursor
 
 
+def _extra_cursors_of(screen: Screen) -> dict[str, Any]:
+    "kitty's extra cursors, each a row, a column and a shape, and their two colours. Lillecarl/pymux#891."
+    extra = screen.extra_cursors
+    return {
+        "cells": [[row, column, int(shape)] for row, column, shape in extra.listed()],
+        "text": list(extra.text_color.parameters()),
+        "cursor": list(extra.cursor_color.parameters()),
+    }
+
+
+def _put_extra_cursors(screen: Screen, data: dict[str, Any]) -> None:
+    extra = screen.extra_cursors
+    cells = {}
+    for cell in data.get("cells") or ():
+        try:
+            row, column, shape = (int(part) for part in cell)
+            cells[row, column] = ExtraShape(shape)
+        except TypeError, ValueError:
+            continue
+    extra.cells = cells
+    extra.text_color = CursorColor.read([int(part) for part in data.get("text") or ()]) or UNSET_COLOR
+    extra.cursor_color = CursorColor.read([int(part) for part in data.get("cursor") or ()]) or UNSET_COLOR
+    extra.changes += 1
+
+
 def _about(screen: Screen) -> dict[str, Any]:
     "What a program set that the peer shows beside the page: the title and the pointer's shape."
     return {"title": screen.titles.window, "pointer": screen.pointer_shapes.shape}
@@ -194,6 +220,7 @@ class GridWriter:
         self.size: tuple[int, int] | None = None
         self.cursor: dict[str, Any] | None = None
         self.about: dict[str, Any] | None = None
+        self.extra: dict[str, Any] | None = None
         self.placements: list[dict[str, Any]] | None = None
         #: The image the peer holds under each id. Held, not compared by
         #: content: a program may send new pixels under an old id.
@@ -248,6 +275,10 @@ class GridWriter:
         about = _about(screen)
         self.size, self.top, self.writes, self.everything_at = (lines, columns), top, screen.writes, everything_at
         pictures = self._pictures(screen, whole)
+        extra = _extra_cursors_of(screen)
+        if extra != self.extra or whole:
+            self.extra = extra
+            pictures["extra_cursors"] = extra
         if not rows and cursor == self.cursor and about == self.about and not pictures and not whole:
             return None
         self.cursor, self.about = cursor, about
@@ -339,6 +370,8 @@ def put_frame(screen: Screen, frame: dict[str, Any], store: dict[str, GraphicsIm
     if "pointer" in frame:
         pointer = str(frame["pointer"])
         screen.pointer_shapes.stack = [pointer] if pointer else []
+    if "extra_cursors" in frame:
+        _put_extra_cursors(screen, frame["extra_cursors"])
     _put_pictures(screen, frame, {} if store is None else store)
 
 
