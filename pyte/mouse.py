@@ -59,6 +59,8 @@ class MouseAction(IntEnum):
     WHEEL_DOWN = 4
     #: A move, with `MouseInput.button` held or `MouseButton.NONE`.
     MOVE = 5
+    #: The pointer left the screen, from the cell it was last over.
+    LEAVE = 6
 
 
 class MouseButton(IntEnum):
@@ -196,7 +198,13 @@ def reports_pixels(screen: Screen) -> bool:
 
 
 def _reported(tracking: _Tracking, mouse: MouseInput) -> bool:
-    "kitty's `mouse_event` gate: 1003 sends every move, 1002 only a drag."
+    """
+    kitty's `mouse_event` gate: 1003 sends every move, 1002 only a drag.
+    A leave asks for no tracking mode (`set_currently_hovered_window`),
+    and only 1016 spells one.
+    """
+    if mouse.action is MouseAction.LEAVE:
+        return True
     if mouse.action is not MouseAction.MOVE:
         return tracking is not _Tracking.NONE
     if mouse.button is MouseButton.NONE:
@@ -212,6 +220,8 @@ def _button(mouse: MouseInput, sgr: bool) -> int:
         number = MouseBits.WHEEL | 1
     elif mouse.action is MouseAction.RELEASE and not sgr:
         number = _RELEASE_BUTTON
+    elif mouse.action is MouseAction.LEAVE:
+        number = MouseBits.LEAVE | MouseBits.MOTION
     else:
         number = int(mouse.button)
         if mouse.action is MouseAction.MOVE:
@@ -275,6 +285,8 @@ def mouse_report(screen: Screen, mouse: MouseInput) -> CsiReport | None:
     cell is a report of its own only there; the caller drops the rest.
     """
     if not _reported(_tracking(screen), mouse):
+        return None
+    if mouse.action is MouseAction.LEAVE and not reports_pixels(screen):
         return None
     column, row = mouse.column + 1, mouse.row + 1
     released = mouse.action is MouseAction.RELEASE

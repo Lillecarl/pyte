@@ -99,6 +99,14 @@ def test_pixels_count_from_zero_at_the_cell_size():
     assert body(screen, MouseAction.RELEASE, 0, 0, across=0.0, down=0.0) == "<0;0;0m"
 
 
+def test_a_leave_is_a_pixel_motion_report_in_any_tracking_mode():
+    "kitty's leave: 256 and the motion bit, in 1016 alone. Lillecarl/pymux#899."
+    screen = screen_in(PrivateMode.SGR_PIXEL_MOUSE)
+    assert body(screen, MouseAction.LEAVE, 0, 0, button=MouseButton.NONE) == "<288;5;10M"
+    screen = screen_in(PrivateMode.ANY_EVENT_MOUSE, PrivateMode.SGR_MOUSE)
+    assert mouse_report(screen, MouseInput(MouseAction.LEAVE, 0, 0)) is None
+
+
 def test_urxvt_tells_a_release_by_button_three():
     screen = screen_in(PrivateMode.MOUSE_REPORTING, PrivateMode.URXVT_MOUSE)
     assert body(screen, MouseAction.PRESS, 2, 1) == "32;3;2M"
