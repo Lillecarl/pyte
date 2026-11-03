@@ -43,7 +43,9 @@ from .cells import (
     Appearance,
     Cell,
     ErasedCell,
+    ProtectedCell,
     Protection,
+    Rendition,
     WrittenCell,
     appearance_of,
     character_width,
@@ -4321,9 +4323,14 @@ class Screen:
     # Two corners name an area, and DECSACE says whether that is a
     # rectangle or the stream between them.
 
-    def _rectangle(self, top: int, left: int, bottom: int, right: int) -> tuple[int, int, int, int] | None:
+    def _rectangle(
+        self, top: int, left: int, bottom: int, right: int, *, stream: bool = False
+    ) -> tuple[int, int, int, int] | None:
         """
         Read the four corners that a rectangle command names.
+
+        A `stream` runs from the first corner to the second, so its
+        right corner may lie left of its left one on a later row.
 
         The numbers count from one. Origin mode counts them from the
         margins, so the corners move with the region and a missing
@@ -4355,10 +4362,11 @@ class Screen:
         # The order is read before the edge of the screen cuts the
         # rectangle down. A rectangle that starts past the screen would
         # otherwise fold onto the last row and fill it.
-        if bottom < top or right < left:
+        if bottom < top or (right < left and (not stream or bottom == top)):
             return None
-        if top >= lines or left >= columns:
+        if top >= lines or (left >= columns and not stream):
             return None
+        left = min(left, columns - 1)
 
         return top, left, min(bottom, lines - 1), min(right, columns - 1)
 
@@ -4542,6 +4550,111 @@ class Screen:
             self.repair_wide_char(line, target_left)
             self.repair_wide_char(line, target_left + width)
 
+    def change_attributes_in_area(self, *params: int, **kwargs) -> None:
+        """
+        DECCARA ("CSI Pt ; Pl ; Pb ; Pr ; Ps... $ r"): apply an SGR to
+        the cells of an area, and leave the characters alone.
+
+        Every SGR applies, colours included, as in kitty
+        (`apply_sgr_to_cells`, kitty/cursor.c). The VT510 and xterm take
+        only bold, underline, blink, reverse and hidden. No SGR is SGR 0,
+        as in kitty and the VT510.
+
+        A cell that holds nothing takes the attributes as a blank, so a
+        program can paint a background on an area. kitty does that in
+        both extents. xterm does it only in a rectangle and skips such a
+        cell in a stream, which leaves kitty's colours out of a stream.
+        Lillecarl/pymux#895.
+        """
+        sgr = tuple(params[4:])
+        self._restyle_area(params, lambda rendition: after_sgr(rendition, sgr))
+
+    #: What DECRARA turns over for each parameter, as xterm reads them
+    #: (`ScrnMarkRectangle`, xterm's screen.c). Zero is xterm's
+    #: `SGR_MASK`, which leaves hidden out.
+    REVERSIBLE: ClassVar[dict[int, tuple[str, ...]]] = {
+        0: ("bold", "underline", "blink", "reverse"),
+        1: ("bold",),
+        4: ("underline",),
+        5: ("blink",),
+        7: ("reverse",),
+        8: ("hidden",),
+    }
+
+    def reverse_attributes_in_area(self, *params: int, **kwargs) -> None:
+        """
+        DECRARA ("CSI Pt ; Pl ; Pb ; Pr ; Ps... $ t"): turn attributes
+        over in the cells of an area. A cell that has one loses it, and
+        a cell that lacks it gains it.
+
+        kitty has no DECRARA, so this follows xterm. A colour has no
+        reverse, and any other parameter changes nothing.
+        """
+        fields = [name for value in params[4:] if value is not None for name in self.REVERSIBLE.get(value, ())]
+        if not fields:
+            return
+
+        def reverse(rendition: Rendition) -> Rendition:
+            for name in fields:
+                rendition = rendition._replace(**{name: not getattr(rendition, name)})
+            return rendition
+
+        self._restyle_area(params, reverse)
+
+    def _restyle_area(self, params: tuple[int, ...], change: Callable[[Rendition], Rendition]) -> None:
+        """
+        Give each cell of the area that DECCARA and DECRARA name the
+        rendition `change` makes of its own.
+
+        DECSACE says what the area is. A rectangle takes the columns
+        between the two corners on every row. A stream runs from the
+        first corner to the end of its row, over every full row
+        between, and to the second corner on the last row, as kitty and
+        xterm both read it. A stream ignores the margins between rows.
+        """
+        stream = self.attribute_extent is not AttributeExtent.RECTANGLE
+        corners = self._rectangle(*_four(params, 0), stream=stream)
+        if corners is None:
+            return
+        top, left, bottom, right = corners
+
+        restyled: dict[Appearance, Appearance] = {}
+
+        def after(appearance: Appearance) -> Appearance:
+            answer = restyled.get(appearance)
+            if answer is None:
+                rendition = change(appearance.rendition)
+                answer = restyled[appearance] = (
+                    appearance
+                    if rendition == appearance.rendition
+                    else appearance_of[rendition, appearance.hyperlink, appearance.hyperlink_id]
+                )
+            return answer
+
+        data_buffer = self.data_buffer
+        line_offset = self.line_offset
+        last_column = self.columns - 1
+        for row in range(top, bottom + 1):
+            first = left if not stream or row == top else 0
+            last = right if not stream or row == bottom else last_column
+            line = data_buffer[row + line_offset]
+            touched = False
+            for column in range(first, last + 1):
+                cell = line.get(column)
+                old = PLAIN_APPEARANCE if cell is None else cell.appearance
+                new = after(old)
+                if new is old:
+                    continue
+                if isinstance(cell, ProtectedCell):
+                    line[column] = _PROTECTED_CHAR_CACHE[cell.char, new, cell.protection]
+                elif isinstance(cell, WrittenCell):
+                    line[column] = _CHAR_CACHE[cell.char, new]
+                else:
+                    line[column] = _ERASED_CACHE[" " if cell is None else cell.char, new]
+                touched = True
+            if touched:
+                self.touch(row + line_offset)
+
     # ------------------------------------------------------------------
     # The settings a program picks with one number.
     #
@@ -4550,11 +4663,8 @@ class Screen:
 
     def set_attribute_extent(self, *params: int, **kwargs) -> None:
         """
-        DECSACE ("CSI Ps * x"): what DECCARA and DECRARA reach.
-
-        ptterm has neither of those two yet, so the setting is kept and
-        nothing acts on it. A program writes it and reads it back with
-        DECRQSS, and an answer that says nothing sends it to a guess.
+        DECSACE ("CSI Ps * x"): what DECCARA and DECRARA reach, a stream
+        or a rectangle. DECRQSS reads it back.
         """
         value = _param(params, 0)
         if value in tuple(AttributeExtent):

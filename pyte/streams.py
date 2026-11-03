@@ -299,7 +299,9 @@ class Stream:
         # intermediate bytes as well as the final one.
         Csi.CBT: "cursor_to_previous_tab",
         Csi.CHT: "cursor_to_next_tab",
+        Csi.DECCARA: "change_attributes_in_area",
         Csi.DECCRA: "copy_rectangle",
+        Csi.DECRARA: "reverse_attributes_in_area",
         Csi.DECDC: "delete_columns",
         Csi.DECERA: "erase_rectangle",
         Csi.DECFRA: "fill_rectangle",

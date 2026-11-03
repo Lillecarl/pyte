@@ -49,6 +49,9 @@ class Csi(StrEnum):
     #: Cursor horizontal forward tabulation.
     CHT = "I"
 
+    #: Change attributes in rectangular area: SGR on an area.
+    DECCARA = "$r"
+
     #: Copy rectangular area: copy a rectangle to another place.
     DECCRA = "$v"
 
@@ -63,6 +66,9 @@ class Csi(StrEnum):
 
     #: Insert column, the other way round from DECDC.
     DECIC = "'}"
+
+    #: Reverse attributes in rectangular area: turn SGR attributes over.
+    DECRARA = "$t"
 
     #: Request checksum of a rectangular area. A conformance suite
     #: reads the screen back with it, so it is the instrument that
