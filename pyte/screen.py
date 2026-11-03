@@ -316,9 +316,10 @@ class Screen:
     #: The state that the alternate screen keeps for itself. The
     #: scrolling region is not in the list: it belongs to the terminal,
     #: so a region set on one screen holds on the other. xterm and
-    #: kitty both work that way.
+    #: kitty both work that way. The modes are not in it either, for the
+    #: same reason: a soft reset on the alternate screen holds after it.
+    #: Lillecarl/pymux#906.
     swap_variables = [
-        "mode",
         "gl",
         # The cursor that "ESC 7" saves belongs to one screen. A
         # restore on the alternate screen may not read the one that the
@@ -5325,10 +5326,9 @@ class Screen:
             known = (
                 number in self._known_private_modes or number in self._remembered_private_modes
             ) and self._embedder_carries(number)
-            # DECSCUSR writes the blink as well, and the alternate
-            # screen carries a `mode` of its own. So the answer
-            # comes from the shape, which is the one value that
-            # both sequences write.
+            # DECSCUSR writes the blink as well, so the answer comes
+            # from the shape, which is the one value that both
+            # sequences write.
             if number == PrivateMode.CURSOR_BLINK:
                 enabled = self.cursor_blinks
             elif flag_of(number) in self._ALTERNATE_SCREEN_MODES:
