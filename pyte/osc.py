@@ -771,6 +771,22 @@ class ColorOverrides:
             self._palette = ProgramPalette(words)
         return self._palette
 
+    def take_palette(self, entries: Sequence[Any]) -> None:
+        """
+        Hold the palette entries of another screen, as `program_palette`
+        gave them: a mirror's copy of what its owner's program set.
+        """
+        for index in [index for index in self.by_index if index < len(PALETTE)]:
+            del self.by_index[index]
+        for entry in entries:
+            try:
+                index, value = int(entry[0]), str(entry[1])
+            except IndexError, TypeError, ValueError:
+                continue
+            color = parse_color(value)
+            if color is not None and 0 <= index < len(PALETTE):
+                self.by_index[index] = color
+
     def color_of(self, index: int) -> Color | None:
         """
         The colour that "OSC 4" reports for an index.
