@@ -16,14 +16,22 @@ ST = "\x1b\\"
 
 
 def test_the_spec_example_reads_and_writes():
-    "The serialized example of the spec's last section."
+    "The serialized example of the spec's last section. It pads its base64, and kitty writes none."
     command = TransferCommand.decode("ac=send;id=test;n=c29tZWZpbGU=;sz=3;d=AQID")
     assert command == TransferCommand(Action.SEND, id="test", name="somefile", size=3, data=b"\x01\x02\x03")
-    assert str(command) == OSC + "5113;ac=send;id=test;sz=3;n=c29tZWZpbGU=;d=AQID" + ST
+    assert str(command) == OSC + "5113;ac=send;id=test;sz=3;n=c29tZWZpbGU;d=AQID" + ST
 
 
 def test_a_field_at_its_default_is_left_out():
-    assert TransferCommand(Action.STATUS, id="x", status="OK").param() == "ac=status;id=x;st=T0s="
+    assert TransferCommand(Action.STATUS, id="x", status="OK").param() == "ac=status;id=x;st=T0s"
+
+
+def test_base64_is_written_without_padding():
+    "The kitten decodes with Go's `RawStdEncoding`, which refuses a `=`. Lillecarl/pymux#913."
+    param = TransferCommand(Action.DATA, name="ab", status="a", bypass="abcd", data=b"\x01").param()
+    values = [part.partition("=")[2] for part in param.split(";")]
+    assert len(values) == 5
+    assert not any(value.endswith("=") for value in values)
 
 
 def test_every_field_crosses():

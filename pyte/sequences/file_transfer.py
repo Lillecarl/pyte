@@ -87,7 +87,7 @@ class TransferCommand(StringReport):
     One OSC 5113 command.
 
         >>> str(TransferCommand(Action.SEND, id="test", name="somefile", size=3, data=b"\\x01\\x02\\x03"))
-        '\\x1b]5113;ac=send;id=test;sz=3;n=c29tZWZpbGU=;d=AQID\\x1b\\\\'
+        '\\x1b]5113;ac=send;id=test;sz=3;n=c29tZWZpbGU;d=AQID\\x1b\\\\'
     """
 
     action: Action
@@ -118,9 +118,9 @@ class TransferCommand(StringReport):
                 continue
             key = _KEY_OF[field.name]
             if field.name == "data":
-                parts.append("%s=%s" % (key, base64.b64encode(value).decode("ascii")))
+                parts.append("%s=%s" % (key, _unpadded(value)))
             elif field.name in _TEXTS:
-                parts.append("%s=%s" % (key, base64.b64encode(value.encode("utf-8")).decode("ascii")))
+                parts.append("%s=%s" % (key, _unpadded(value.encode("utf-8"))))
             elif field.name in _SAFE:
                 parts.append("%s=%s" % (key, _UNSAFE.sub("", value)))
             else:
@@ -176,6 +176,11 @@ _KEY_OF: Final = {
     "data": "d",
 }
 _NAME_OF: Final = {key: name for name, key in _KEY_OF.items()}
+
+
+def _unpadded(value: bytes) -> str:
+    "Standard base64 with no padding, as kitty writes it. The kitten refuses a `=`: it decodes with Go's `RawStdEncoding`."
+    return base64.b64encode(value).decode("ascii").rstrip("=")
 
 
 def _base64(value: str) -> bytes:
