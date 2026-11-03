@@ -214,6 +214,12 @@ class PrivateMode(IntEnum):
     #: through SIGWINCH.
     INBAND_RESIZE = 2048
 
+    #: kitty's paste events: a paste sends the program the MIME types on
+    #: the clipboard, over OSC 5522, instead of a bracketed paste. The
+    #: embedder serves it, so a screen without a clipboard does not
+    #: carry it.
+    PASTE_EVENTS = 5522
+
 
 class AnsiMode(IntEnum):
     """

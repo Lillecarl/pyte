@@ -72,6 +72,7 @@ from .keys.events import (
     ModifyOtherKeys,
 )
 from .keys.flags import current_flags, deliverable_flags, popped, pushed, with_flags_set
+from .kitty_clipboard import ClipboardRequest, KittyClipboard, answer_to
 from .modes import AnsiMode, ModeState, PrivateMode, flag_of
 from .osc import (
     CLEAR_SCROLLBACK,
@@ -117,6 +118,8 @@ from .parameters import (
 from .placeholders import PlaceholderRun, merge_runs, runs_in_line
 from .reflow import first_row_to_lay_out, highest_row_held, lay_out
 from .sequences.csi import Csi, CsiReport, CsiSequence, Marker, Parameter
+from .sequences.kitty_clipboard import ClipboardPacket
+from .sequences.kitty_clipboard import Status as ClipboardStatus
 from .sequences.reports import (
     AttributesKind,
     CellSizeReport,
@@ -399,6 +402,7 @@ class Screen:
         "tab_color": Keep.SAVED,
         "colors": Keep.SAVED,
         "pointer_shapes": Keep.SAVED,
+        "kitty_clipboard": Keep.SAVED,
         "extra_cursors": Keep.SAVED,
         "graphics": Keep.SAVED,
         "attribute_extent": Keep.SAVED,
@@ -423,6 +427,7 @@ class Screen:
         "resize_func": Keep.REBUILT,
         "may_resize": Keep.REBUILT,
         "surroundings_func": Keep.REBUILT,
+        "clipboard_func": Keep.REBUILT,
         "version": Keep.REBUILT,
         # Caches of what the cells say.
         "_cell_caches": Keep.REBUILT,
@@ -520,6 +525,13 @@ class Screen:
         #: screen may name itself, and may name itself differently to
         #: different programs.
         self.version: Callable[[], str] = lambda: TERMINAL_VERSION
+        #: Whoever serves kitty's clipboard (OSC 5522): told each finished
+        #: write and each read, and answers the program. None answers
+        #: EPERM, and DECRQM does not know the paste events mode.
+        #: Lillecarl/pymux#893.
+        self.clipboard_func: Callable[[ClipboardRequest], None] | None = None
+        #: A write that is still arriving. A reset leaves it, as kitty does.
+        self.kitty_clipboard = KittyClipboard()
 
         # The colours a pane starts with, before a program sets any. The
         # embedder replaces it when it learns the theme of the terminal
@@ -1450,9 +1462,12 @@ class Screen:
         `allow-program-resize` on and off while a pane runs, and a
         program that asks twice deserves the answer that holds now.
 
-        Only the modes in `_MODES_THE_EMBEDDER_GATES` can be refused.
-        Everything else the embedder has no opinion about.
+        Only the modes in `_MODES_THE_EMBEDDER_GATES` can be refused,
+        and kitty's paste events, which need an embedder that serves a
+        clipboard. Everything else the embedder has no opinion about.
         """
+        if number == PrivateMode.PASTE_EVENTS:
+            return self.clipboard_func is not None
         if number not in self._MODES_THE_EMBEDDER_GATES:
             return True
         return self.may_resize()
@@ -5169,6 +5184,7 @@ class Screen:
             PrivateMode.SYNCHRONIZED_OUTPUT,
             PrivateMode.GRAPHEME_CLUSTERS,
             PrivateMode.INBAND_RESIZE,
+            PrivateMode.PASTE_EVENTS,
         ]
     )
 
@@ -5825,6 +5841,8 @@ class Screen:
             self.push_colors()
         elif code == Osc.POP_COLORS:
             self.pop_colors()
+        elif code == Osc.KITTY_CLIPBOARD:
+            self._kitty_clipboard(param)
         elif code in FORWARDED_OSC:
             if code == Osc.TERMINAL_EXTENSION:
                 self._read_terminal_extension(param)
@@ -5863,6 +5881,16 @@ class Screen:
                     "%s=%.1f;%.1f;1.0" % (REPORT_CELL_SIZE, self.cell_height, self.cell_width),
                 )
             )
+
+    def _kitty_clipboard(self, param: str) -> None:
+        "One OSC 5522 packet: an error goes back now, a whole request to the embedder."
+        taken = self.kitty_clipboard.take(param)
+        if isinstance(taken, ClipboardPacket):
+            self.reply(taken)
+        elif taken is not None and self.clipboard_func is None:
+            self.reply(answer_to(taken, ClipboardStatus.EPERM))
+        elif taken is not None:
+            self.clipboard_func(taken)
 
     def _reply_each(self, answers: Iterable[OscString]) -> None:
         """

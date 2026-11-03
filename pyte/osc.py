@@ -93,6 +93,8 @@ class Osc(StrEnum):
     POINTER_SHAPE = "22"
     #: "OSC 52": the clipboard of the user.
     CLIPBOARD = "52"
+    #: "OSC 5522": kitty's clipboard, every MIME type, both ways.
+    KITTY_CLIPBOARD = "5522"
     #: "OSC 99": a desktop notification.
     NOTIFICATION = "99"
     #: "OSC 777 ; notify ; title ; body": the plain desktop notification
