@@ -26,7 +26,11 @@ def page_of(text: str, lines: int = 6, columns: int = 20):
 
 def found(text: str, rules=(), **size):
     page, first, last = page_of(text, **size)
-    return [(link.url, link.row - first, link.column, link.osc8) for link in links_in(page, first, last, rules)]
+    columns = size.get("columns", 20)
+    return [
+        (link.url, link.row - first, link.column, link.osc8)
+        for link in links_in(page, first, last, rules, columns=columns)
+    ]
 
 
 def test_a_url_in_the_text_is_found_where_it_stands():
@@ -47,6 +51,28 @@ def test_a_url_that_wrapped_is_one_url():
     assert [link.url for link in links] == ["https://example.org/long/path"]
     (link,) = links
     assert (link.end_row - link.row, link.end_column) == (1, 16)
+
+
+def test_a_url_a_program_broke_at_the_edge_goes_on_after_the_indent():
+    "Claude Code's shape: a hard break at the last column, two spaces, the rest. Lillecarl/pymux#926."
+    page, first, last = page_of("  https://a.io/abcde\r\n  fgh and more")
+    (link,) = links_in(page, first, last, columns=20)
+    assert link.url == "https://a.io/abcdefgh"
+    assert (link.end_row - first, link.end_column) == (1, 4)
+
+
+def test_a_url_broken_after_a_dot_keeps_the_dot():
+    "`URL_PATTERN` ends a URL before a dot; at the edge the dot is inside it."
+    assert found("  https://abcdefghi.\r\n  com/x")[0][0] == "https://abcdefghi.com/x"
+
+
+def test_a_url_that_ends_before_the_edge_stops_at_the_break():
+    assert [url for url, *_ in found("  https://a.io/x\r\n  next")] == ["https://a.io/x"]
+
+
+def test_a_url_goes_on_over_several_broken_rows():
+    text = "https://a.io/0123456\r\n78901234567890123456\r\nabc def"
+    assert found(text)[0][0] == "https://a.io/012345678901234567890123456abc"
 
 
 def test_a_link_a_program_made_is_found_by_its_target():

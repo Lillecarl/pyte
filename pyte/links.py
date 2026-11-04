@@ -94,6 +94,42 @@ def _cells_of(page: Page, line: TextLine) -> list[tuple[int, int]]:
     return where
 
 
+#: A URL that runs to the end of the text, its last character kept
+#: even where `URL_PATTERN` would leave it out: a row can break after
+#: the dot of `github.com`.
+_RUNS_TO_THE_END = re.compile(_SCHEMES + r"[0-9a-zA-Z:/?#@!$&*+,;=.~_%^'\-\[\]()\"]*\Z")
+_URL_CHARACTER = re.compile(r"[0-9a-zA-Z:/?#@!$&*+,;=.~_%^'\-\[\]()\"]")
+
+
+def _joined(page: Page, lines: list[TextLine], columns: int | None) -> list[tuple[str, list[tuple[int, int]]]]:
+    """
+    Each line's text with the row and column of each character, and a
+    line that a URL runs off the right edge of joined to the next.
+
+    Claude Code and other programs wrap their own text: the row ends
+    with a hard break, and the next one starts with their indentation.
+    So a URL whose last character sits on the last column goes on after
+    the next row's leading spaces. kitty does the same, across a hard
+    break, but stops at a space. Lillecarl/pymux#926.
+    """
+    joined: list[tuple[str, list[tuple[int, int]]]] = []
+    for line in lines:
+        where = _cells_of(page, line)
+        if joined and columns is not None:
+            text, cells = joined[-1]
+            indent = len(line.text) - len(line.text.lstrip(" "))
+            if (
+                cells
+                and cells[-1][1] == columns - 1
+                and _RUNS_TO_THE_END.search(text)
+                and _URL_CHARACTER.match(line.text, indent)
+            ):
+                joined[-1] = (text + line.text[indent:], cells + where[indent:])
+                continue
+        joined.append((line.text, where))
+    return joined
+
+
 def _osc8_links(page: Page, first: int, last: int) -> list[Link]:
     "Each run of cells inside one link, one run per row."
     links = []
@@ -121,18 +157,23 @@ def _overlaps(one: Link, other: Link) -> bool:
     )
 
 
-def links_in(page: Page, first: int, last: int, rules: Sequence[LinkRule] = ()) -> list[Link]:
-    "The links rows `first` to `last` show, top to bottom."
+def links_in(
+    page: Page, first: int, last: int, rules: Sequence[LinkRule] = (), *, columns: int | None = None
+) -> list[Link]:
+    """
+    The links rows `first` to `last` show, top to bottom. With the
+    page's `columns`, a URL that reaches the last column goes on to the
+    next row though a program broke the line there.
+    """
     links = _osc8_links(page, first, last)
-    for line in page.text_lines(first, last):
-        where = _cells_of(page, line)
-        for match in URL_PATTERN.finditer(line.text):
+    for text, where in _joined(page, page.text_lines(first, last), columns):
+        for match in URL_PATTERN.finditer(text):
             (row, column), (end_row, end_column) = where[match.start()], where[match.end() - 1]
             found = Link(match.group(), row, column, end_row, end_column, False)
             if not any(_overlaps(found, link) for link in links if link.osc8):
                 links.append(found)
         for rule in rules:
-            for match in rule.pattern.finditer(line.text):
+            for match in rule.pattern.finditer(text):
                 if match.end() == match.start():
                     continue
                 (row, column), (end_row, end_column) = where[match.start()], where[match.end() - 1]
