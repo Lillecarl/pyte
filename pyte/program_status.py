@@ -233,6 +233,12 @@ class ProgramStatuses:
     def clear(self) -> None:
         self._drop(lambda id, record: True)
 
+    def replace(self, reports: list[Report]) -> None:
+        "Hold `reports` and nothing else, as another terminal's copy holds them."
+        kept = [report for report in reports if report.state is not ProgramState.CLEAR]
+        self.records = {report.id: report for report in kept[-MAX_RECORDS:]}
+        self.version += 1
+
     def app_of(self, id: str) -> str | None:
         "The record's `app`, or the nearest ancestor's."
         while True:
