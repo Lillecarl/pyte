@@ -102,6 +102,8 @@ class Osc(StrEnum):
     TEXT_SIZE = "66"
     #: "OSC 5113": kitty's file transfer, both ways.
     FILE_TRANSFER = "5113"
+    #: "OSC 7501": what a program says it is doing, `program_status.py`.
+    PROGRAM_STATUS = "7501"
     #: "OSC 99": a desktop notification.
     NOTIFICATION = "99"
     #: "OSC 777 ; notify ; title ; body": the plain desktop notification

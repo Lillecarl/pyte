@@ -88,6 +88,7 @@ PURE = {
     "terminfo",
     "text_sizes",
     "titles",
+    "program_status",
     "xcms",
 }
 

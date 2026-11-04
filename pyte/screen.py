@@ -118,6 +118,7 @@ from .parameters import (
     WindowOp,
 )
 from .placeholders import PlaceholderRun, merge_runs, runs_in_line
+from .program_status import QUERY, REPLY, ProgramStatuses, parse_report
 from .reflow import first_row_to_lay_out, highest_row_held, lay_out
 from .sequences.csi import Csi, CsiReport, CsiSequence, Marker, Parameter
 from .sequences.escapes import Sharp
@@ -411,6 +412,7 @@ class Screen:
         "key_modifier_options": Keep.SAVED,
         "key_format_options": Keep.SAVED,
         "titles": Keep.SAVED,
+        "program_status": Keep.SAVED,
         "tab_color": Keep.SAVED,
         "colors": Keep.SAVED,
         "pointer_shapes": Keep.SAVED,
@@ -1060,6 +1062,13 @@ class Screen:
         # A reset gives a fresh one, the way it takes away everything
         # else that a program set.
         self.titles = Titles()
+        # "OSC 7501": records belong to the terminal, and RIS takes them.
+        # The embedder hears of it, as of any change to them.
+        if getattr(self, "program_status", None) is None:
+            self.program_status = ProgramStatuses()
+        elif self.program_status.records:
+            self.program_status.clear()
+            self._forward_osc(Osc.PROGRAM_STATUS, "")
         # "OSC 6": the colour the embedder draws this pane's tab in, as
         # red, green and blue. Lillecarl/pymux#786.
         self.tab_color: tuple[int, int, int] | None = None
@@ -6176,7 +6185,11 @@ class Screen:
                 except MalformedTransfer:
                     return
                 self.file_transfer_func(command)
+        elif code == Osc.PROGRAM_STATUS:
+            self._program_status(param)
         elif code in FORWARDED_OSC:
+            if code == Osc.SHELL_INTEGRATION and param[:1] == "A":
+                self.program_status.passed()
             if code == Osc.TERMINAL_EXTENSION:
                 self._read_terminal_extension(param)
             self._forward_osc(code, param)
@@ -6214,6 +6227,19 @@ class Screen:
                     "%s=%.1f;%.1f;1.0" % (REPORT_CELL_SIZE, self.cell_height, self.cell_width),
                 )
             )
+
+    def _program_status(self, param: str) -> None:
+        "One OSC 7501: the feature query, or a report the embedder hears of when it changed a record."
+        if param == QUERY:
+            self.reply(OscString(Osc.PROGRAM_STATUS, REPLY))
+            return
+        report = parse_report(param)
+        if report is None:
+            return
+        version = self.program_status.version
+        self.program_status.take(report)
+        if self.program_status.version != version:
+            self._forward_osc(Osc.PROGRAM_STATUS, param)
 
     def _kitty_clipboard(self, param: str) -> None:
         "One OSC 5522 packet: an error goes back now, a whole request to the embedder."
