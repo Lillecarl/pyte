@@ -105,6 +105,17 @@ def test_the_copy_shows_the_page_through_anything_a_program_writes(seed):
     _same(screen, peer.copy)
 
 
+def test_an_erase_that_ends_a_wrap_reaches_the_copy():
+    "The erase writes the row above; the mark it takes is on the row below."
+    screen = a_screen(40, 12, history=50)
+    stream = Stream(screen)
+    stream.feed("x" * 48)
+    peer = Peer(screen)
+    stream.feed(CSI + "H" + CSI + "K")
+    peer.sync(screen)
+    _same(screen, peer.copy)
+
+
 #: One thing each, so a failure names it.
 CORNERS = {
     "colours": CSI + "1;38;5;196;48;2;10;20;30mred" + CSI + "0m plain",

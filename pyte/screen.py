@@ -1841,9 +1841,7 @@ class Screen:
         if wrapped:
             self.page.data_buffer[row].wrapped = True
             return
-        line = self.page.data_buffer.get(row)
-        if line is not None:
-            line.wrapped = False
+        self._forget_the_wrap_marks([row])
 
     def mark_row(self, mark: page_module.RowMark) -> None:
         """
@@ -5161,12 +5159,17 @@ class Screen:
         """
         Take the continuation mark off these lines, without making a
         line that is not there.
+
+        A row that loses its mark counts as written: a reader that
+        copies rows by their count (`pyte.grid`) holds the mark too, and
+        an erase on the row above changes nothing else on this one.
         """
         data_buffer = self.page.data_buffer
         for row in rows:
             line = data_buffer.get(row)
-            if line is not None:
+            if line is not None and line.wrapped:
                 line.wrapped = False
+                self.touch(row)
 
     # ------------------------------------------------------------------
     # How the characters after this are drawn.
