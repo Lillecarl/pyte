@@ -14,9 +14,8 @@ from __future__ import annotations
 
 import base64
 import re
-from dataclasses import dataclass
 from enum import StrEnum
-from typing import ClassVar
+from typing import ClassVar, NamedTuple
 
 from .keep import Keep
 
@@ -79,11 +78,14 @@ _TEXT_LIMITS = {"msg": (2732, 2048), "title": (256, 192)}
 _CONTROL = re.compile("[\x00-\x1f\x7f-\x9f]")
 
 
-@dataclass(frozen=True, slots=True)
-class Report:
+class Report(NamedTuple):
     """
     One report, checked. `id` is "" for the root record. `title` and
     `msg` are kept as the base64 that came, and as the text it says.
+
+    A NamedTuple and not a frozen dataclass: a hot upgrade freezes and
+    thaws the records (`pyte.freeze`), and a thaw sets each field of an
+    object it builds, which a frozen dataclass refuses.
     """
 
     state: ProgramState

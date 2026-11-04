@@ -37,6 +37,8 @@ BEFORE = "".join(
         # Titles, a palette colour, a cursor shape, a tab stop, charsets.
         OSC + "2;the window" + ST + OSC + "1;the icon" + ST + CSI + "22;0t",
         OSC + "4;1;rgb:12/34/56" + ST,
+        # A program's status record, which a hot upgrade keeps.
+        OSC + "7501;state=blocked:id=job:kind=permission:app=claude-code:msg=QXBwcm92ZT8" + ST,
         CSI + "4 q",
         CSI + "3g" + CSI + "5G" + ESC + "H",
         ESC + ")0" + "\x0e" + "lqk" + "\x0f",
