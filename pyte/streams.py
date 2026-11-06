@@ -865,28 +865,44 @@ class GroundTimer:
         #: is reading plain text.
         self.since: float | None = None
 
-    def feed(self, data: str) -> Dropped | None:
+        #: Whether the last feed was cut short by the reader, with a
+        #: sequence open at its end.
+        self._cut = False
+
+    def feed(self, data: str, cut: bool = False) -> Dropped | None:
         """
         Feed the stream, dropping a sequence that stayed open too long.
 
+        `cut` says the reader cut `data` short: its read filled the
+        page, so the rest of the write was already waiting. A sequence
+        open at such a cut is never dropped at the next feed. The
+        program did not stop there, the reader did, and a reader held
+        up for the timeout is not a program gone quiet. Measured on a
+        live pane: five cuts mid-sequence and a 3.85s stall in 15
+        minutes. Lillecarl/pymux#935.
+
         Answers what it dropped, so the embedder can log it: a drop is
         silent on the screen, and the rest of the sequence then draws
-        as text. Lillecarl/pymux#935.
+        as text.
         """
         now = self.now()
 
         dropped = None
-        if self.since is not None and now - self.since >= self.timeout:
+        if self.since is not None and not self._cut and now - self.since >= self.timeout:
             dropped = Dropped(self.stream.replay(), now - self.since)
             self.stream.ground_timer_expired()
 
         self.stream.feed(data)
 
         if self.stream.ground_timer_active:
-            if self.since is None:
+            # After a cut the clock starts again at the bytes that
+            # continued it: those are the program's, the gap was not.
+            if self.since is None or self._cut:
                 self.since = now
+            self._cut = cut
         else:
             self.since = None
+            self._cut = False
         return dropped
 
 
