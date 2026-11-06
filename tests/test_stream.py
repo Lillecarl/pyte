@@ -539,10 +539,17 @@ def test_the_ground_timer_drops_a_sequence_that_stayed_open():
     timer.feed("abc" + ctrl.CSI + "1;")
     assert stream.ground_timer_active
 
+    now[0] = 4.0
+    assert timer.expire() is None
+    assert timer.deadline == 5.0
+
     now[0] = 6.0  # The timeout passed with no byte.
+    dropped = timer.expire()
     timer.feed("def")
 
+    assert dropped == ("\x1b[1;", 6.0)
     assert not stream.ground_timer_active
+    assert timer.deadline is None
     assert display(screen)[0].strip() == "abcdef"
 
 
@@ -555,5 +562,7 @@ def test_the_ground_timer_keeps_a_sequence_still_arriving():
     timer.feed(ctrl.CSI + "1;")
     now[0] = 3.0
     timer.feed("5m")  # Within the timeout, so the sequence stands.
+    now[0] = 6.0
 
+    assert timer.expire() is None
     assert not stream.ground_timer_active
