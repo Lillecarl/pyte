@@ -26,7 +26,7 @@ import inspect
 import itertools
 import re
 from collections import defaultdict
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, NamedTuple
 
 from . import control as ctrl
 from . import escape as esc
@@ -865,18 +865,19 @@ class GroundTimer:
         #: is reading plain text.
         self.since: float | None = None
 
-    def feed(self, data: str) -> bool:
+    def feed(self, data: str) -> Dropped | None:
         """
         Feed the stream, dropping a sequence that stayed open too long.
 
-        Answers whether it dropped one. A mirror of this stream applies
-        the same answer and keeps no clock of its own: the gaps between
-        reads are not the same on the far side of a network.
+        Answers what it dropped, so the embedder can log it: a drop is
+        silent on the screen, and the rest of the sequence then draws
+        as text. Lillecarl/pymux#935.
         """
         now = self.now()
 
-        expired = self.since is not None and now - self.since >= self.timeout
-        if expired:
+        dropped = None
+        if self.since is not None and now - self.since >= self.timeout:
+            dropped = Dropped(self.stream.replay(), now - self.since)
             self.stream.ground_timer_expired()
 
         self.stream.feed(data)
@@ -886,4 +887,11 @@ class GroundTimer:
                 self.since = now
         else:
             self.since = None
-        return expired
+        return dropped
+
+
+class Dropped(NamedTuple):
+    "A sequence `GroundTimer` dropped, and how long it had stayed open."
+
+    sequence: str
+    seconds: float
