@@ -5089,15 +5089,26 @@ class Screen:
         first half of the line is what a VT100 shows on a line twice as
         wide, and it keeps the rest out of sight. DECSWL turns the blocks
         back into text and shows the rest again.
+
+        The cursor keeps its column counted in the line's own cells, so
+        it moves to twice its column on a line that turns double and back
+        to half on one that turns single. xterm and libvterm agree:
+        "CSI 1;3H ESC # 6 ab" draws "a" in the fifth column.
         """
         sizes = self.text_sizes
-        y = self.pt_cursor_position.y
+        cursor = self.pt_cursor_position
+        y = cursor.y
+        half = self.columns // 2
+        was_double = sizes.dec_line is not None and sizes.dec_line.row == y
         self._single_width_line(y)
         if kind == Sharp.DECSWL:
             sizes.dec_line = None
+            if was_double:
+                cursor.x //= 2
             return
+        if not was_double:
+            cursor.x = min(2 * cursor.x, 2 * (half - 1))
         row = self.data_buffer[y]
-        half = self.columns // 2
         texts = []
         held = {}
         for column, cell in sorted(row.items()):

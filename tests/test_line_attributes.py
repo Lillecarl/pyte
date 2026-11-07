@@ -67,6 +67,22 @@ def test_a_double_width_line_shows_the_first_half():
     assert _text(screen, 0) == "a b c d e "
 
 
+@pytest.mark.parametrize("kind", [Sharp.DECDWL, Sharp.DECDHL_TOP])
+def test_a_line_that_turns_double_keeps_the_cursor_s_column_in_its_own_cells(kind):
+    """
+    vttest's double-size screen moves the cursor to column 2 and then
+    sets the attribute. xterm and libvterm both draw "CSI 1;3H ESC # 6
+    ab" with "a" in the fifth column. Lillecarl/pyterm#374.
+    """
+    screen = _screen("\x1b[1;3H" + sharp(kind) + "ab")
+    assert [block.x for block in screen.text_sizes.blocks] == [4, 6]
+
+
+def test_a_line_that_turns_single_again_halves_the_cursor_s_column():
+    screen = _screen("\x1b[1;3H" + sharp(Sharp.DECDWL) + sharp(Sharp.DECSWL) + "ab")
+    assert _text(screen, 0) == "  ab      "
+
+
 def test_single_width_brings_the_second_half_back():
     """
     vttest's "Erase right half of double width lines": a long line set
