@@ -5087,7 +5087,8 @@ class Screen:
         Turn the text of the cursor's line into blocks of `kind`, and
         hold `kind` for what the program writes on the line next. The
         first half of the line is what a VT100 shows on a line twice as
-        wide, and the rest goes. DECSWL turns the blocks back into text.
+        wide, and it keeps the rest out of sight. DECSWL turns the blocks
+        back into text and shows the rest again.
         """
         sizes = self.text_sizes
         y = self.pt_cursor_position.y
@@ -5098,12 +5099,17 @@ class Screen:
         row = self.data_buffer[y]
         half = self.columns // 2
         texts = []
+        held = {}
         for column, cell in sorted(row.items()):
             if sizes.block_at(column, y) is not None:
                 continue
             del row[column]
-            if column < half and cell.char:
+            if column >= half:
+                held[column] = cell
+            elif cell.char:
                 texts.append((column, cell))
+        if held:
+            sizes.held[y] = held
         for column, cell in texts:
             size = self._dec_size(cell.char, kind, y)
             columns = 2 * character_width(cell.char)
@@ -5113,7 +5119,7 @@ class Screen:
         self.touch(y)
 
     def _single_width_line(self, y: int) -> None:
-        "Put the text of the DEC blocks on line `y` back in its cells, at one size."
+        "Put the text of the DEC blocks on line `y` back in its cells, at one size, and the held cells after it."
         sizes = self.text_sizes
         row = self.data_buffer[y]
         for block in [block for block in sizes.blocks if block.line and block.y == y]:
@@ -5124,6 +5130,9 @@ class Screen:
                 if character_width(piece) > 1:
                     row[column + 1] = _CHAR_CACHE["", block.appearance]
                 column += character_width(piece)
+        for column, cell in sizes.held.pop(y, {}).items():
+            if column < self.columns:
+                row[column] = cell
         self.touch(y)
 
     # ------------------------------------------------------------------

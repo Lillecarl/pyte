@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar, NamedTuple
 
-from .cells import _CHAR_CACHE, Appearance, Rendition, appearance_of, character_width, joins
+from .cells import _CHAR_CACHE, Appearance, Cell, Rendition, appearance_of, character_width, joins
 from .keep import Keep
 from .sequences.escapes import Sharp
 from .sequences.text_sizing import TextSize
@@ -132,16 +132,31 @@ class TextSizes:
     The alternate screen has its own, as it has its own images.
     """
 
-    __slots__ = ("blocks", "dec_line", "drawing")
+    __slots__ = ("blocks", "dec_line", "drawing", "held")
 
-    KEEP: ClassVar[dict[str, Keep]] = {name: Keep.SAVED for name in __slots__}
+    #: `held` is cells outside any row, which `freeze` cannot carry, and
+    #: a hot upgrade loses only the right half of a line nobody sees.
+    KEEP: ClassVar[dict[str, Keep]] = {
+        "blocks": Keep.SAVED,
+        "dec_line": Keep.SAVED,
+        "drawing": Keep.SAVED,
+        "held": Keep.DROPPED,
+    }
 
     def __init__(self) -> None:
         self.blocks: list[SizedBlock] = []
         self.dec_line: DecLine | None = None
+        #: The cells past the half of each DEC double row, by row and
+        #: column, which DECSWL gives back. A VT100 and xterm keep them,
+        #: and vttest calls losing them a misfeature; of the panel only
+        #: libvterm drops them. Lillecarl/pyterm#374.
+        self.held: dict[int, dict[int, Cell]] = {}
         #: Set while `Screen.draw` draws one character for the blocks,
         #: so that it takes the plain path.
         self.drawing = False
+
+    def after_thaw(self) -> None:
+        self.held = {}
 
     def block_at(self, x: int, y: int) -> SizedBlock | None:
         for block in self.blocks:
@@ -202,9 +217,22 @@ class TextSizes:
         screen.touch_rows(range(block.y, block.y + block.rows))
 
     def cover(self, screen: Screen, top: int, bottom: int, left: int, right: int) -> None:
-        "An erase took the cells of rows `top` to `bottom`, columns `left` up to `right`: every block there goes."
+        """
+        An erase took the cells of rows `top` to `bottom`, columns `left`
+        up to `right`: every block there goes. An erase to the end of a
+        double row reaches its held cells too, from the column under
+        `left` on.
+        """
         for block in [block for block in self.blocks if block.meets(top, bottom, left, right)]:
             self.remove(screen, block)
+        if right < screen.columns:
+            return
+        for row in [row for row in self.held if top <= row <= bottom]:
+            kept = {column: cell for column, cell in self.held[row].items() if column < left // 2}
+            if kept:
+                self.held[row] = kept
+            else:
+                del self.held[row]
 
     def shift(self, screen: Screen, row: int, column: int, count: int, end: int) -> None:
         """
@@ -212,7 +240,9 @@ class TextSizes:
         from `column` up to `end`. A block of one row moves with them,
         and one that the edit splits or that the edge cuts goes. A block
         of more rows anywhere from `column` on goes, as the spec says.
+        The held cells of the row go as well.
         """
+        self.held.pop(row, None)
         for block in list(self.blocks):
             if not block.meets(row, row, column, end):
                 continue
@@ -249,15 +279,25 @@ class TextSizes:
             if block.y >= first_row and block.y + block.rows - 1 <= last_row:
                 kept.append(block)
         self.blocks = kept
+        held: dict[int, dict[int, Cell]] = {}
+        for row, cells in self.held.items():
+            if not first_row <= row <= last_row:
+                held[row] = cells
+            elif first_row <= row - count <= last_row:
+                held[row - count] = cells
+        self.held = held
 
     def prune_above(self, row: int) -> None:
         "The history lost the rows above `row`."
         self.blocks = [block for block in self.blocks if block.y + block.rows > row]
+        self.held = {kept: cells for kept, cells in self.held.items() if kept >= row}
 
     def prune_below(self, row: int) -> None:
         "The rows below `row` went."
         self.blocks = [block for block in self.blocks if block.y + block.rows - 1 <= row]
+        self.held = {kept: cells for kept, cells in self.held.items() if kept <= row}
 
     def clear(self) -> None:
         self.blocks = []
         self.dec_line = None
+        self.held = {}

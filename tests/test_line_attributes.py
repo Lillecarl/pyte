@@ -67,6 +67,28 @@ def test_a_double_width_line_shows_the_first_half():
     assert _text(screen, 0) == "a b c d e "
 
 
+def test_single_width_brings_the_second_half_back():
+    """
+    vttest's "Erase right half of double width lines": a long line set
+    double and then single again shows all of it, as xterm and five
+    more of the panel show it. Lillecarl/pyterm#374.
+    """
+    screen = _screen("abcdefghij" + sharp(Sharp.DECDWL) + sharp(Sharp.DECSWL))
+    assert _text(screen, 0) == "abcdefghij"
+
+
+def test_the_second_half_moves_with_its_line():
+    "A scroll inside a region moves the row, and the held half with it."
+    moved = "\x1b[2;5r\x1b[3;1H" + "abcdefghij" + sharp(Sharp.DECDWL) + "\x1b[5;1H\n\x1b[2;1H" + sharp(Sharp.DECSWL)
+    screen = _screen(moved)
+    assert _text(screen, 1) == "abcdefghij"
+
+
+def test_an_erase_to_the_end_of_a_double_line_takes_the_second_half():
+    screen = _screen("abcdefghij" + sharp(Sharp.DECDWL) + "\x1b[1;5H\x1b[K" + sharp(Sharp.DECSWL))
+    assert _text(screen, 0) == "ab        "
+
+
 def test_alignment_display_makes_every_line_single():
     screen = _screen(sharp(Sharp.DECDWL) + "ab" + sharp(Sharp.DECALN))
     assert screen.text_sizes.blocks == []
