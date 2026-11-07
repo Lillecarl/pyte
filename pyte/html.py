@@ -58,6 +58,7 @@ __all__ = (
     "href_of",
     "html_of_page",
     "html_of_row",
+    "measured_runs_of_row",
     "runs_of_row",
     "style_of",
     "theme_css",
@@ -396,9 +397,7 @@ def runs_of_row(row: Row, columns: int, reverse_video: bool = False) -> list[tup
     function because more than one thing asks: the markup below, and a
     caller that sends the cells somewhere else. Lillecarl/pymux#461.
     """
-    last = columns - 1
-    while last >= 0 and not _draws(row[last], reverse_video):
-        last -= 1
+    last = _last_drawn(row, columns, reverse_video)
     if last < 0:
         return []
 
@@ -421,6 +420,54 @@ def runs_of_row(row: Row, columns: int, reverse_video: bool = False) -> list[tup
     if text:
         runs.append((appearance, "".join(text)))
     return runs
+
+
+def measured_runs_of_row(row: Row, columns: int, reverse_video: bool = False) -> list[tuple[Appearance, str, int]]:
+    """
+    `runs_of_row` for a reader that pins each run to its cells: each run
+    also says how many columns it covers.
+
+    **A character that is not printable ASCII is a run of its own.** A
+    browser draws it from whatever font has it, and that font's advance
+    is not the cell's, so in a run of flowing text it moved every cell
+    after it: the border between two panes leaned. Pinned alone, its box
+    is its cells whatever the glyph measures. Lillecarl/pymux#948.
+    """
+    last = _last_drawn(row, columns, reverse_video)
+    runs: list[tuple[Appearance, str, int]] = []
+    text: list[str] = []
+    start = 0
+    appearance = row[0].appearance
+
+    for column in range(last + 1):
+        cell = row[column]
+        char = cell.char
+        if char == "":
+            # The second half of a wide character: its run counts it.
+            continue
+        alone = not (" " <= char <= "~")
+        if text and (alone or cell.appearance is not appearance):
+            runs.append((appearance, "".join(text), column - start))
+            text.clear()
+        appearance = cell.appearance
+        if alone:
+            runs.append((appearance, visible_char(char), max(1, cell.width)))
+            continue
+        if not text:
+            start = column
+        text.append(char)
+
+    if text:
+        runs.append((appearance, "".join(text), last + 1 - start))
+    return runs
+
+
+def _last_drawn(row: Row, columns: int, reverse_video: bool) -> int:
+    "The last column of `row` that draws anything, or -1."
+    last = columns - 1
+    while last >= 0 and not _draws(row[last], reverse_video):
+        last -= 1
+    return last
 
 
 def html_of_row(row: Row, columns: int, reverse_video: bool = False) -> str:

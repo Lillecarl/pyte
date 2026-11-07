@@ -28,6 +28,7 @@ from pyte.html import (
     href_of,
     html_of_page,
     html_of_row,
+    measured_runs_of_row,
     runs_of_row,
     style_of,
     theme_css,
@@ -536,6 +537,32 @@ def test_the_markup_is_built_from_the_runs():
     assert [run for _appearance, run in runs] == ["ab", "cd"]
     assert markup.count("<span") == 1, markup
     assert markup.endswith("cd</span>"), markup
+
+
+def test_a_measured_run_says_its_cells_and_a_foreign_glyph_stands_alone():
+    """
+    A glyph that is not printable ASCII is a run of its own, so a reader
+    that pins each run to its cells pins that glyph to its own cells.
+    Lillecarl/pymux#948.
+    """
+    row = _screen(3, 20, "ab●cd漢ef\x1b[1mgh\x1b[0m").page.data_buffer[0]
+
+    assert [(text, cells) for _appearance, text, cells in measured_runs_of_row(row, 20)] == [
+        ("ab", 2),
+        ("●", 1),
+        ("cd", 2),
+        ("漢", 2),
+        ("ef", 2),
+        ("gh", 2),
+    ]
+
+
+def test_measured_runs_cover_what_the_row_draws():
+    "Every column up to the last drawn one, in reverse video the whole row."
+    row = _screen(3, 6, "a漢b").page.data_buffer[0]
+
+    assert sum(cells for *_rest, cells in measured_runs_of_row(row, 6)) == 4
+    assert sum(cells for *_rest, cells in measured_runs_of_row(row, 6, reverse_video=True)) == 6
 
 
 # ----------------------------------------------------------------------
