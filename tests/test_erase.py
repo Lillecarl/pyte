@@ -41,7 +41,7 @@ def test_an_erased_cell_and_a_written_blank_look_the_same():
     The class still tells them apart, and that is the difference that
     matters: a combining mark hangs on a written space and falls off an
     erased cell, and the renderer keeps a written blank at the end of a
-    row. Lillecarl/pymux#56.
+    row. Lillecarl/pyterm#58.
     """
     screen, stream = _screen()
     stream.feed(csi(escape.SGR, 42) + " " + csi(escape.CUP, 1, 2) + csi(escape.EL))
@@ -134,7 +134,7 @@ def test_an_underline_reaches_no_erased_cell():
     blank. Five judges say no and only kitty says yes, for both ED and
     EL, and `test_the_panel.py` holds that tally. A shell that leaves
     the underline on and clears the screen underlined every blank cell
-    of it. Lillecarl/pymux#67.
+    of it. Lillecarl/pyterm#69.
     """
     screen, stream = _screen()
     stream.feed(csi(escape.SGR, 4) + "hi" + csi(escape.EL))

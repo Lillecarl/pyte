@@ -73,7 +73,7 @@ def test_a_region_scroll_reports_its_region_and_distance():
     rows, the signed distance (up positive), the counts of its rows
     before and after so a reader moves only what still shows its row,
     and the sequence so a reader that missed any rebuilds instead.
-    Lillecarl/pymux#516.
+    Lillecarl/pyterm#518.
     """
     screen, stream = _screen()
     stream.feed("a\r\nb\r\nc\r\nd" + csi(escape.DECSTBM, 2, 3))

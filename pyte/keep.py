@@ -5,7 +5,7 @@ A class lists every attribute of its instances in `KEEP`, a mapping of
 name to `Keep`. pymux's `test_every_attribute_has_a_fate` walks a live
 session and fails on an attribute with no entry, and on an entry with
 no attribute. A field added without a decision cannot ship, which is
-what keeps a restore from quietly losing state. Lillecarl/pymux#399.
+what keeps a restore from quietly losing state. Lillecarl/pyterm#401.
 
 It lives in pyte because pyte is the lowest layer: every package above
 it declares with the same three words.

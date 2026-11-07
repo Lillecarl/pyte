@@ -7,7 +7,7 @@ it was on. That is what a user sees when they widen a window: the prompt
 does not move, and more of what scrolled away comes back.
 
 libvterm is the only oracle here. No judge on the panel can be resized,
-so a reflow has no vote to read (Lillecarl/pymux#64).
+so a reflow has no vote to read (Lillecarl/pyterm#66).
 
 libvterm agrees, but only when it has a history. Its `69screen_reflow`
 test asks for `WANTSCREEN r`, which turns reflow on and leaves the
@@ -15,7 +15,7 @@ scrollback off, so `sb_popline` in `t/harness.c` returns 0 and
 `src/screen.c` falls back to moving the text to the top. Give the same
 harness `WANTSCREEN rb` and the same bytes, and it pops a line, fills
 the top row and puts the cursor at `4,2`, which is what these tests
-assert. Lillecarl/pymux#57.
+assert. Lillecarl/pyterm#59.
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ def _row(screen, row: int) -> str:
     test `_reflow` uses.
 
     The blank inside a row is content. The space after "> " is one, and
-    a reflow that drops it is Lillecarl/pymux#56 again.
+    a reflow that drops it is Lillecarl/pyterm#58 again.
     """
     line = screen.page.data_buffer[screen.line_offset + row]
     text = [line[x] for x in range(max(line) + 1)]
@@ -121,7 +121,7 @@ def test_the_cursor_lands_once():
 
     Four characters, one "CSI T" and a narrowing is enough. The cursor
     stands on the blank at column four of an empty row, and it landed
-    a row low, on the "t" of "text". Lillecarl/pymux#110.
+    a row low, on the "t" of "text". Lillecarl/pyterm#112.
     """
     screen = Screen(6, 10, write_process_input=lambda answer: None)
     Stream(screen).feed("text" + csi(Csi.SD, 0))

@@ -98,7 +98,7 @@ def test_the_alternate_screen_stays_in_front():
 
 
 def test_a_soft_reset_on_the_alternate_screen_holds_after_it():
-    "Modes belong to the terminal, as in kitty. Lillecarl/pymux#906."
+    "Modes belong to the terminal, as in kitty. Lillecarl/pyterm#908."
     _screen_, stream, answers = _screen()
     leave = reset_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR)
     stream.feed(reset_mode(PrivateMode.AUTOWRAP) + set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR))

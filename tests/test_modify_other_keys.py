@@ -12,7 +12,7 @@ of the key without its modifiers.
 
 The levels are xterm's, and so are the examples:
 `xterm-snapshots/ctlseqs.ms`, under "Alt and Meta Keys".
-Lillecarl/pymux#169.
+Lillecarl/pyterm#171.
 """
 
 from __future__ import annotations
@@ -25,8 +25,8 @@ from pyte.keys.events import FormatOtherKeys, KeyModifierResource, ModifyOtherKe
 
 #: What xterm 390 sends in its own mode where the other terminals split,
 #: from the key panel: the sequence the terminal of the person sends,
-#: the level, DECKPAM, and xterm's answer. Lillecarl/pymux#693,
-#: Lillecarl/pymux#700.
+#: the level, DECKPAM, and xterm's answer. Lillecarl/pyterm#695,
+#: Lillecarl/pyterm#702.
 XTERMS_ANSWERS = [
     ("caps lock and Delete", "\x1b[3;65~", ModifyOtherKeys.EVERY_KEY, False, "\x1b[3;1~"),
     ("caps lock and Left", "\x1b[1;65D", ModifyOtherKeys.EVERY_KEY, False, "\x1b[1;1D"),
@@ -107,7 +107,7 @@ def test_the_first_level_takes_what_ctrl_and_shift_cannot_say(key, sent):
     """
     xterm writes the escape form at level 1 where ctrl or shift has no
     legacy form: ctrl on a key with no control code, and Enter or Tab
-    with either. WezTerm agrees. Lillecarl/pymux#701.
+    with either. WezTerm agrees. Lillecarl/pyterm#703.
     """
     screen, stream, _ = a_screen()
     stream.feed("\x1b[>4;1m")
@@ -121,7 +121,7 @@ def test_every_modifier_is_the_second_level():
     shift-Tab as "CSI 27 ; 2 ; 9 ~". xterm 390 itself sends "CSI Z":
     shift and Tab arrive as the keysym ISO_Left_Tab, which it writes as
     the back tab first. It is xterm's mode, so xterm decides.
-    Lillecarl/pymux#693.
+    Lillecarl/pyterm#695.
     """
     screen, stream, _ = a_screen()
     stream.feed("\x1b[>4;2m")
@@ -137,7 +137,7 @@ def test_shift_on_a_letter_is_the_escape_form_at_the_second_level():
     that types a character from 0x40 to 0x7F does (`IsControlInput` in
     its `input.c`), and Ghostty does the same. vim, which asks for this
     level, reads it as "A". A key with no modifier is still its text.
-    Lillecarl/pymux#702.
+    Lillecarl/pyterm#704.
     """
     screen, stream, _ = a_screen()
     stream.feed("\x1b[>4;2m")
@@ -149,7 +149,7 @@ def test_shift_on_a_letter_is_the_escape_form_at_the_second_level():
 
 
 def test_the_escape_form_writes_the_character_the_key_types():
-    "alt+shift+minus is the underscore, as xterm and Ghostty write it. Lillecarl/pymux#702."
+    "alt+shift+minus is the underscore, as xterm and Ghostty write it. Lillecarl/pyterm#704."
     screen, stream, _ = a_screen()
     stream.feed("\x1b[>4;2m")
 
@@ -161,7 +161,7 @@ def test_shift_on_space_counts_at_the_second_level():
     """
     Space writes itself with shift held, so it has no shifted
     character, and shift counts the way it does on Tab. Ghostty and
-    WezTerm both send "CSI 27 ; 2 ; 32 ~". Lillecarl/pymux#699.
+    WezTerm both send "CSI 27 ; 2 ; 32 ~". Lillecarl/pyterm#701.
     """
     screen, stream, _ = a_screen()
     stream.feed("\x1b[>4;2m")
@@ -175,7 +175,7 @@ def test_ctrl_on_backspace_is_the_back_arrow_toggle():
     xterm's `IsBackarrowToggle`: ctrl flips Backspace between DEL and
     BS, and it is no modifier to the second level. So ctrl+Backspace is
     BS, as xterm and Ghostty send it, and another modifier beside it
-    takes the escape form with BS in it. Lillecarl/pymux#703.
+    takes the escape form with BS in it. Lillecarl/pyterm#705.
     """
     screen, stream, _ = a_screen()
     stream.feed("\x1b[>4;2m")
@@ -224,7 +224,7 @@ def test_no_parameter_at_all_puts_every_resource_back():
 
     This is the sequence that could not be told from `CSI > 0 m` while
     the parser turned an empty parameter into a zero.
-    Lillecarl/pymux#178.
+    Lillecarl/pyterm#180.
     """
     screen, stream, _ = a_screen()
     stream.feed("\x1b[>0;2m")
@@ -329,7 +329,7 @@ def test_a_pane_the_host_holds_back_stays_in_the_legacy_encoding():
     The escape hatch, for a program that misbehaves under the extended
     encodings. The pane hears it: it answers what it really does, and
     not what it asked for, so a program that queries is told the
-    truth. Lillecarl/pymux#173.
+    truth. Lillecarl/pyterm#175.
     """
     screen, stream, replies = a_screen()
     stream.feed("\x1b[>4;2m")
@@ -386,7 +386,7 @@ def test_a_program_can_ask_for_the_csi_u_form():
     """
     xterm's own example: "when modifyOtherKeys is set to 1, for
     example alt-Tab sends CSI 9 ; 3 u (changing the order of
-    parameters)". Lillecarl/pymux#183.
+    parameters)". Lillecarl/pyterm#185.
     """
     screen, stream, _ = a_screen()
     stream.feed("\x1b[>4;1m")
@@ -411,7 +411,7 @@ def test_xtfmtkeys_does_not_move_the_cursor():
     Its final byte is the one HVP has, and the private marker is the
     whole difference. Reading it as a position moved the cursor to row
     four, and every character the program drew after it landed in the
-    wrong place. Lillecarl/pymux#183.
+    wrong place. Lillecarl/pyterm#185.
     """
     screen, stream, _ = a_screen()
     stream.feed("\x1b[3;3H")

@@ -10,7 +10,7 @@ next character alone.
 A program that wants one character out of another set uses the second
 kind. It designates the set into G2 and writes "ESC N" before the
 character, which is cheaper than shifting there and back.
-Lillecarl/pymux#373.
+Lillecarl/pyterm#375.
 """
 
 from __future__ import annotations

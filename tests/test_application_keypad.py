@@ -8,7 +8,7 @@ above the letters. `less`, `mc` and everything built on curses ask.
 terminfo's `smkx` is usually "\\E[?1h\\E=": the application cursor
 keys and this, in one string. pyte acted on the first half and
 ignored the second, which is a state no real terminal is ever in.
-Lillecarl/pymux#175.
+Lillecarl/pyterm#177.
 
 The table is xterm's, out of `kypd_num` and `kypd_apl` in its
 `input.c`. Both are indexed by the keysym less `XK_KP_Space`, so the
@@ -139,7 +139,7 @@ def test_a_keypad_arrow_follows_the_cursor_keys_and_not_the_keypad():
 def test_a_modified_keypad_key_keeps_its_ss3_form():
     """
     xterm writes the modifiers into the SS3 form, as it does for F1:
-    shift on keypad plus is "SS3 2 k". Lillecarl/pymux#700.
+    shift on keypad plus is "SS3 2 k". Lillecarl/pyterm#702.
     """
     screen, stream = a_screen()
     stream.feed("\x1b=")
@@ -152,7 +152,7 @@ def test_num_lock_puts_the_digits_back():
     """
     xterm's `numLock`: with num lock on, a keypad key that types a
     character types it, whatever DECKPAM says. Ghostty agrees.
-    Lillecarl/pymux#700.
+    Lillecarl/pyterm#702.
     """
     screen, stream = a_screen()
     stream.feed("\x1b=")
@@ -165,7 +165,7 @@ def test_num_lock_puts_the_digits_back():
 def test_modify_other_keys_never_reaches_the_keypad():
     """
     xterm takes a keypad key before it looks at modifyOtherKeys, so at
-    every level it is the character it types. Lillecarl/pymux#700.
+    every level it is the character it types. Lillecarl/pyterm#702.
     """
     screen, stream = a_screen()
     stream.feed("\x1b[>4;3m")
@@ -213,7 +213,7 @@ def test_the_backarrow_sends_a_delete_to_begin_with():
 
 
 def test_decbkm_makes_it_a_backspace():
-    "DECBKM, private mode 67. Lillecarl/pymux#184."
+    "DECBKM, private mode 67. Lillecarl/pyterm#186."
     screen, stream = a_screen()
 
     stream.feed("\x1b[?67h")

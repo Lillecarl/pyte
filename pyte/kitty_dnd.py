@@ -11,7 +11,7 @@ it. This does the same, for a pane's program and for a terminal.
 A program registers once, at its start: as a drop target, with the MIME
 types it takes, and as a drag source. kitty keeps that per window; a
 pane keeps it on its screen, so that it lives through a server upgrade.
-Lillecarl/pymux#892.
+Lillecarl/pyterm#894.
 """
 
 from __future__ import annotations

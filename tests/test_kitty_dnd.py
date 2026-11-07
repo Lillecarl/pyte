@@ -2,7 +2,7 @@
 kitty's drag and drop protocol (OSC 72) as a pane's program sends it:
 each packet goes to the embedder, a chunk of a chain with the metadata
 of its first chunk, and with no embedder nothing answers. The parser
-itself is judged against kitty in ptterm. Lillecarl/pymux#892.
+itself is judged against kitty in ptterm. Lillecarl/pyterm#894.
 """
 
 from __future__ import annotations

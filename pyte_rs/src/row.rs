@@ -1,7 +1,7 @@
 //! `pyte_rs.Row`: one row of a page, stored by column in one contiguous
 //! vector. It answers the mapping protocol `pyte.page.Row` answers, with
 //! the same cell objects, so nothing that reads a row can tell the two
-//! apart but by speed. Lillecarl/pymux#570.
+//! apart but by speed. Lillecarl/pyterm#572.
 
 use std::collections::BTreeMap;
 
@@ -74,7 +74,7 @@ pub struct Row {
     #[pyo3(get, set)]
     wrapped: bool,
     /// What a shell marked on this row: a `pyte.page.RowMark`.
-    /// Lillecarl/pymux#500.
+    /// Lillecarl/pyterm#502.
     #[pyo3(get, set)]
     marks: Py<PyAny>,
 }

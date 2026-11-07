@@ -60,10 +60,10 @@ def the_modifiers_a_pane_cannot_read(
 
     if event.code == KeyCode.TAB and event.mods & Modifier.SHIFT:
         # Back tab is "CSI Z" and carries no ctrl, as in kitty.
-        # Lillecarl/pymux#174.
+        # Lillecarl/pyterm#176.
         return lost | (event.mods & Modifier.CTRL)
     # The key shift makes, which the encoder writes under ctrl or alt.
-    # Lillecarl/pymux#691.
+    # Lillecarl/pyterm#693.
     shifted = shifted_key_of(event)
     if modify_other_keys:
         profile = MODIFY_OTHER_KEYS_PROFILE
@@ -75,12 +75,12 @@ def the_modifiers_a_pane_cannot_read(
             code = shifted
         else:
             # ctrl+a and ctrl+shift+a are one control code.
-            # Lillecarl/pymux#168.
+            # Lillecarl/pyterm#170.
             lost |= event.mods & Modifier.SHIFT
             legacy_event = folded(event, flags, profile)
             code = event.code if legacy_event is None else legacy_event.code
         if not has_a_control_code(code):
-            # ctrl+1 is "1". Lillecarl/pymux#686.
+            # ctrl+1 is "1". Lillecarl/pyterm#688.
             lost |= Modifier.CTRL
         return lost
     if event.mods & Modifier.ALT and shifted is not None:

@@ -5,7 +5,7 @@ A write arrives in packets: "type=write", then "wdata" chunks per MIME
 type and "walias" packets, then a "wdata" with no type to end it. This
 holds the write in progress and hands the embedder a finished one, or
 a read request. A screen does not own a clipboard, so the embedder
-decides both, and answers the program. Lillecarl/pymux#893.
+decides both, and answers the program. Lillecarl/pyterm#895.
 
 kitty's `ClipboardRequestManager.parse_osc_5522` is the reference: an
 error aborts the write, and every packet after it is ignored until the

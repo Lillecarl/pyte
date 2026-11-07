@@ -17,7 +17,7 @@ xterm `top_marg == 0` with no left or right margin (`util.c`,
 `scroll_all_lines`), Alacritty `region.start == 0` (`grid/mod.rs`,
 `scroll_up`), Ghostty `scrolling_region.top == 0` (`Terminal.zig`) and
 libvterm `rect.start_row == 0` over the full width (`screen.c`,
-`premove`). Lillecarl/pymux#423.
+`premove`). Lillecarl/pyterm#425.
 """
 
 from __future__ import annotations
@@ -138,7 +138,7 @@ def test_a_screen_that_has_not_filled_once_still_keeps_the_row():
 
     A program that scrolls a region is using the whole height anyway:
     the rows under the region are on the screen, and the row that
-    leaves the top of it has to go somewhere. Lillecarl/pymux#424.
+    leaves the top of it has to go somewhere. Lillecarl/pyterm#426.
     """
     screen, stream = _screen()
     # Two rows written, four never touched.
@@ -191,7 +191,7 @@ def test_the_alternate_screen_does_not_slide_at_all():
     vim measured it: `vim_24bitcolors_bce` takes the alternate screen
     and then scrolls a region 641 times, and each scroll paid for a
     prune. The suites beside it in `checks.all` began to fail on
-    timing. Lillecarl/pymux#425.
+    timing. Lillecarl/pyterm#427.
 
     `line_offset` is what says which path ran, and it is cheap to
     assert. A prune on every row leaves the same rows behind as no

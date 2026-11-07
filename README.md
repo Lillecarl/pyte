@@ -3,7 +3,7 @@
 > This repository is a copy. Work on pyte happens in
 > [pyterm](https://github.com/Lillecarl/pyterm), which exports its `pyte/`
 > directory here on every push. Send changes there, and issues to
-> [Lillecarl/pymux](https://github.com/Lillecarl/pymux/issues).
+> [Lillecarl/pyterm](https://github.com/Lillecarl/pyterm/issues).
 > The docs are at <https://lillecarl.github.io/pyte/>.
 
 <!-- The lines above are pyterm's nix/shared/readme-head.md, written by sync-sources. -->

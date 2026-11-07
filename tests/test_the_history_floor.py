@@ -6,7 +6,7 @@ the ones above the limit. A pane at fifty thousand rows drops about a
 hundred of them at a time, so that read was five hundred rows of work
 for each row of output. Printing a hundred lines cost three times as
 much at fifty thousand rows as at two thousand, and the depth is what a
-person chooses. Lillecarl/pymux#8.
+person chooses. Lillecarl/pyterm#10.
 
 `history_floor` is the lowest row the buffer can hold, so a prune walks
 from there and stops. **The shortcut is only right while nothing lives
@@ -71,7 +71,7 @@ def say_the_floor_holds(screen) -> None:
     # A row that left the history takes its count with it, or
     # `written_at` grows with the session instead of with the history.
     # The wrap mark needs no check of its own: it rides on the row, so
-    # dropping the row drops it. Lillecarl/pymux#134.
+    # dropping the row drops it. Lillecarl/pyterm#136.
     counts = sorted(row for row in screen.written_at if row < remove_above)
     assert not counts, "these counts should have gone: %s" % counts
 
@@ -106,7 +106,7 @@ def test_the_notes_about_a_row_go_when_the_row_does():
 
     It was a dictionary keyed by row number once, and the row numbers of
     a session never come back around, so a note outlived its row and
-    both grew with the session. Lillecarl/pymux#134 put it where it
+    both grew with the session. Lillecarl/pyterm#136 put it where it
     cannot. This says the buffer really is written on, so the test would
     have failed before that change.
     """

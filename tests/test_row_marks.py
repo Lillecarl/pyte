@@ -4,7 +4,7 @@ A shell's prompt marks live on the row, so they move with it.
 `Screen.mark_row` is what a front end calls for "OSC 133 ; A" and "C".
 The marks were a list of row numbers beside the buffer, and a number
 says where the cursor stood, not where that row is after a scroll or a
-resize. Lillecarl/pymux#500.
+resize. Lillecarl/pyterm#502.
 """
 
 from __future__ import annotations

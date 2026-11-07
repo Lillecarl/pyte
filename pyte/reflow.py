@@ -4,7 +4,7 @@ The arithmetic of laying a buffer out again at a new width.
 It lays out the screen and the lines that reach it, and leaves the
 history where it is. A reader of the history reads lines and not rows,
 so the width those rows were laid out at never reaches it.
-Lillecarl/pymux#135.
+Lillecarl/pyterm#137.
 
 These read and write the rows and nothing else. Moving the cursor,
 `max_y` and the floors is the screen's: `Screen._reflow`.
@@ -56,7 +56,7 @@ def highest_row_held(data_buffer: Mapping[int, Row], bottom: int, lines: int) ->
     the gap down to the last row of the history is as deep as the
     history. That fall back costs what this cost before: `max` walks
     every key, which at fifty thousand rows is 392 microseconds of a
-    resize that takes 1,200. Lillecarl/pymux#145.
+    resize that takes 1,200. Lillecarl/pyterm#147.
     """
     for number in range(bottom, bottom - lines, -1):
         if number in data_buffer:
@@ -93,7 +93,7 @@ def first_row_to_lay_out(data_buffer: Mapping[int, Row], last: int, wanted: int,
     walk passes every row between `last` and the floor, so it has seen
     the lowest one by the time it gets there, and asking `min` would
     read every key of the buffer to find a number that only matters when
-    the walk runs all the way down. Lillecarl/pymux#145.
+    the walk runs all the way down. Lillecarl/pyterm#147.
     """
     collected = 0
     lowest = last
@@ -148,7 +148,7 @@ def lay_out(
     # test is the class and not the character: a space out of
     # `draw` is a `WrittenCell`, and the blank that an erase leaves
     # is not. Reading the character instead lost the space after a
-    # shell prompt on every resize. Lillecarl/pymux#56.
+    # shell prompt on every resize. Lillecarl/pyterm#58.
     #
     # Also make sure that lines consist of at lesat one character,
     # otherwise we can't calculate `max_y` correctly. (This is important
@@ -157,7 +157,7 @@ def lay_out(
     # The cursor needs nothing held back here. It travels as an
     # offset from the start of its line, and an offset past the
     # end of one is where it stands on a full row or on a row a
-    # program moved onto and did not write. Lillecarl/pymux#143.
+    # program moved onto and did not write. Lillecarl/pyterm#145.
     for line in lines:
         cells = line.cells
         while len(cells) > 1 and not isinstance(cells[-1], WrittenCell) and cells[-1].appearance == PLAIN_APPEARANCE:
@@ -189,7 +189,7 @@ def lay_out(
     # characters, one "CSI T" and a narrowing was enough: the
     # cursor landed a row low, on the "t" of "text" instead of on
     # the blank it stood on, and the check at the end of
-    # `Screen._reflow` raised. Lillecarl/pymux#110.
+    # `Screen._reflow` raised. Lillecarl/pyterm#112.
     new_cursor_position = None
 
     for line_index, line in enumerate(lines):
@@ -211,7 +211,7 @@ def lay_out(
             # not at the next free one: it is zero wide, so the next
             # character landed on it and took its place, and every
             # wide character came out of a resize followed by a blank
-            # (Lillecarl/pymux#548's pictures). A half whose
+            # (Lillecarl/pyterm#550's pictures). A half whose
             # character is not there is dropped, as an edit drops it.
             if not char_width and char.char == "":
                 before = row.get(new_column_index - 2)
@@ -239,7 +239,7 @@ def lay_out(
         # A cursor that stands past the end of its line lands the
         # same distance past the last cell of it, wrapping the way
         # a character would. No cell in the loop above matched it,
-        # because there is no cell there. Lillecarl/pymux#143.
+        # because there is no cell there. Lillecarl/pyterm#145.
         if cy == line_index and cx >= len(line.cells):
             cursor_row = new_row_index
             cursor_column = new_column_index + cx - len(line.cells)

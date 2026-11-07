@@ -43,7 +43,7 @@ def test_kitty_push():
 
 
 def test_kitty_push_without_flags():
-    "A sequence with no parameter carries none. Lillecarl/pymux#178."
+    "A sequence with no parameter carries none. Lillecarl/pyterm#180."
     assert feed(csi(Csi.KITTY_KEYBOARD, private=Marker.GREATER)) == [("report_kitty_keyboard", (), {"private": ">"})]
 
 

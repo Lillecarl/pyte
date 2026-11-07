@@ -81,7 +81,7 @@ def _press(key: str, code: int, shifted: int, mods: int, other_keys: int, keypad
 EXTENDED_DEVIATIONS = [
     ExtendedDeviation(
         "kitty's profile writes super under DECKPAM",
-        "Lillecarl/pymux#706",
+        "Lillecarl/pyterm#708",
         # With only DECKPAM on, super+F3 is "CSI 1 ; 9 R" in the default
         # profile, xterm drops super and Ghostty writes kitty's F3.
         lambda case: bool(case.request.mods & Modifier.SUPER) and case.request.other_keys == ModifyOtherKeys.OFF,
@@ -89,7 +89,7 @@ EXTENDED_DEVIATIONS = [
     ),
     ExtendedDeviation(
         "kitty's profile keeps the shifted key under DECKPAM",
-        "Lillecarl/pymux#706",
+        "Lillecarl/pyterm#708",
         # ctrl+shift+[ with only DECKPAM on, which is not xterm's own mode:
         # the default profile writes kitty's "{", xterm ESC, Ghostty CSI u.
         lambda case: (
@@ -186,7 +186,7 @@ def test_each_profile_sends_what_its_terminal_sends(judge):
     """
     Where the judge answers with a legacy form, its profile sends that.
     Where it answers with a form a legacy pane prints, the profile sends
-    a legacy form of its own. Lillecarl/pymux#706.
+    a legacy form of its own. Lillecarl/pyterm#708.
     """
     requests = [_press(key, code, shifted, mods, ModifyOtherKeys.OFF) for key, code, shifted, mods in PROFILE_EXAMPLES]
     wrong = []
@@ -214,7 +214,7 @@ def test_xterm_decides_its_own_mode(other_keys, keypad):
     Under modifyOtherKeys pyte sends exactly what xterm sends, wherever
     xterm answers, and a split among the others does not weigh against
     it: caps lock on Delete at level 3 is "CSI 3 ; 1 ~", and super is
-    dropped. Lillecarl/pymux#693, Lillecarl/pymux#700.
+    dropped. Lillecarl/pyterm#695, Lillecarl/pyterm#702.
     """
     differ = [
         (case.request, case.pyte, case.answers["xterm"])

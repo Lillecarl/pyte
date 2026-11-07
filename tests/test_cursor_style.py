@@ -100,7 +100,7 @@ def test_decrqm_answers_for_the_blinking():
 
 
 def test_iterm2_names_the_shape_and_keeps_the_blinking():
-    "OSC 1337 ; CursorShape: 0 block, 1 bar, 2 underline. Lillecarl/pymux#781."
+    "OSC 1337 ; CursorShape: 0 block, 1 bar, 2 underline. Lillecarl/pyterm#783."
     screen, stream, responses = make_screen()
     stream.feed("\x1b]1337;CursorShape=1\x1b\\")
     assert screen.cursor_style == 5  # A bar that blinks, as the block did.

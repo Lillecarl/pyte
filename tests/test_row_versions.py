@@ -13,7 +13,7 @@ ends draw one screen while pymux gives several clients one pane. A
 screen that tracked its readers would have to register them, which a
 pure layer cannot do. A count that only goes up needs no emptying:
 each reader answers for itself, and a reader that attaches late
-remembers nothing, so it draws everything once. Lillecarl/pymux#126.
+remembers nothing, so it draws everything once. Lillecarl/pyterm#128.
 
 **A missed write is not a slow screen, it is a wrong one.** A row that
 changed and did not say so stays on the screen as it was, in whatever
@@ -187,7 +187,7 @@ PLAIN = [
     "text",
     "wider text that wraps around the end of a short row",
     # Two cells each: a resize lost the second of them until
-    # Lillecarl/pymux#548, and no chunk here drew one.
+    # Lillecarl/pyterm#550, and no chunk here drew one.
     "漢字",
     "wide 漢字 that wraps 漢 at the edge",
 ]

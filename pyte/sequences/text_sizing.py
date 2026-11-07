@@ -2,7 +2,7 @@
 kitty's text sizing protocol, "OSC 66 ; metadata ; text ST": text drawn
 in a block of cells larger or smaller than one.
 https://sw.kovidgoyal.net/kitty/text-sizing-protocol/.
-Lillecarl/pymux#890.
+Lillecarl/pyterm#892.
 
 The metadata is "key=value" pairs joined by colons, each value an
 unsigned integer. kitty's `parse-multicell-command.h` drops the whole

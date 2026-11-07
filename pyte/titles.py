@@ -15,7 +15,7 @@ its own title back.
 Nothing here writes a sequence. `to_report` gives the text and the
 screen sends it. `parameters.py` holds `TitleMode` and `TitlePart`,
 the numbers that name a mode and a half of the pair.
-Lillecarl/pymux#129.
+Lillecarl/pyterm#131.
 """
 
 from __future__ import annotations
@@ -96,7 +96,7 @@ class Titles:
         several. A sequence that carries no parameter names mode zero,
         and so does one that carries an empty parameter: an empty
         parameter asks for the default of that position, which here is
-        zero. Lillecarl/pymux#178.
+        zero. Lillecarl/pyterm#180.
 
         A number that no mode has is ignored. xterm does the same, and
         a program that asks for a mode nobody carries should not lose

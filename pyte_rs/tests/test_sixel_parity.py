@@ -5,7 +5,7 @@ Random payloads of every command a body holds -- data, repeats, colour
 selections and definitions in both systems, carriage returns, new bands,
 raster attributes -- with numbers short, long and past 18 digits, and
 digits Python reads that ASCII does not. Both have to give the same
-image, byte for byte, or the same error. Lillecarl/pymux#574.
+image, byte for byte, or the same error. Lillecarl/pyterm#576.
 """
 
 from __future__ import annotations

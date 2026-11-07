@@ -3,7 +3,7 @@ A page carried as frames of rows shows what the screen it came from shows.
 
 `pyte.grid` is what a pymux server sends a peer that mirrors a pane:
 the visible page, as the rows that changed since the last frame.
-Lillecarl/pymux#759.
+Lillecarl/pyterm#761.
 """
 
 from __future__ import annotations
@@ -141,7 +141,7 @@ CORNERS = {
 
 
 def test_text_at_another_size_crosses_when_it_changes():
-    "Lillecarl/pymux#910."
+    "Lillecarl/pyterm#912."
     screen = a_screen(40, 12)
     stream = Stream(screen)
     peer = Peer(screen)
@@ -168,7 +168,7 @@ def test_each_corner_shows_the_same(name):
 
 
 def test_the_copy_holds_kittys_extra_cursors():
-    "Lillecarl/pymux#891."
+    "Lillecarl/pyterm#893."
     screen = a_screen(40, 12)
     stream = Stream(screen)
     peer = Peer(screen)

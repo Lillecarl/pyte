@@ -126,7 +126,7 @@ def test_decncsm_needs_the_level_that_brought_it():
 # page, so a pane that will never get one does not carry the mode.
 # xterm keeps it behind `allowWindowOps` for the same reason, and
 # esctest2 marks `DECRQMTests.test_DECRQM_DEC_DECNCSM` `optionRequired`
-# on that resource. Lillecarl/pymux#31.
+# on that resource. Lillecarl/pyterm#33.
 
 
 def refusing_screen(allowed):
@@ -197,7 +197,7 @@ def test_a_reset_gives_the_narrow_page_back():
     """
     RIS ("ESC c") puts a terminal on the 132 column page back on the
     80 column one. `RISTests.test_RIS_ResetDECCOLM` of esctest2 asks
-    for it, and Lillecarl/pymux#42 is where it was found.
+    for it, and Lillecarl/pyterm#44 is where it was found.
     """
     screen, stream, asks = make_screen()
     stream.feed(ALLOW + WIDE)

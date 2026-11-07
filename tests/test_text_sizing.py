@@ -1,7 +1,7 @@
 """
 kitty's text sizing protocol, OSC 66: text in a block of cells.
 https://sw.kovidgoyal.net/kitty/text-sizing-protocol/.
-Lillecarl/pymux#890.
+Lillecarl/pyterm#892.
 """
 
 from __future__ import annotations

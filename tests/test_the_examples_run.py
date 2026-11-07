@@ -4,7 +4,7 @@ Every example that needs nothing but pyte runs, and says what it says.
 The lint reads `examples/` and nothing ran it, so six of seven broke
 against a new `Screen` with no red check. `webterm.py` and
 `terminal_emulator.py` need a web server and Textual, which pyte does
-not depend on, so only the lint holds those. Lillecarl/pymux#672.
+not depend on, so only the lint holds those. Lillecarl/pyterm#674.
 """
 
 from __future__ import annotations

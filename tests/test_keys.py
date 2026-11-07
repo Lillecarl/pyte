@@ -39,7 +39,7 @@ def test_the_number_of_a_tilde_key_is_kept():
     The number is the identity of the key in that form, so it always
     goes out. Every other form has 1 for its default, and the rule that
     leaves a default field empty took the 1 away here as well: a pane
-    read "CSI ~", which names no key. Lillecarl/pymux#152.
+    read "CSI ~", which names no key. Lillecarl/pyterm#154.
     """
     assert translate_key_data("\x1b[1~", flags=0) == "\x1b[1~"
     assert translate_key_data("\x1b[1;5~", flags=0) == "\x1b[1;5~"
@@ -47,7 +47,7 @@ def test_the_number_of_a_tilde_key_is_kept():
 
 
 def test_ctrl_and_enter_is_a_carriage_return():
-    "kitty, xterm and WezTerm send a CR. Lillecarl/pymux#694."
+    "kitty, xterm and WezTerm send a CR. Lillecarl/pyterm#696."
     assert translate_key_data("\x1b[13;5u", flags=0) == "\r"
     assert translate_key_data("\x1b[13;7u", flags=0) == "\x1b\r"
     assert translate_key_data("\x1b[57414;5u", flags=0) == "\r"
@@ -106,7 +106,7 @@ def test_shift_on_enter_reaches_a_pane_that_disambiguates(key, flags, sent):
     """
     kitty, Ghostty and WezTerm write shift+Enter as "CSI 13 ; 2 u" once
     a pane disambiguates. A lock is no modifier, and a legacy pane has
-    no form for the shift. Lillecarl/pymux#689.
+    no form for the shift. Lillecarl/pyterm#691.
     """
     assert translate_key_data(key, flags=flags, source_flags=REPORT_ALL | EVENT_TYPES) == sent
 
@@ -152,7 +152,7 @@ def test_home_end_and_begin_follow_the_cursor_key_mode(key, normal, application,
     """
     kitty, Ghostty and WezTerm move Home, End and keypad Begin to SS3
     with the arrows, and so does xterm. A modifier keeps the CSI form,
-    as it does for an arrow. Lillecarl/pymux#687.
+    as it does for an arrow. Lillecarl/pyterm#689.
     """
     assert translate_key_data(key, flags=0) == normal
     assert translate_key_data(key, flags=0, application_mode=True) == application
@@ -267,7 +267,7 @@ def test_the_text_of_a_key_reaches_a_pane_that_asked():
     """
     assert translate_key_data("A", flags=REPORT_ALL | ASSOCIATED_TEXT) == ("\x1b[97;2;65u")
     # The text rides an escape code, and without REPORT_ALL_KEYS a text
-    # key is not one: kitty, Ghostty and WezTerm send "a". Lillecarl/pymux#695.
+    # key is not one: kitty, Ghostty and WezTerm send "a". Lillecarl/pyterm#697.
     assert translate_key_data("a", flags=ASSOCIATED_TEXT) == "a"
     # A key that writes no text carries none.
     assert translate_key_data("\r", flags=REPORT_ALL | ASSOCIATED_TEXT) == ("\x1b[13u")
@@ -276,7 +276,7 @@ def test_the_text_of_a_key_reaches_a_pane_that_asked():
 
 #: A pane that pushed a flag, but neither DISAMBIGUATE nor REPORT_ALL_KEYS:
 #: the sequence the terminal of the person sends, the flags, and what
-#: kitty, Ghostty and WezTerm all send. Lillecarl/pymux#695.
+#: kitty, Ghostty and WezTerm all send. Lillecarl/pyterm#697.
 WITHOUT_DISAMBIGUATE = [
     ("f13", "\x1b[57376u", EVENT_TYPES, "\x1b[57376u"),
     ("shift and f13", "\x1b[57376;2u", ALTERNATE_KEYS, "\x1b[57376;2u"),
@@ -434,7 +434,7 @@ def test_a_pane_reads_the_same_key_from_either_keyboard():
     read one key the same way from both, or asking the terminal of the
     person for the protocol would change what every program reads.
 
-    Lillecarl/pymux#166.
+    Lillecarl/pyterm#168.
     """
     for name, legacy, protocol in WHAT_A_KEYBOARD_SENDS:
         assert translate_key_data(protocol, flags=0) == translate_key_data(legacy, flags=0), name
@@ -463,7 +463,7 @@ def test_a_modifier_key_reaches_only_a_pane_that_asked_for_every_key(key):
     kitty sends a modifier or lock key only with REPORT_ALL_KEYS
     (`is_modifier_key`), and Ghostty does the same. A pane that pushed
     DISAMBIGUATE got an event each time shift went down.
-    Lillecarl/pymux#688.
+    Lillecarl/pyterm#690.
     """
     for flags in (DISAMBIGUATE, DISAMBIGUATE | EVENT_TYPES, DISAMBIGUATE | ALTERNATE_KEYS | ASSOCIATED_TEXT):
         assert translate_key_data(key, flags=flags, source_flags=REPORT_ALL | EVENT_TYPES) == "", flags
@@ -493,7 +493,7 @@ def test_a_key_in_the_modify_other_keys_form_is_the_key_it_names():
     The key is in the third parameter and the first one names the
     form. Reading the first as the key gave the wrong one: ctrl+a,
     alt+a and ctrl+enter all came out as "CSI 27 ; mods ~", which
-    names none of them and no other key either. Lillecarl/pymux#171.
+    names none of them and no other key either. Lillecarl/pyterm#173.
     """
     for name, sequence, legacy in MODIFY_OTHER_KEYS:
         assert translate_key_data(sequence, flags=0) == legacy, name
@@ -523,7 +523,7 @@ def test_shift_and_tab_is_the_back_tab_in_the_legacy_encoding():
     The legacy encoding has a sequence for this one key with a
     modifier, and it is what a shell and a readline prompt read to
     cycle a completion backwards. Without it the shift was dropped and
-    the pane read a plain Tab. Lillecarl/pymux#174.
+    the pane read a plain Tab. Lillecarl/pyterm#176.
     """
     assert translate_key_data("\x1b[9;2u", flags=0) == "\x1b[Z"
     assert translate_key_data("\x1b[27;2;9~", flags=0) == "\x1b[Z"
@@ -561,7 +561,7 @@ def test_a_back_tab_from_a_legacy_keyboard_reaches_the_pane_in_its_form():
     It used to pass through to every pane, because the parser could not
     read the form the encoder writes. The encoder has always meant
     otherwise: its back tab branch sends `CSI 9;2u` to a pane that is
-    not in the legacy mode. Lillecarl/pymux#174, Lillecarl/pymux#237.
+    not in the legacy mode. Lillecarl/pyterm#176, Lillecarl/pyterm#239.
     """
     assert translate_key_data("\x1b[Z", flags=0) == "\x1b[Z"
     for flags in (DISAMBIGUATE, REPORT_ALL):
@@ -577,7 +577,7 @@ def test_f3_takes_the_tilde_form_for_a_pane_that_speaks_the_protocol():
     and keeps "CSI P", "CSI Q" and "CSI S" for F1, F2 and F4. Its
     decoder says the same in the other direction, and raises
     `KeyError: 'R'` on what pyte used to write here.
-    Lillecarl/pymux#242.
+    Lillecarl/pyterm#244.
     """
     assert translate_key_data("\x1bOR", flags=DISAMBIGUATE) == "\x1b[13~"
     assert translate_key_data("\x1b[13;5~", flags=DISAMBIGUATE) == "\x1b[13;5~"
@@ -597,7 +597,7 @@ def test_the_rxvt_numbering_of_the_function_row_is_read():
 
     Read, and folded onto the letter form: one key has one event, and
     what reaches a pane is what kitty and every terminfo entry name.
-    Lillecarl/pymux#243.
+    Lillecarl/pyterm#245.
     """
     # A pane that speaks the protocol gets the letters kitty uses.
     assert translate_key_data("\x1b[11~", flags=DISAMBIGUATE) == "\x1b[P"
@@ -694,7 +694,7 @@ def test_the_parser_reads_back_what_the_encoder_writes(event, flags):
         # report byte for byte, and the parser keeps the report. It is
         # the one hole left in this walk, and
         # `test_ctrl_and_f3_reaches_a_legacy_pane_as_a_cursor_report`
-        # is where it is written down. Lillecarl/pymux#242.
+        # is where it is written down. Lillecarl/pyterm#244.
         return
 
     encoded = translate_key_event(event, flags=flags)
@@ -739,7 +739,7 @@ def test_a_pane_that_pushed_no_flag_reads_no_lock(name, locked, plain):
     field for it. With num lock on, every arrow reached bash as
     "CSI 1 ; 129 D", which readline does not know: it rang the bell and
     typed "29D". kitty takes both locks off for a pane that pushed no
-    flag. Lillecarl/pymux#684.
+    flag. Lillecarl/pyterm#686.
     """
     for application_mode in (False, True):
         expected = translate_key_data(plain, flags=0, application_mode=application_mode)
@@ -755,7 +755,7 @@ def test_num_lock_takes_the_application_keypad_off():
     """
     The one lock that changes a keypad key: with num lock on, xterm
     sends the digit whatever DECKPAM says (`real_NumLock`), and Ghostty
-    agrees. Lillecarl/pymux#700.
+    agrees. Lillecarl/pyterm#702.
     """
     assert translate_key_data("\x1b[57399;129u", flags=0, application_keypad=True) == "0"
 
@@ -815,7 +815,7 @@ CTRL_ON_A_SYMBOL = [
 def test_ctrl_on_a_symbol_is_its_control_code(key, control):
     """
     ctrl+space reached a legacy pane as a space, and Emacs never saw
-    set-mark. Lillecarl/pymux#686.
+    set-mark. Lillecarl/pyterm#688.
     """
     assert translate_key_data("\x1b[%d;5u" % ord(key), flags=0) == control
     assert translate_key_data("\x1b[%d;7u" % ord(key), flags=0) == "\x1b" + control
@@ -856,7 +856,7 @@ def test_shift_with_a_modifier_writes_the_shifted_key(name, key, sent):
     """
     alt+shift+1 reached a legacy pane as "ESC 1". kitty, Ghostty and
     WezTerm all write "ESC !": the terminal says which key shift makes.
-    Lillecarl/pymux#691.
+    Lillecarl/pyterm#693.
     """
     assert translate_key_data(key, flags=0, source_flags=REPORT_ALL | ALTERNATE_KEYS) == sent, name
     event = parse_key_data(key)[0]
@@ -864,7 +864,7 @@ def test_shift_with_a_modifier_writes_the_shifted_key(name, key, sent):
 
 
 def test_ctrl_and_shift_on_a_letter_stays_the_control_code():
-    "kitty does not take the capital under ctrl either. Lillecarl/pymux#168."
+    "kitty does not take the capital under ctrl either. Lillecarl/pyterm#170."
     assert translate_key_data("\x1b[97:65;6u", flags=0, source_flags=REPORT_ALL | ALTERNATE_KEYS) == "\x01"
 
 
@@ -895,7 +895,7 @@ def test_a_key_that_writes_text_sends_the_text(name, data, flags, text):
     """
     kitty's `send_text_standalone`: with num lock on, a keypad digit
     reached fish and neovim as "CSI 57399 ; 129 u", where kitty sends
-    "0". Lillecarl/pymux#690.
+    "0". Lillecarl/pyterm#692.
     """
     assert translate_key_data(data, flags=flags, source_flags=REPORT_ALL | EVENT_TYPES) == text, name
 

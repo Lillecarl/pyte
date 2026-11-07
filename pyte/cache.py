@@ -28,7 +28,7 @@ class FastDictCache(dict[_K, _V]):
     1920 of them, and nearly every one is a repeat.
 
     This is `prompt_toolkit.cache.FastDictCache`, copied because a
-    screen is not a toolkit's. Lillecarl/pymux#11.
+    screen is not a toolkit's. Lillecarl/pyterm#13.
     """
 
     def __init__(self, get_value: Callable[..., _V], size: int = 1000000) -> None:

@@ -3,7 +3,7 @@
 //! with no number past 18 digits. Anything else answers `False` and the
 //! Python decodes it, because Python reads Unicode digits, keeps numbers of
 //! any size, and raises on one too big for a float. It runs with the GIL
-//! released. Lillecarl/pymux#574.
+//! released. Lillecarl/pyterm#576.
 
 use pyo3::prelude::*;
 use pyo3::pybacked::PyBackedStr;

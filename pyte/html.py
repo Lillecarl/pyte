@@ -12,7 +12,7 @@ and this file is CSS's.
 package that holds the library it speaks for. CSS has no library. It is
 a standard a string is written in, like the sixel `sixel.py` writes and
 the sequences `sequences/` builds, so it asks nothing of this package
-that the screen does not already do. Lillecarl/pymux#452.
+that the screen does not already do. Lillecarl/pyterm#454.
 
 **CSS carries more of a rendition than either of the others.** Rich
 drops the shape of an underline, its colour and the baseline; a browser
@@ -100,7 +100,7 @@ _BACKGROUND = "--pyte-bg"
 #: `javascript:` and `data:` are refused, and so is a URL with no
 #: scheme at all -- a relative URL would point at whatever is serving
 #: the page, which is nothing a program in a pane may name. The link
-#: goes away and the text stays. Lillecarl/pymux#452.
+#: goes away and the text stays. Lillecarl/pyterm#454.
 SAFE_SCHEMES = frozenset(["http", "https", "mailto", "ftp", "ftps", "file", "tel"])
 
 #: What each shape of underline draws, in the words CSS uses.
@@ -160,7 +160,7 @@ class Drawn(NamedTuple):
     shapes are each one fixed declaration, so each is a rule in `CSS`
     and a word here instead of forty characters on every span that has
     it. Measured on a real pane: 134 styled spans in one frame, polled
-    twice a second for each viewer. Lillecarl/pymux#460.
+    twice a second for each viewer. Lillecarl/pyterm#462.
 
     What is left in `style` is what carries a value: a colour past the
     themed sixteen, a colour a program named itself, and the mix that
@@ -395,7 +395,7 @@ def runs_of_row(row: Row, columns: int, reverse_video: bool = False) -> list[tup
 
     This is where a row ends and what a blank is worth, and it is one
     function because more than one thing asks: the markup below, and a
-    caller that sends the cells somewhere else. Lillecarl/pymux#461.
+    caller that sends the cells somewhere else. Lillecarl/pyterm#463.
     """
     last = _last_drawn(row, columns, reverse_video)
     if last < 0:
@@ -431,7 +431,7 @@ def measured_runs_of_row(row: Row, columns: int, reverse_video: bool = False) ->
     browser draws it from whatever font has it, and that font's advance
     is not the cell's, so in a run of flowing text it moved every cell
     after it: the border between two panes leaned. Pinned alone, its box
-    is its cells whatever the glyph measures. Lillecarl/pymux#948.
+    is its cells whatever the glyph measures. Lillecarl/pyterm#950.
     """
     last = _last_drawn(row, columns, reverse_video)
     runs: list[tuple[Appearance, str, int]] = []
@@ -549,7 +549,7 @@ def _renditions() -> str:
 
     Every one of these was a declaration on the span that had it, and
     each span that had one carried the whole spelling. `Drawn` says
-    what that cost. Lillecarl/pymux#460.
+    what that cost. Lillecarl/pyterm#462.
 
     The rules are written from the same tables the classes are, so a
     name here and a name there cannot drift.
@@ -627,7 +627,7 @@ def theme_css(colors: ColorOverrides) -> str:
 
     The cube past `THEMED` is not in it, for the reason `THEMED` gives.
     A program that sets one of those with "OSC 4" does not reach a
-    browser, and Lillecarl/pymux#452 holds that.
+    browser, and Lillecarl/pyterm#454 holds that.
     """
     lines = [
         "  %s: %s;" % (_FOREGROUND, colors.named("foreground").hex),

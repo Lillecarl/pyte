@@ -206,7 +206,7 @@ def sixel_size(payload: str) -> tuple[int, int] | None:
     The width and height `decode_sixel` gives `payload`, or None where it
     gives None, without building a pixel. A screen reserves the cells of
     an image with it, and leaves the decoding to whoever draws the
-    image. Lillecarl/pymux#575.
+    image. Lillecarl/pyterm#577.
     """
     walked = _walk(payload, _Canvas(paint=False))
     if walked is None:

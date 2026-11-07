@@ -9,7 +9,7 @@ CSS does not understand is dropped by the browser in silence, so a
 wrong colour or an underline nobody asked for passes every test here.
 
 So this writes a screen that holds one of everything, and the work is
-opening it. Lillecarl/pymux#452.
+opening it. Lillecarl/pyterm#454.
 
     python tests/render_a_sample_page.py /tmp/sample.html
 """

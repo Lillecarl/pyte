@@ -4,7 +4,7 @@ The national sets, against the source they were copied from.
 A hundred and thirty odd positions typed by hand is where an error
 hides, and an error here draws the wrong letter in somebody's language
 and says nothing. `xterm_tables.py` says why xterm's `charsets.h` is
-the list and why there is no other. Lillecarl/pymux#111.
+the list and why there is no other. Lillecarl/pyterm#113.
 """
 
 from __future__ import annotations

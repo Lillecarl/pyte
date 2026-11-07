@@ -137,7 +137,7 @@ def test_missing_params():
     """
     A parameter the program left empty arrives as None, and not as the
     number zero, so that a handler can tell the two apart.
-    Lillecarl/pymux#178.
+    Lillecarl/pyterm#180.
     """
     handler = argcheck()
     screen = a_screen(80, 24)
@@ -413,7 +413,7 @@ def test_define_charset_unknown():
     stream = pyte.Stream(screen)
     default_g0_charset = screen.g_charsets[0]
     # ``"!"`` names no set in any terminal, so expect a noop. It was
-    # ``"Z"`` until Lillecarl/pymux#111, which made that Spanish.
+    # ``"Z"`` until Lillecarl/pyterm#113, which made that Spanish.
     assert "!" not in cs.MAPS
     stream.feed(ctrl.ESC + "(!")
     assert display(screen)[0] == " " * 3
@@ -513,7 +513,7 @@ def test_expiring_the_ground_timer_keeps_what_was_drawn():
     Dropping an unfinished sequence wastes only its own bytes. The
     program that left it open does not lose the screen it drew.
     The embedder carries the clock and calls this.
-    Lillecarl/pymux#390.
+    Lillecarl/pyterm#392.
     """
     screen = a_screen(20, 1)
     stream = pyte.Stream(screen)
@@ -529,7 +529,7 @@ def test_the_ground_timer_drops_a_sequence_that_stayed_open():
     """
     A program that writes a partial escape and stops must not leave
     the parser reading every later byte through the wrong state.
-    Lillecarl/pymux#390.
+    Lillecarl/pyterm#392.
     """
     now = [0.0]
     screen = a_screen(20, 1)

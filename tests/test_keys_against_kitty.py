@@ -7,7 +7,7 @@ modes and under every set of the five flags. `kitty_keys.py` says
 where both answers come from.
 
 **Every difference is named, or the run fails.** A port that drifts
-from the original in silence is how Lillecarl/pymux#684 happened: a
+from the original in silence is how Lillecarl/pyterm#686 happened: a
 lock reached bash as "CSI 1 ; 129 D", and kitty never sends that. So
 a difference is one of `DEVIATIONS`, with the issue that holds it, or
 it is a failure. Each entry carries one key that has to differ still,
@@ -50,7 +50,7 @@ class Deviation(NamedTuple):
 DEVIATIONS = [
     Deviation(
         "kitty writes a keypad key by the number of its character",
-        "Lillecarl/pymux#695",
+        "Lillecarl/pyterm#697",
         # A pane that pushed a flag but not DISAMBIGUATE or REPORT_ALL_KEYS
         # gets a modified keypad + as "CSI 43 ; 9 u" from kitty, which
         # folds the keypad first. Ghostty and WezTerm keep the keypad's
@@ -60,7 +60,7 @@ DEVIATIONS = [
     ),
     Deviation(
         "Escape under the event types alone",
-        "Lillecarl/pymux#695",
+        "Lillecarl/pyterm#697",
         # A lock on Escape, and its repeat and release, to a pane that
         # pushed only the event types: kitty sends ESC for the second and
         # "CSI 27 ; 65 u" for the first, Ghostty "CSI 27 ; 1 : 2 u" for the
@@ -85,16 +85,16 @@ DEVIATIONS = [
     ),
     Deviation(
         "a key with no legacy form is dropped",
-        "Lillecarl/pymux#692",
+        "Lillecarl/pyterm#694",
         # F13 and up, the media keys, Menu, Pause, Print Screen and the
         # keypad separator. kitty writes "CSI number u", and Menu as
-        # "CSI 29 ~". pyte sends nothing, Lillecarl/pymux#166.
+        # "CSI 29 ~". pyte sends nothing, Lillecarl/pyterm#168.
         lambda case: case.flags == 0 and case.pyte == "" and case.kitty.startswith("\x1b["),
         ("F13", 0, "press", 0),
     ),
     Deviation(
         "super on a key a legacy pane reads is dropped",
-        "Lillecarl/pymux#693",
+        "Lillecarl/pyterm#695",
         # kitty writes "CSI 97 ; 9 u". pyte drops super, hyper and meta:
         # `_MODIFIERS_THE_LEGACY_ENCODING_DROPS`.
         lambda case: case.flags == 0 and bool(case.mods & Modifier.SUPER),
@@ -102,13 +102,13 @@ DEVIATIONS = [
     ),
     Deviation(
         "a modified F3 takes the cursor report form",
-        "Lillecarl/pymux#242",
+        "Lillecarl/pyterm#244",
         lambda case: case.flags == 0 and case.key == "F3" and case.pyte.endswith("R"),
         ("F3", Modifier.SHIFT, "press", 0),
     ),
     Deviation(
         "ctrl and shift on a letter is the control code",
-        "Lillecarl/pymux#168",
+        "Lillecarl/pyterm#170",
         # kitty finds no legacy form and writes "CSI 97 ; 6 u".
         lambda case: (
             case.flags == 0
@@ -119,7 +119,7 @@ DEVIATIONS = [
     ),
     Deviation(
         "shift with ctrl or alt on a key with no shifted key is dropped",
-        "Lillecarl/pymux#691",
+        "Lillecarl/pyterm#693",
         # Space and the keypad have no shifted key, so kitty finds no
         # legacy form and writes "CSI 32 ; 8 u". Ghostty and WezTerm drop
         # the shift, as pyte does: alt+ctrl+shift+space is "ESC NUL".
@@ -150,7 +150,7 @@ def test_the_deviation_is_still_there(deviation):
 
 def test_a_lock_is_judged():
     """
-    The sweep holds the locks, and #684 is in it: an arrow with num
+    The sweep holds the locks, and #686 is in it: an arrow with num
     lock reaches a legacy pane the way kitty sends it.
     """
     case = judged("LEFT", Modifier.NUM_LOCK, "press", 0)

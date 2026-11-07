@@ -12,7 +12,7 @@ shift, and `PrivateMode.flag` is the value a member carries.
 
 Nothing here acts on a mode. This says what the numbers mean; the
 screen decides what each one does, and `Screen._MODE_LEVELS` says which
-conformance level admits which. Lillecarl/pymux#129.
+conformance level admits which. Lillecarl/pyterm#131.
 """
 
 from __future__ import annotations
@@ -226,7 +226,7 @@ class PrivateMode(IntEnum):
 #: group off. kitty, Ghostty, libvterm and xterm.js do both. WezTerm
 #: keeps 1000, 1002 and 1003 apart. Alacritty acts on a reset only when
 #: it names the mode that is on, and xterm does so for the formats.
-#: Lillecarl/pymux#901.
+#: Lillecarl/pyterm#903.
 ONE_OF_A_GROUP: tuple[frozenset[int], ...] = (
     frozenset(
         mode.flag for mode in (PrivateMode.MOUSE_REPORTING, PrivateMode.BUTTON_EVENT_MOUSE, PrivateMode.ANY_EVENT_MOUSE)

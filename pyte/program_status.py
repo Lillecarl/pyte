@@ -7,7 +7,7 @@ the terminal keeps one record per id. Nothing here writes a sequence
 but the answer to the feature query, and nothing goes back to the
 program from a record. Spec revision 0.4, 2026-10-10:
 https://www.superlogical.com/rex/docs/build/program-status.
-Lillecarl/pymux#927.
+Lillecarl/pyterm#929.
 """
 
 from __future__ import annotations

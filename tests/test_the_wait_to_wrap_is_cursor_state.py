@@ -6,11 +6,11 @@ the next character starts the row below. The wait is where the cursor
 is -- one column past the last it wrote -- and not a thing beside it.
 
 pyte dropped it in three places, and three issues were open as three
-questions. They are one flag, which is Lillecarl/pymux#107's point:
+questions. They are one flag, which is Lillecarl/pyterm#109's point:
 
-- a tab stop move, `CSI Z` (Lillecarl/pymux#106)
-- a save and a restore, `ESC 7` and `ESC 8` (Lillecarl/pymux#88)
-- giving the alternate screen back, `?47l` (Lillecarl/pymux#35)
+- a tab stop move, `CSI Z` (Lillecarl/pyterm#108)
+- a save and a restore, `ESC 7` and `ESC 8` (Lillecarl/pyterm#90)
+- giving the alternate screen back, `?47l` (Lillecarl/pyterm#37)
 
 xterm keeps it through all three, and so do Alacritty and Ghostty. The
 panel splits four to three on the first two and is unanimous on the
@@ -57,7 +57,7 @@ def _where(screen, char: str):
 
 
 # ----------------------------------------------------------------------
-# A tab stop move. Lillecarl/pymux#106.
+# A tab stop move. Lillecarl/pyterm#108.
 
 
 @pytest.mark.parametrize("count", [None, 1, 2, 5])
@@ -83,7 +83,7 @@ def test_a_tab_stop_back_still_works_without_a_wait():
 
 
 # ----------------------------------------------------------------------
-# A save and a restore. Lillecarl/pymux#88.
+# A save and a restore. Lillecarl/pyterm#90.
 
 
 PAIRS = [
@@ -127,7 +127,7 @@ def test_a_restore_with_nothing_saved_leaves_no_wait():
 
 
 # ----------------------------------------------------------------------
-# Giving the alternate screen back. Lillecarl/pymux#35.
+# Giving the alternate screen back. Lillecarl/pyterm#37.
 
 
 @pytest.mark.parametrize("mode", [PrivateMode.ALTERNATE_SCREEN, PrivateMode.ALTERNATE_SCREEN_AGAIN])

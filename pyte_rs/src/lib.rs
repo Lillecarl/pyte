@@ -1,6 +1,6 @@
 //! Rust kernels for pyte's per-cell loops. `python/pyte_rs/__init__.py`
 //! says how they are put in place; each one gives the answer its Python
-//! original gives, decision for decision. Lillecarl/pymux#566.
+//! original gives, decision for decision. Lillecarl/pyterm#568.
 
 mod png;
 mod row;

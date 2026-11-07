@@ -276,7 +276,7 @@ def test_a_special_colour_that_nobody_set_follows_the_text_colour(pane):
 
     xterm paints bold text in the current foreground while no bold
     colour is set, so the answer has to follow the set and not the
-    default. Lillecarl/pymux#19.
+    default. Lillecarl/pyterm#21.
     """
     _screen, stream, responses = pane
     stream.feed(osc("10", "#aabbcc"))
@@ -347,7 +347,7 @@ def test_the_kitty_query_reads_the_colour_that_was_set(pane):
 
 
 def test_iterm2_sets_the_colours_xterm_names(pane):
-    "OSC 1337 ; SetColors writes what the xterm sequence would. Lillecarl/pymux#782."
+    "OSC 1337 ; SetColors writes what the xterm sequence would. Lillecarl/pyterm#784."
     screen, stream, _responses = pane
     stream.feed(osc(Osc.TERMINAL_EXTENSION, "SetColors=fg=aabbcc"))
     stream.feed(osc(Osc.TERMINAL_EXTENSION, "SetColors=br_red=srgb:ddeeff"))
@@ -364,7 +364,7 @@ def test_iterm2_colours_pyte_cannot_hold_change_nothing(pane, value):
 
 
 def test_osc_6_sets_the_tab_colour_a_channel_at_a_time(pane):
-    "iTerm2's tab colour. Lillecarl/pymux#786."
+    "iTerm2's tab colour. Lillecarl/pyterm#788."
     screen, stream, _responses = pane
     assert screen.tab_color is None
     stream.feed(osc(Osc.TAB_COLOR, "1", "bg", "red", "brightness", "200"))

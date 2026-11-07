@@ -1,6 +1,6 @@
 //! `pyte.png`'s per-byte loops: `_unfilter` and `_rgba_of`. Each gives the
 //! bytes its Python original gives, and runs with the GIL released, so a
-//! worker thread decodes beside the event loop. Lillecarl/pymux#574.
+//! worker thread decodes beside the event loop. Lillecarl/pyterm#576.
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;

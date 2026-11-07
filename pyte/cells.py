@@ -10,7 +10,7 @@ the same object, and neither has to parse the other's words.
 
 Nothing here reads a sequence or writes one. `screen.py` parses SGR
 into a `Rendition` and `page.py` says what holds the cells.
-Lillecarl/pymux#129.
+Lillecarl/pyterm#131.
 """
 
 from __future__ import annotations
@@ -95,7 +95,7 @@ def character_width(text: str) -> int:
     A cell holds two characters that each take room only as a
     grapheme cluster (DEC 2027): a family emoji, a flag, a skin tone.
     That is as wide as Unicode says the cluster is, two columns.
-    Lillecarl/pymux#798.
+    Lillecarl/pyterm#800.
     """
     if len(text) == 1:
         return max(0, wcwidth(text))
@@ -112,7 +112,7 @@ def _characters_of(*tables: tuple[tuple[int, int], ...]) -> frozenset[str]:
 #: The characters of one column that can join the cluster before them:
 #: the second half of a flag, a vowel sign, a consonant after a virama.
 #: `Screen.draw`'s quick path takes characters of one column without
-#: asking, so it must never be handed one of these. Lillecarl/pymux#798.
+#: asking, so it must never be handed one of these. Lillecarl/pyterm#800.
 NARROW_JOINERS: frozenset[str] = _characters_of(
     table_grapheme.GRAPHEME_REGIONAL_INDICATOR, table_grapheme.GRAPHEME_SPACINGMARK, table_grapheme.INCB_CONSONANT
 )
@@ -147,7 +147,7 @@ def without_widening_selectors(text: str) -> str:
     sums it and six emulators of seven agree. kitty draws it two wide
     and over the next cell, so a terminal like it is given the
     character alone. A selector after a wide character stays: that
-    emoji is two columns everywhere. Lillecarl/pymux#539.
+    emoji is two columns everywhere. Lillecarl/pyterm#541.
     """
     parts = text.split(VS16)
     kept = [parts[0]]
@@ -172,7 +172,7 @@ class Cell:
     could only read it by parsing one toolkit's words back into the
     fields they came from. `ptterm/style.py` spells one for
     prompt_toolkit, and a Textual widget spells a `rich.style.Style`
-    from the same object. Lillecarl/pymux#11 and Lillecarl/pymux#82.
+    from the same object. Lillecarl/pyterm#13 and Lillecarl/pyterm#84.
 
     This was `prompt_toolkit.layout.screen.Char`, without that class's
     `display_mappings`. The table swaps a control character for "^A"
@@ -190,7 +190,7 @@ class Cell:
     #: every cell of a kind, so it costs no memory per cell, and a
     #: front end asks it once per cell of every frame: `isinstance`
     #: against `WrittenCell` was 0.36 s of a 12 s frame of moving
-    #: output at 400x150. Lillecarl/pymux#434.
+    #: output at 400x150. Lillecarl/pyterm#436.
     written = False
 
     def __init__(self, char: str, appearance: Appearance) -> None:
@@ -296,7 +296,7 @@ _CHAR_CACHE: FastDictCache[tuple[str, Appearance], Cell] = FastDictCache(Written
 #: One erased blank per character and appearance. An erase made one of
 #: its own, so two rows blanked by two erases held equal cells that were
 #: different objects, and a row's content key, which reads cells by
-#: identity, told them apart. Lillecarl/pymux#570.
+#: identity, told them apart. Lillecarl/pyterm#572.
 _ERASED_CACHE: FastDictCache[tuple[str, Appearance], ErasedCell] = FastDictCache(ErasedCell, size=10 * 1000)
 
 #: The same for the cells that carry a mark. Nearly no program marks
@@ -321,7 +321,7 @@ class Rendition(NamedTuple):
     This was `prompt_toolkit.styles.Attrs`, with the two hyperlink
     fields left out. A hyperlink is not a rendition: it comes from OSC
     8 and not from SGR, and the screen already holds it apart.
-    Lillecarl/pymux#11.
+    Lillecarl/pyterm#13.
     """
 
     color: SgrColor | None = None
@@ -428,5 +428,5 @@ PLAIN_APPEARANCE = appearance_of[PLAIN, "", ""]
 #: One object for the whole package, because it carries nothing that
 #: could differ. A row that held its own cost a closure per row: 10.7
 #: MB of the 38.3 MB a fifty thousand row history took.
-#: Lillecarl/pymux#227.
+#: Lillecarl/pyterm#229.
 UNWRITTEN = Cell(" ", PLAIN_APPEARANCE)

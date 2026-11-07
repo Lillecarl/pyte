@@ -1,7 +1,7 @@
 """
 kitty's multiple cursors protocol: what a screen holds and answers.
 `test_multi_cursors` in kitty_tests/screen.py is the source of the
-first tests here. Lillecarl/pymux#891.
+first tests here. Lillecarl/pyterm#893.
 """
 
 from __future__ import annotations

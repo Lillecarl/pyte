@@ -6,7 +6,7 @@
 //! the data ends inside, a control inside a CSI sequence, a parameter that
 //! is not ASCII or not small. It stops before such a sequence starts, so
 //! the parser reads all of it and nothing is dispatched twice.
-//! Lillecarl/pymux#570.
+//! Lillecarl/pyterm#572.
 
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PySlice, PyString, PyStringData, PyTuple};

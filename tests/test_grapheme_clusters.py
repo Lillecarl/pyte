@@ -1,5 +1,5 @@
 """
-A grapheme cluster takes one cell, DEC 2027. Lillecarl/pymux#798.
+A grapheme cluster takes one cell, DEC 2027. Lillecarl/pyterm#800.
 
 On by default, as in kitty, Ghostty and tmux; a program turns it off
 for itself, and then each code point takes its own width.

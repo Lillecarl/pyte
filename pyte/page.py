@@ -9,7 +9,7 @@ None of it decides anything. `screen.py` reads a sequence and writes
 here. What reads it back is a front end drawing a frame —
 `TerminalControl.create_content` in ptterm and `Terminal.render_line`
 in txterm — and copy mode, which walks the whole buffer.
-Lillecarl/pymux#129.
+Lillecarl/pyterm#131.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ class RowMark(IntFlag):
     Where a shell said something starts: a prompt ("OSC 133 ; A", and
     iTerm2's "OSC 1337 ; SetMark"), or a command's output ("OSC 133 ;
     C"). tmux keeps the same two as flags on a grid line, and copy mode
-    jumps between them. Lillecarl/pymux#500.
+    jumps between them. Lillecarl/pyterm#502.
     """
 
     PROMPT = 1
@@ -95,9 +95,9 @@ class Row(dict[int, Cell]):
     notes behind, so they grew with the session; `_reflow` had to
     rebuild both to match the new numbering; and `_move_rows` moved the
     cells and left the wrap mark where it was. None of that can happen
-    to something the row carries. Lillecarl/pymux#134.
+    to something the row carries. Lillecarl/pyterm#136.
 
-    Every terminal that was read for Lillecarl/pymux#135 does the same:
+    Every terminal that was read for Lillecarl/pyterm#137 does the same:
     Alacritty and kitty put the wrap mark on the last cell of the row,
     WezTerm and Ghostty on the row.
 
@@ -109,10 +109,10 @@ class Row(dict[int, Cell]):
     `defaultdict` does differently. This was a `defaultdict`, and it
     cost twice over. Asking about a cell made one, so a cursor parked
     past the end of a line gave that line a run of blanks nobody wrote
-    (Lillecarl/pymux#143) and a frame filled in every gap of every row
+    (Lillecarl/pyterm#145) and a frame filled in every gap of every row
     it drew, for ever. And the factory was a closure over the blank,
     so every row carried a function of its own: 10.7 MB of the 38.3 MB
-    a fifty thousand row history took. Lillecarl/pymux#227.
+    a fifty thousand row history took. Lillecarl/pyterm#229.
     """
 
     __slots__ = ("marks", "wrapped")
@@ -151,7 +151,7 @@ class RowImage:
     it: it changes nothing a row shows.
 
     `pyte_rs.Row.image` makes the same thing in Rust. Only images of one
-    kind are compared with each other. Lillecarl/pymux#570.
+    kind are compared with each other. Lillecarl/pyterm#572.
     """
 
     __slots__ = ("_cells", "_columns", "_hash")
@@ -186,7 +186,7 @@ class LogicalLine:
 
     `Screen._reflow` builds one of these for every line of the buffer,
     lays them out at the new width, and throws them away. Keeping them
-    instead is Lillecarl/pymux#135, and this is the type that would be
+    instead is Lillecarl/pyterm#137, and this is the type that would be
     kept.
     """
 
@@ -232,7 +232,7 @@ class Page:
     and the write positions all belong to a program that draws an
     interface, and a pane draws what another program wrote. Holding
     them here tied the screen to one toolkit for nothing.
-    Lillecarl/pymux#11.
+    Lillecarl/pyterm#13.
     """
 
     __slots__ = ("data_buffer", "show_cursor")
@@ -263,7 +263,7 @@ class Page:
 
         `.get` and not `[]`: the buffer makes a row for a number it does
         not hold, and a row made below the floor of the history is a row
-        that came back from the dead. Lillecarl/pymux#134.
+        that came back from the dead. Lillecarl/pyterm#136.
         """
         line = self.data_buffer.get(row)
         return line is not None and line.wrapped
@@ -302,11 +302,11 @@ class Page:
         then `unwrap` for the rows of that one line. Copy mode does
         that: it opens on fifty thousand rows and shows a screenful,
         and it pays for the text of all of them because a `Document`
-        holds one string. Lillecarl/pymux#131.
+        holds one string. Lillecarl/pyterm#133.
 
         The rows come with the text and not in a list beside it. Two
         containers that a caller has to keep in step are two containers
-        that go out of step. Lillecarl/pymux#134.
+        that go out of step. Lillecarl/pyterm#136.
 
         Nothing here writes, and a row the buffer does not hold gives
         no characters.
@@ -363,7 +363,7 @@ class Page:
         **Here and not in the reader.** A reader that counted the
         rows itself would be a second copy of that rule, and the two
         would go out of step the first time one of them changed.
-        Lillecarl/pymux#189.
+        Lillecarl/pyterm#191.
 
         The answer never runs past the end of the text. A cursor
         stands where the next character goes, so on a row that a
@@ -392,7 +392,7 @@ class Page:
         A run of rows joined by the wrap mark is one line, and a line
         carries no width. That is what makes laying one out again all
         that a column change has to do, and it is why the answer can be
-        kept: Lillecarl/pymux#135.
+        kept: Lillecarl/pyterm#137.
 
         `cursor` is a row and a column to follow through the unwrapping.
         The answer says where it landed, as a line and an offset in it,
@@ -404,7 +404,7 @@ class Page:
         program moved the cursor onto without writing. So the offset
         counts from the start of the line whether the line reaches it
         or not, and the caller places it the same distance past the
-        cells it laid out. Lillecarl/pymux#143.
+        cells it laid out. Lillecarl/pyterm#145.
 
         The range is a range and not the whole buffer, because the whole
         buffer is what a reflow costs today. A caller that wants only

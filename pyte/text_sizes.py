@@ -2,7 +2,7 @@
 The text a program asked for at another size: kitty's text sizing
 protocol, OSC 66, and the DEC line attributes, which become OSC 66.
 https://sw.kovidgoyal.net/kitty/text-sizing-protocol/.
-Lillecarl/pymux#890.
+Lillecarl/pyterm#892.
 
 **A block lies over cells that draw it at scale one.** The top row
 holds the text one cell a column, cut at the block's width, and every
@@ -20,7 +20,7 @@ on the bottom row is dropped.
 The line attribute lasts while the cursor stays on that row. A program
 that leaves the row and comes back writes plain text there, where a
 VT100 kept the line double. Holding it longer is the row attribute
-Lillecarl/pymux#141 took out.
+Lillecarl/pyterm#143 took out.
 """
 
 from __future__ import annotations

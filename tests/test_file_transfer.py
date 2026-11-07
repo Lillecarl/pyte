@@ -1,6 +1,6 @@
 """
 kitty's file transfer protocol, OSC 5113: the command as kitty reads and
-writes it. Lillecarl/pymux#912.
+writes it. Lillecarl/pyterm#914.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ def test_a_field_at_its_default_is_left_out():
 
 
 def test_base64_is_written_without_padding():
-    "The kitten decodes with Go's `RawStdEncoding`, which refuses a `=`. Lillecarl/pymux#913."
+    "The kitten decodes with Go's `RawStdEncoding`, which refuses a `=`. Lillecarl/pyterm#915."
     param = TransferCommand(Action.DATA, name="ab", status="a", bypass="abcd", data=b"\x01").param()
     values = [part.partition("=")[2] for part in param.split(";")]
     assert len(values) == 5

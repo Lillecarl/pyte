@@ -12,7 +12,7 @@ reaches the screen, and three things read it back:
 
 Until somebody says otherwise it is `ASSUMED_CELL_WIDTH` by
 `ASSUMED_CELL_HEIGHT`, because a screen nobody draws still has to
-answer those queries. Lillecarl/pymux#369.
+answer those queries. Lillecarl/pyterm#371.
 """
 
 from __future__ import annotations
@@ -55,7 +55,7 @@ def test_the_cell_size_reaches_the_report():
 
 
 def test_iterm2_asks_the_cell_size_too():
-    "OSC 1337 ; ReportCellSize: height, width, and a scale of one. Lillecarl/pymux#783."
+    "OSC 1337 ; ReportCellSize: height, width, and a scale of one. Lillecarl/pyterm#785."
     screen, stream, replies, _asks = _screen()
     screen.set_cell_size(*REAL_CELL)
     stream.feed("\x1b]1337;ReportCellSize\x1b\\")

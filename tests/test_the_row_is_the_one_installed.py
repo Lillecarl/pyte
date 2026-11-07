@@ -4,7 +4,7 @@ A page makes its rows from whatever `pyte.page.Row` is when it makes them.
 `checks.pyte-rs-unit` runs this suite with `pyte_rs.install()` in
 `conftest.py`, and a green run there says something only if the pages
 really held Rust rows. Without `PYTE_RS` they hold the dict.
-Lillecarl/pymux#570.
+Lillecarl/pyterm#572.
 """
 
 from __future__ import annotations

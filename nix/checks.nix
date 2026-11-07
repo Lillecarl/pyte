@@ -12,7 +12,7 @@
   # The python every suite runs on: a virtualenv of pyte, what pyte
   # declares, and its `test` extra. `default.nix` builds it from
   # `pyproject.toml`, so what a suite may import is what the package
-  # declares and there is no second list here. Lillecarl/pymux#319.
+  # declares and there is no second list here. Lillecarl/pyterm#321.
   testEnv,
   callPackage,
   ncurses,
@@ -105,7 +105,7 @@ let
   # The unit group over four workers. One collection first writes the
   # rewritten test modules to __pycache__, which each worker would
   # otherwise rewrite again. Measured, wall and CPU seconds: serial 55
-  # and 30, four workers 13 and 32, sixteen 13 and 56. Lillecarl/pymux#579.
+  # and 30, four workers 13 and 32, sixteen 13 and 56. Lillecarl/pyterm#581.
   runPytestSpread = ''
     cores="''${NIX_BUILD_CORES:-0}"
     if [ "$cores" = 0 ] || [ "$cores" -gt 4 ]; then cores=4; fi
@@ -137,7 +137,7 @@ in
   # twice. That is what a gate is for, and it is also why the gate
   # alone stops finding anything new. This one runs the same property
   # tests off a fresh seed. `tests/conftest.py` holds both profiles.
-  # Lillecarl/pymux#180.
+  # Lillecarl/pyterm#182.
   #
   # `-m hypothesis` is the plugin's own mark, put on every test that
   # draws. So a property test written tomorrow lands here by being one,
@@ -183,7 +183,7 @@ in
   # DEC directory and no python package carries them -- so xterm's
   # `charsets.h` is the list, and a port is only right if something
   # says so against the original. The same argument as `xcms`.
-  # Lillecarl/pymux#111.
+  # Lillecarl/pyterm#113.
   xterm-tables = suite {
     name = "pyte-xterm-tables";
     inputs = [ testEnv ];
@@ -198,7 +198,7 @@ in
 
   # The key encoder, judged against kitty's and voted on by kitty,
   # Ghostty, WezTerm and xterm. `pyte/keys/encode.py` is a port of
-  # `kitty/key_encoding.c`, and #684 was a line of it the port missed: a
+  # `kitty/key_encoding.c`, and #686 was a line of it the port missed: a
   # lock reached bash as "CSI 1 ; 129 D". The same argument as `xcms`.
   #
   # A judge that will not load or answers wrong fails the build here,

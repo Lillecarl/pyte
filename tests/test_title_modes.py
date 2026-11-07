@@ -7,7 +7,7 @@ byte that is not valid UTF-8 has no way through "OSC 0", "OSC 1" or
 "CSI > Ps T" takes away. Two say how a program writes a title, and two
 say how the terminal reports one back.
 
-`SMTitleTests` of esctest2 asks for all four. Lillecarl/pymux#44 is
+`SMTitleTests` of esctest2 asks for all four. Lillecarl/pyterm#46 is
 where the gap was found.
 """
 

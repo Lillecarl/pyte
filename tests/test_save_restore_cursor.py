@@ -176,7 +176,7 @@ def test_the_mode_that_saves_the_cursor_leaves_it_where_it_stands():
     pair never has to know where it stood in between. Alacritty,
     Ghostty, libvterm and xterm.js leave it, and xterm describes the
     mode as a save, a switch and a clear with no move.
-    Lillecarl/pymux#34.
+    Lillecarl/pyterm#36.
     """
     screen, stream = _screen(lines=4, columns=8)
     stream.feed(csi(escape.CUP, 2, 3) + set_mode(PrivateMode.ALTERNATE_SCREEN_WITH_CURSOR))

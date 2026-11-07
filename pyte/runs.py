@@ -68,7 +68,7 @@ class Run(NamedTuple):
 
 #: Builds a `Run` without the `__new__` that `NamedTuple` writes in
 #: Python: half the cost, and a row of highlighted text makes a run
-#: every few cells. Lillecarl/pymux#517.
+#: every few cells. Lillecarl/pyterm#519.
 _new_run: Final = tuple.__new__
 
 
@@ -97,7 +97,7 @@ def runs_of(row: Row) -> list[Run]:
         # is most of every row, and testing it before the full
         # classification below spares four names and a ladder of
         # comparisons per cell. It joins exactly the cells the
-        # classification would. Lillecarl/pymux#517.
+        # classification would. Lillecarl/pyterm#519.
         if (
             column == end
             and text is not None

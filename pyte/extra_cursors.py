@@ -2,7 +2,7 @@
 kitty's multiple cursors: the extra cursors a program asks the terminal
 to draw, and the one colour pair that all of them share.
 https://sw.kovidgoyal.net/kitty/multiple-cursors-protocol/
-Lillecarl/pymux#891.
+Lillecarl/pyterm#893.
 
 A program writes "CSI > SHAPE ; WHERE : COORDINATES ... SP q". A screen
 holds what it asked for in an `ExtraCursors`, and what draws the screen

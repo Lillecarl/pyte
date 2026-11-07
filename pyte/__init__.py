@@ -20,7 +20,7 @@ Nothing between VT100 and VT500 is skipped, and esctest2's
 "ESC # 4", "ESC # 5" and "ESC # 6" draw a line at twice the width or
 twice the height on a VT100. This screen turns each into kitty's text
 sizing, OSC 66, which has no glyph twice as wide: a double width line
-draws wrong in kitty. `text_sizes.py` says how. Lillecarl/pymux#890.
+draws wrong in kitty. `text_sizes.py` says how. Lillecarl/pyterm#892.
 
 On top of that are the things no DEC terminal had: 256 colours,
 truecolour, the kitty keyboard and graphics protocols, sixels,

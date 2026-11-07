@@ -10,7 +10,7 @@ that way.
 
 A key that came from a name has not. Nobody typing `send-keys super+a`
 means "type an a", so that caller asks with `exactly` and is told.
-Lillecarl/pymux#237.
+Lillecarl/pyterm#239.
 
 `the_modifiers_a_pane_cannot_read` is the accounting behind both, and it
 names the rules of `_encode_event` rather than holding a second opinion

@@ -5,7 +5,7 @@ Two streams take the same text in the same chunks: one through the
 Python ground step and one through Rust, each driving a screen that
 records every call it gets. The two records have to be the same call
 for call, with the same arguments, and so do the exceptions a feed
-raised and what each stream holds open at the end. Lillecarl/pymux#570.
+raised and what each stream holds open at the end. Lillecarl/pyterm#572.
 """
 
 from __future__ import annotations

@@ -1,5 +1,5 @@
 """
-A resize reaches the page nobody is looking at. Lillecarl/pymux#203.
+A resize reaches the page nobody is looking at. Lillecarl/pyterm#205.
 
 A switch to the alternate screen stashes the first page and puts it
 back on the way out. A resize laid out `self.page`, which is the one a
@@ -97,7 +97,7 @@ def test_a_widening_puts_the_line_back_together():
 #
 # "?47" and "?1047" find what the last visit left, so that page has to
 # be the right size as well. It is cut down rather than laid out again,
-# the way the alternate screen always is. Lillecarl/pymux#192.
+# the way the alternate screen always is. Lillecarl/pyterm#194.
 
 
 def test_the_alternate_page_is_cut_down_while_it_is_stashed():

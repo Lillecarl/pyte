@@ -6,7 +6,7 @@ dragging a window edge cost the scrollback: 99,027,334 bytecode
 instructions on fifty thousand rows, paid while a person watched the
 edge move. It walks up from the last row now and stops once it holds a
 line for every row of the screen, which is 97,954 whatever the history
-holds. Lillecarl/pymux#135.
+holds. Lillecarl/pyterm#137.
 
 **So the history keeps the width it was written at.** That is safe
 because nothing reads the history as rows: copy mode and `capture-pane`
@@ -37,7 +37,7 @@ class EagerScreen(Screen):
     """
     A screen that lays the whole buffer out again on every resize.
 
-    That is what `_reflow` did before Lillecarl/pymux#135 bounded it,
+    That is what `_reflow` did before Lillecarl/pyterm#137 bounded it,
     and it is the answer this file holds the bounded one to.
     """
 
@@ -150,7 +150,7 @@ def test_a_narrowing_puts_the_rows_it_gains_above_the_screen():
     `_reflow` used to hold `max_y` down to the cursor instead. The
     rows above it stayed in the buffer and nothing could draw them:
     six lines of "E" at ten columns became eighteen rows at four, and
-    the screen reached six. Lillecarl/pymux#146.
+    the screen reached six. Lillecarl/pyterm#148.
 
     libvterm fills the new screen from the bottom, pushes what does
     not fit into the scrollback, and puts the cursor at the top of the

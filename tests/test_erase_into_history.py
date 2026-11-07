@@ -2,7 +2,7 @@
 ED 22, kitty's: the screen moves into the history, images too, and is
 then left as ED 2 leaves it. kitty's `screen_move_into_scrollback`
 (kitty/screen.c) moves the rows down to the last one that holds
-anything, and only on the first screen with no region. Lillecarl/pymux#896.
+anything, and only on the first screen with no region. Lillecarl/pyterm#898.
 """
 
 from __future__ import annotations

@@ -7,7 +7,7 @@ plain string, and a wrong digit passes review as easily as a right
 one. `pyte.sequences` names them instead. This is the tool that moves
 the calls over, because there are too many to move by hand and a hand
 that moves three thousand of them makes mistakes of its own.
-Lillecarl/pymux#165.
+Lillecarl/pyterm#167.
 
     python pyte/tools/name_the_sequences.py pyte/tests        # look
     python pyte/tools/name_the_sequences.py --apply pyte/tests  # do it

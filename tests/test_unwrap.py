@@ -4,7 +4,7 @@
 A row is a line cut to fit a screen. `unwrap` joins the pieces back
 together, and the answer carries no width at all. Three readers want
 that shape and one of them is a reflow: copy mode, `capture-pane`, and
-`Screen._reflow`. Lillecarl/pymux#135.
+`Screen._reflow`. Lillecarl/pyterm#137.
 
 These judge the joining itself, on a page built by hand. The property
 that a resize keeps every line is `test_reflow_keeps_the_content.py`,
@@ -161,7 +161,7 @@ def test_the_rows_of_a_text_line_unwrap_to_its_cells():
 
 # ----------------------------------------------------------------------
 # Where a row and a column of the buffer sit in a line's text.
-# Lillecarl/pymux#189.
+# Lillecarl/pyterm#191.
 
 
 def test_the_offset_of_a_cursor_on_the_first_row_of_a_line():
@@ -214,7 +214,7 @@ def test_nothing_is_written_by_reading():
     """
     The buffer makes a row for a number it does not hold, so a
     question that writes brings a row back from the dead.
-    Lillecarl/pymux#134.
+    Lillecarl/pyterm#136.
     """
     page = _a_page("one")
     page.unwrap(0, 10)

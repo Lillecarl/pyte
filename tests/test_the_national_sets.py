@@ -5,7 +5,7 @@ A national set is ASCII with a handful of positions replaced by the
 letters one country needs. That is what a seven bit terminal did
 instead of having an eighth bit, and a program that selects one and
 gets ASCII draws the wrong glyph with nothing to say it has.
-Lillecarl/pymux#111.
+Lillecarl/pyterm#113.
 
 The tables themselves are checked against xterm's `charsets.h`, which
 is where they come from. What is checked here is that a name reaches a
@@ -61,7 +61,7 @@ def test_the_german_set_moves_eight_positions():
 def test_the_portuguese_set_needs_two_bytes_to_name():
     """
     `ESC ( % 6`. The parser read one byte after the "(" until
-    Lillecarl/pymux#111, so "%" named nothing and "6" was drawn.
+    Lillecarl/pyterm#113, so "%" named nothing and "6" was drawn.
     """
     assert _drawn("\x1b(%6[\\]") == "ÃÇÕ"
 

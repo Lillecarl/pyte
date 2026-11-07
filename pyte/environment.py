@@ -20,7 +20,7 @@ unchanged:
 - `COLORTERM` decides whether a program writes a colour or the palette
   entry beside it.
 
-`prepare` fixes all three. It is the whole of Lillecarl/pymux#125.
+`prepare` fixes all three. It is the whole of Lillecarl/pyterm#127.
 
 **This module is not the pure layer.** It reads `os` and looks at a
 directory, because the entry that describes this screen is a file and
@@ -190,7 +190,7 @@ def preparing(theirs: Callable[[dict[str, str]], None] | None = None) -> Callabl
     environment of a program on this screen: `prepare`, then `theirs`.
 
     Theirs runs last, so an embedder can still say something different:
-    pymux has an option for the name. Lillecarl/pymux#125.
+    pymux has an option for the name. Lillecarl/pyterm#127.
     """
 
     def edit(environment: dict[str, str]) -> None:

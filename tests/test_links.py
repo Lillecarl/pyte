@@ -1,5 +1,5 @@
 """
-The links some rows of a page show. Lillecarl/pymux#608.
+The links some rows of a page show. Lillecarl/pyterm#610.
 """
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ def test_a_url_that_wrapped_is_one_url():
 
 
 def test_a_url_a_program_broke_at_the_edge_goes_on_after_the_indent():
-    "Claude Code's shape: a hard break at the last column, two spaces, the rest. Lillecarl/pymux#926."
+    "Claude Code's shape: a hard break at the last column, two spaces, the rest. Lillecarl/pyterm#928."
     page, first, last = page_of("  https://a.io/abcde\r\n  fgh and more")
     (link,) = links_in(page, first, last, columns=20)
     assert link.url == "https://a.io/abcdefgh"

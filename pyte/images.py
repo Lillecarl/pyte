@@ -69,7 +69,7 @@ class PixelFormat(IntEnum):
     #: Not kitty's: the payload of a sixel DCS sequence, stored by
     #: `sixel.store_payload` and decoded by whoever draws it. No "f" key
     #: can name it, because `_transmit` takes only the three above.
-    #: Lillecarl/pymux#575.
+    #: Lillecarl/pyterm#577.
     SIXEL = -6
 
 
@@ -77,7 +77,7 @@ class PixelFormat(IntEnum):
 # screen holds cells and not pixels, so it cannot measure this; what
 # draws it can. `Screen.set_cell_size` is how it is told, and the
 # reservation reads `screen.cell_width` and `screen.cell_height`, never
-# these. Lillecarl/pymux#369.
+# these. Lillecarl/pyterm#371.
 ASSUMED_CELL_WIDTH = 10
 ASSUMED_CELL_HEIGHT = 20
 
@@ -169,7 +169,7 @@ class GraphicsPlacement:
         #: stretching it there is the answer. The same counts reached
         #: by `ceil(pixels / cell)` mean only "this is the room it
         #: needs", and stretching the image to fill them is the
-        #: resampling of Lillecarl/pymux#369.
+        #: resampling of Lillecarl/pyterm#371.
         #:
         #: Sixel never names a box, so `add_sixel` clears this.
         self.asked_for_the_box = asked_for_the_box
@@ -661,7 +661,7 @@ class GraphicsState:
         `rows` cells, which the drawer fits it to: iTerm2's inline image,
         which the embedder decodes and sizes. The cursor ends right after
         the image on its last row, as kitty's, unless `move_cursor` is
-        false; iTerm2's own imgcat writes a newline after. Lillecarl/pymux#789.
+        false; iTerm2's own imgcat writes a newline after. Lillecarl/pyterm#791.
         """
         width, height = _png_size(data)
         if self._total_image_data() + len(data) > MAX_TOTAL_IMAGE_DATA:
@@ -731,7 +731,7 @@ class GraphicsState:
         them goes, and what is left is up to four pieces around the
         hole. foot cuts it this way (`sixel_overwrite_by_rectangle`),
         and xterm draws sixel into its cells. yazi takes a preview away
-        by writing spaces over it. Lillecarl/pymux#598.
+        by writing spaces over it. Lillecarl/pyterm#600.
 
         A kitty placement lies above the text, and stays.
         """

@@ -20,7 +20,7 @@ it at six functions.
 
 Each mode is the legacy encoding plus a rule about which keys leave
 it, and no byte sequence means two things, which is what makes one
-event in the middle work. Lillecarl/pymux#172.
+event in the middle work. Lillecarl/pyterm#174.
 
 The process in a pane asks with "CSI > flags u", and `Screen` holds
 the stack. What it gets:

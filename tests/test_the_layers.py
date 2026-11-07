@@ -4,7 +4,7 @@ Which module may import what.
 **This package is the pure layer.** It parses bytes and holds cells. It
 opens nothing, it talks to nobody, and it has no opinion about how a
 cell is drawn. That is what makes it worth having on its own, and it is
-the whole of Lillecarl/pymux#11.
+the whole of Lillecarl/pyterm#13.
 
 Two front ends prove it rather than claim it. `ptterm` draws a screen
 with prompt_toolkit and `txterm` draws the same screen with Textual, and
@@ -132,7 +132,7 @@ MAY_IMPORT = {
     "itertools",
     "math",
     # `operator.is_`, so a row image compares its cells by identity in
-    # C rather than in a Python loop. Lillecarl/pymux#570.
+    # C rather than in a Python loop. Lillecarl/pyterm#572.
     "operator",
     "re",
     "string",
@@ -149,7 +149,7 @@ MAY_IMPORT = {
 TOOLKITS = {"prompt_toolkit", "textual", "rich"}
 
 #: The package that runs a program on a pty. A screen parses bytes;
-#: where they came from is not its question. Lillecarl/pymux#85.
+#: where they came from is not its question. Lillecarl/pyterm#87.
 RUNS_A_PROGRAM = "ptyhost"
 
 #: The two front ends. Neither may appear here at all.
@@ -217,7 +217,7 @@ def test_every_module_has_a_layer():
 
 @pytest.mark.parametrize("name", sorted(PURE))
 def test_the_pure_layer_imports_no_toolkit(name):
-    "The whole point of the package. Lillecarl/pymux#11."
+    "The whole point of the package. Lillecarl/pyterm#13."
     outside, _inside = _imports(MODULES[name])
     assert not (outside & TOOLKITS)
 
@@ -236,7 +236,7 @@ def test_no_module_reaches_a_front_end(name):
 def test_the_pure_layer_reaches_no_pty(name):
     """
     A screen parses bytes and holds cells. Where the bytes came from is
-    not its question. Lillecarl/pymux#85.
+    not its question. Lillecarl/pyterm#87.
     """
     outside, _inside = _imports(MODULES[name])
     assert RUNS_A_PROGRAM not in outside

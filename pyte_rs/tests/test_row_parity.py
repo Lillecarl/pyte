@@ -9,7 +9,7 @@ exactly when the rows hold the same cell objects in the same columns.
 One difference is allowed: a Rust row iterates by column and a dict
 in the order it was written, so contents are compared sorted. pyte's
 whole suite runs with the Rust row in `checks.pyte-rs-unit`, which is
-what says nothing reads that order. Lillecarl/pymux#570.
+what says nothing reads that order. Lillecarl/pyterm#572.
 """
 
 from __future__ import annotations

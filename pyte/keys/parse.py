@@ -31,7 +31,7 @@ _SS3_FINALS = _LETTER_FINALS + "R"
 #: The letter each key of the function row takes, by the number rxvt
 #: gives it. One key has one event, so a sequence read in the tilde
 #: numbering comes out spelled the way the rest of the row is.
-#: Lillecarl/pymux#243.
+#: Lillecarl/pyterm#245.
 _FUNCTION_ROW_LETTER = {
     TildeKey.F1: "P",
     TildeKey.F2: "Q",
@@ -178,7 +178,7 @@ def _parse_csi(data: str, start: int) -> tuple[_Item, int]:
         # and the first one names the form, so reading this as a key of
         # the "~" form gives the wrong key: ctrl+a, alt+a and
         # ctrl+enter all became "CSI 27 ; mods ~", which is none of
-        # them. Lillecarl/pymux#171.
+        # them. Lillecarl/pyterm#173.
         return (
             KeyEvent(_first(rows[2], 0), mods, "u", "", (), event),
             i + 1 - start,

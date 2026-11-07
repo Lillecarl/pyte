@@ -39,7 +39,7 @@ A property test with no seed is a different test every run. This one
 was: `test_a_size_change_keeps_every_line` failed about one run in
 eight, and a gate that is red by luck teaches everybody to run it
 again instead of to look. So there are two profiles and the gate takes
-the pinned one. Lillecarl/pymux#180.
+the pinned one. Lillecarl/pyterm#182.
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ from hypothesis import HealthCheck, settings
 # The whole suite again with the Rust row and kernels in place, which
 # is `checks.pyte-rs-unit`: the pure layer is held by the run without
 # it. Installed here, before any test module makes a page.
-# Lillecarl/pymux#570.
+# Lillecarl/pyterm#572.
 if os.environ.get("PYTE_RS", "") not in ("", "0"):
     import pyte_rs
 

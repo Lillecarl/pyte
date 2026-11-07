@@ -5,7 +5,7 @@ The bytes that name a sequence, and the sequences built from them.
 and a VT220 send. This package names the rest -- what a VT400 and a
 VT500 added, what xterm added after them, and what kitty added after
 that -- and writes and reads whole sequences, so that a caller says
-what it means instead of a hand-typed string. Lillecarl/pymux#165.
+what it means instead of a hand-typed string. Lillecarl/pyterm#167.
 
 One module per family, each holding its names beside the code that
 writes them:

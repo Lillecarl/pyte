@@ -1,7 +1,7 @@
 """
 kitty's clipboard protocol, "OSC 5522 ; metadata ; payload ST": one
 packet, either way. https://sw.kovidgoyal.net/kitty/clipboard/.
-Lillecarl/pymux#893.
+Lillecarl/pyterm#895.
 
 The metadata is "key=value" pairs joined by colons. `mime`, `name` and
 `pw` travel as base64 and are held here decoded; the payload stays

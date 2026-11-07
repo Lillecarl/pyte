@@ -1,7 +1,7 @@
 """
 A frozen screen thaws into one that holds the same and behaves the same.
 
-Lillecarl/pymux#399.
+Lillecarl/pyterm#401.
 """
 
 from __future__ import annotations
@@ -163,7 +163,7 @@ def _drop_field(value, kind: str, field: str):
 
 
 def test_a_placement_from_before_pieces_thaws_whole():
-    "A snapshot of a pymux without sixel pieces carries no crop. Lillecarl/pymux#598."
+    "A snapshot of a pymux without sixel pieces carries no crop. Lillecarl/pyterm#600."
     screen = a_screen(80, 24)
     Stream(screen).feed(ESC + "Pq" + '"1;1;30;60#1~' + ST)
     frozen = json.loads(json.dumps(freeze(screen)))
@@ -301,7 +301,7 @@ def test_how_long_a_deep_history_takes(rows, capsys):
     The time a freeze, its JSON and a thaw take, printed to the log.
 
     A hot upgrade pauses the server for the freeze, so this is the
-    number Lillecarl/pymux#399 bounds. The assertion is loose, because
+    number Lillecarl/pyterm#401 bounds. The assertion is loose, because
     a build machine is not the machine a person sits at.
     """
     screen = a_screen(80, 24, history=rows)

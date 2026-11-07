@@ -85,7 +85,7 @@ def test_a_clipboard_write_that_looks_like_a_query_still_leaves():
 def test_clear_scrollback_clears_the_history_and_still_leaves():
     """
     iTerm2's "CSI 3 J": the pane's own history goes, the screen stays,
-    and the terminal of the user hears it too. Lillecarl/pymux#504.
+    and the terminal of the user hears it too. Lillecarl/pyterm#506.
     """
     stream, forwarded, _answers = make_screen()
     screen = stream.screen

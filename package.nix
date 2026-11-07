@@ -7,7 +7,7 @@
 #
 # **This is a pyproject.nix builders package, not a nixpkgs one.** The one
 # dependency is declared in `pyproject.toml` and the renderer reads it; an
-# environment is a virtualenv rather than a PYTHONPATH. Lillecarl/pymux#319.
+# environment is a virtualenv rather than a PYTHONPATH. Lillecarl/pyterm#321.
 {
   lib,
   stdenv,
@@ -94,7 +94,7 @@ let
   # `tools/name_the_sequences.py` rewrites hand-typed escape sequences
   # into the builders of `pyte.sequences`, and it has changed a few
   # hundred lines across three repositories, so what it refuses to
-  # touch is worth a test. Lillecarl/pymux#165.
+  # touch is worth a test. Lillecarl/pyterm#167.
   testSources = lib.fileset.toSource {
     root = ./.;
     fileset = lib.fileset.unions [

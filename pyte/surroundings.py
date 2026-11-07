@@ -9,7 +9,7 @@ again after a load.
 
 A mirror of the screen has no embedder of its own to ask: the screen it
 mirrors is drawn somewhere else, by somebody else's terminal. So these
-travel to it as one value, beside the reads. Lillecarl/pymux#759.
+travel to it as one value, beside the reads. Lillecarl/pyterm#761.
 """
 
 from __future__ import annotations

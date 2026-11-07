@@ -135,7 +135,7 @@ def test_the_region_does_not_hold_the_row_without_origin_mode():
 # ----------------------------------------------------------------------
 # HPB and VPB, the two of the position family that move backward. They
 # move the way CUB and CUU move, so they are bounded the same way.
-# Lillecarl/pymux#52.
+# Lillecarl/pyterm#54.
 
 
 def test_hpb_moves_the_cursor_to_the_left():

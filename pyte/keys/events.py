@@ -50,7 +50,7 @@ __all__ = [
 #
 # What it gives up: `a | b` is an int, not a member, so it reprs as a
 # number. Nothing reads a name off a combination -- `key_spelling.py`
-# takes `.name` off one member at a time. Lillecarl/pymux#359.
+# takes `.name` off one member at a time. Lillecarl/pyterm#361.
 
 
 class Modifier(IntFlag):
@@ -81,7 +81,7 @@ class Modifier(IntFlag):
     CAPS_LOCK = 64
     NUM_LOCK = 128
 
-    # The comment above says why. Lillecarl/pymux#359.
+    # The comment above says why. Lillecarl/pyterm#361.
     __and__ = __rand__ = int.__and__
     __or__ = __ror__ = int.__or__
     __xor__ = __rxor__ = int.__xor__
@@ -102,7 +102,7 @@ class KeyboardFlag(IntFlag):
     REPORT_ALL_KEYS = 0b1000
     REPORT_ASSOCIATED_TEXT = 0b10000
 
-    # The comment above `Modifier` says why. Lillecarl/pymux#359.
+    # The comment above `Modifier` says why. Lillecarl/pyterm#361.
     __and__ = __rand__ = int.__and__
     __or__ = __ror__ = int.__or__
     __xor__ = __rxor__ = int.__xor__
@@ -278,7 +278,7 @@ class FunctionalKey(IntEnum):
 #: The keys a pane reads only once it asked for every key as an escape
 #: code: kitty's `is_modifier_key` (`kitty/keys.c`). A program that
 #: pushed DISAMBIGUATE to tell Escape from alt does not want an event
-#: each time shift goes down. Lillecarl/pymux#688.
+#: each time shift goes down. Lillecarl/pyterm#690.
 MODIFIER_KEYS = frozenset(
     (
         FunctionalKey.CAPS_LOCK,
@@ -305,7 +305,7 @@ class TildeKey(IntEnum):
     #: rxvt-unicode sends all four, so all four are read. They fold onto
     #: the letter form, so nothing here writes them back: what a pane
     #: gets is what kitty and every terminfo entry name.
-    #: Lillecarl/pymux#242, Lillecarl/pymux#243.
+    #: Lillecarl/pyterm#244, Lillecarl/pyterm#245.
     F1 = 11
     F2 = 12
     F3 = 13
@@ -325,13 +325,13 @@ class KeyProfile(NamedTuple):
     **Only a legacy form is a choice.** Where a terminal answers a
     pane that asked for nothing with "CSI u" or "CSI 27 ; m ; k ~", the
     program prints it: kitty's "CSI 57376 u" for F13 is the symptom of
-    Lillecarl/pymux#684. No profile copies those, so Ghostty's and kitty's
+    Lillecarl/pyterm#686. No profile copies those, so Ghostty's and kitty's
     profiles drop the key where the terminal itself writes junk.
 
     **Nor is a key that terminfo names.** A program reads its keys
     through the TERM of the pane, which is pyte's entry and not the
     terminal's: kitty's ctrl+F3 is "CSI 13 ; 5 ~" because xterm-kitty
-    says so, and pyte's entry says "CSI 1 ; 5 R". Lillecarl/pymux#706.
+    says so, and pyte's entry says "CSI 1 ; 5 R". Lillecarl/pyterm#708.
     """
 
     #: super, hyper and meta written into a CSI form, "CSI 3 ; 9 ~". The
@@ -340,11 +340,11 @@ class KeyProfile(NamedTuple):
     #: Menu is "CSI 29 ~", which kitty and xterm send. Without it Menu
     #: is a key the legacy encoding cannot write.
     menu: bool
-    #: F13 to F24 take `_RXVT_FUNCTION_KEY`. Lillecarl/pymux#692.
+    #: F13 to F24 take `_RXVT_FUNCTION_KEY`. Lillecarl/pyterm#694.
     rxvt_function_keys: bool
     #: ctrl+shift on a key whose shifted key has no control code takes
     #: the code of the unshifted key: ctrl+shift+[ is ESC, not "{".
-    #: Lillecarl/pymux#704.
+    #: Lillecarl/pyterm#706.
     ctrl_on_the_unshifted_key: bool
 
 

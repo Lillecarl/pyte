@@ -3,7 +3,7 @@
 
 The screen only keeps the mode. Holding the picture is the job of
 whoever shows the screen, the way tmux holds a pane (`MODE_SYNC` in
-`screen-write.c`). Lillecarl/pymux#566.
+`screen-write.c`). Lillecarl/pyterm#568.
 """
 
 from __future__ import annotations

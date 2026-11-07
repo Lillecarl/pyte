@@ -16,7 +16,7 @@ cell report to kitty's own encoder.
 
 The wheel on the alternate screen is not a report: there it moves the
 cursor, `WHEEL_ARROWS` times `ARROWS_PER_WHEEL_STEP`, for a program that
-asked for the alternate screen and no mouse. Lillecarl/pymux#422.
+asked for the alternate screen and no mouse. Lillecarl/pyterm#424.
 """
 
 from __future__ import annotations
@@ -148,7 +148,7 @@ _BUTTON_OFFSET = 32
 #: further out sends nothing, which is what kitty does with it.
 #:
 #: It was 96, which is narrower than a great many panes: a press past
-#: column 96 went nowhere. Lillecarl/pymux#139.
+#: column 96 went nowhere. Lillecarl/pyterm#141.
 _X10_COLUMNS = 223
 
 #: The key a wheel step is on the alternate screen, before the keyboard
@@ -176,7 +176,7 @@ def _one_byte(value: int) -> str:
     It travels as a surrogate instead, which is Python's channel for a
     byte that is not a character, and `ptyhost/backends/posix.py`
     encodes it back with "surrogateescape". `Screen._control` spells the
-    eight bit C1 controls the same way. Lillecarl/pymux#139.
+    eight bit C1 controls the same way. Lillecarl/pyterm#141.
     """
     if value < 0x80:
         return chr(value)

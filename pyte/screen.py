@@ -7,7 +7,7 @@ no opinion about how a cell is spelled for a renderer. A cell holds an
 prompt_toolkit and `txterm/style.py` builds a `rich.style.Style` from
 the same object, and neither reads a word the other wrote.
 
-That is why this file is here and not in a widget. Lillecarl/pymux#11.
+That is why this file is here and not in a widget. Lillecarl/pyterm#13.
 
 It replaces the `Screen` of upstream pyte, which is gone. What was
 different, and is now simply what this package does:
@@ -194,7 +194,7 @@ def _param(params: Sequence[object], index: int, default: int = 0) -> int:
     Parameter `index`, or `default` when the program left it out.
 
     A parameter that arrives as None was written empty, and one past
-    the end was not written at all (Lillecarl/pymux#178). A sequence
+    the end was not written at all (Lillecarl/pyterm#180). A sequence
     whose default is what it is reads the two the same way, which is
     most of them.
     """
@@ -238,7 +238,7 @@ _Savepoint = namedtuple(
         # Whether the cursor was waiting to wrap. It is part of where
         # the cursor is -- one column past the last it wrote -- so a
         # save that folded it away made "ESC 7 ESC 8" move the screen.
-        # Lillecarl/pymux#88.
+        # Lillecarl/pyterm#90.
         "pending_wrap",
     ],
 )
@@ -295,7 +295,7 @@ def _draw_on_row(row: Row, x: int, chars: str, index: int, edge: int, cells: dic
     character not drawn, and whether any cell changed. A cell that holds
     the same object already is left alone. `Screen.draw` calls this for
     the common run, and `pyte_rs` replaces it with Rust: it is the
-    reference that kernel is held to. Lillecarl/pymux#566.
+    reference that kernel is held to. Lillecarl/pyterm#568.
     """
     changed = False
     count = len(chars)
@@ -326,7 +326,7 @@ class Screen:
     #: so a region set on one screen holds on the other. xterm and
     #: kitty both work that way. The modes are not in it either, for the
     #: same reason: a soft reset on the alternate screen holds after it.
-    #: Lillecarl/pymux#906.
+    #: Lillecarl/pyterm#908.
     swap_variables = [
         "gl",
         # The cursor that "ESC 7" saves belongs to one screen. A
@@ -351,7 +351,7 @@ class Screen:
         # The continuation mark is not here. It belongs to the lines of
         # one screen, and it now rides on the rows themselves, so the
         # buffer carries it across a switch on its own.
-        # Lillecarl/pymux#134.
+        # Lillecarl/pyterm#136.
         #
         # The kitty keyboard protocol keeps separate flag stacks for the
         # main and the alternate screen. (Immutable tuple: safe to swap.)
@@ -491,7 +491,7 @@ class Screen:
         # How many times this screen has written a row, and the count at
         # which each row last changed. Together they say which rows a
         # reader has to draw again. `touch` says why the state is shaped
-        # this way. Lillecarl/pymux#126.
+        # this way. Lillecarl/pyterm#128.
         self.writes = 0
         self.written_at: dict[int, int] = {}
 
@@ -505,7 +505,7 @@ class Screen:
         # that missed any rebuilds everything instead. Rectangle
         # scrolls inside left and right margins are not whole lines
         # and say nothing: their rows were touched, so they rebuild as
-        # before. Lillecarl/pymux#516.
+        # before. Lillecarl/pyterm#518.
         self.scrolls: list[tuple[int, int, int, RegionCounts, int]] = []
         self.scroll_seq = 0
 
@@ -546,14 +546,14 @@ class Screen:
         #: Whoever serves kitty's clipboard (OSC 5522): told each finished
         #: write and each read, and answers the program. None answers
         #: EPERM, and DECRQM does not know the paste events mode.
-        #: Lillecarl/pymux#893.
+        #: Lillecarl/pyterm#895.
         self.clipboard_func: Callable[[ClipboardRequest], None] | None = None
         #: A write that is still arriving. A reset leaves it, as kitty does.
         self.kitty_clipboard = KittyClipboard()
         #: Whoever serves kitty's drag and drop (OSC 72): told each
         #: packet the program sends. None ignores them all, so a query
         #: goes unanswered and the program sees no support.
-        #: Lillecarl/pymux#892.
+        #: Lillecarl/pyterm#894.
         self.dnd_func: Callable[[DndPacket], None] | None = None
         #: A chain of chunks still arriving, and what the program
         #: registered for. A reset leaves both, as kitty's window does.
@@ -561,13 +561,13 @@ class Screen:
         #: Whoever serves kitty's file transfer (OSC 5113): told each
         #: command the program sends. None ignores them all, so a
         #: transfer waits for an answer that never comes.
-        #: Lillecarl/pymux#912.
+        #: Lillecarl/pyterm#914.
         self.file_transfer_func: Callable[[TransferCommand], None] | None = None
 
         # The colours a pane starts with, before a program sets any. The
         # embedder replaces it when it learns the theme of the terminal
         # of the user, with `set_color_base`; a reset keeps it and takes
-        # the colours that a program set away. Lillecarl/pymux#283.
+        # the colours that a program set away. Lillecarl/pyterm#285.
         self.color_base = color_base or COLOR_BASE
 
         # Stack of kitty keyboard protocol flags. ("CSI > flags u" pushes,
@@ -609,7 +609,7 @@ class Screen:
         # A pane that is not allowed hears so: it answers "CSI ? 0 u"
         # and "CSI > 4 ; 0 m" whatever it asked for, because a
         # capability that is claimed and not served is worse than one
-        # that is missing. Lillecarl/pymux#173.
+        # that is missing. Lillecarl/pyterm#175.
         self.extended_keys_allowed: bool = True
 
         # The shapes of the pointer that "OSC 22" pushed. Each screen
@@ -622,7 +622,7 @@ class Screen:
         self.graphics = GraphicsState()
 
         #: kitty's text sizing, OSC 66, and the DEC line attributes.
-        #: Lillecarl/pymux#890.
+        #: Lillecarl/pyterm#892.
         self.text_sizes = TextSizes()
 
         #: The size of one cell, in pixels. A screen holds no pixels of
@@ -857,7 +857,7 @@ class Screen:
         The mirror of XTMODKEYS, and the same shape: a resource alone
         puts that one back, and a value sets it. The two together are
         one feature -- how much leaves the legacy encoding, and how
-        what leaves is written. Lillecarl/pymux#183.
+        what leaves is written. Lillecarl/pyterm#185.
         """
         self._remember_a_key_option(self.key_format_options, params)
 
@@ -881,7 +881,7 @@ class Screen:
         started, and with the resource alone that one does. xterm says
         both, and the two are told apart because a sequence that writes
         no parameter carries none, while "CSI > 0 f" carries a zero.
-        Lillecarl/pymux#178.
+        Lillecarl/pyterm#180.
         """
         if not params:
             options.clear()
@@ -995,7 +995,7 @@ class Screen:
         Answer the program. A report the person makes, such as a mouse
         click, is input: the embedder writes `encode_report` to the
         program itself, because a mirrored screen drops its replies and
-        must not drop a click. Lillecarl/pymux#759.
+        must not drop a click. Lillecarl/pyterm#761.
         """
         self.write_process_input(self.encode_report(answer))
 
@@ -1070,7 +1070,7 @@ class Screen:
             self.program_status.clear()
             self._forward_osc(Osc.PROGRAM_STATUS, "")
         # "OSC 6": the colour the embedder draws this pane's tab in, as
-        # red, green and blue. Lillecarl/pymux#786.
+        # red, green and blue. Lillecarl/pyterm#788.
         self.tab_color: tuple[int, int, int] | None = None
 
         # Reset the kitty keyboard protocol flag stack as well. (RIS is a
@@ -1161,7 +1161,7 @@ class Screen:
             # sets it anyway; `less` does not ask, and scrolls on arrows.
             PrivateMode.ALTERNATE_SCROLL.flag,
             # On in kitty, which has no mode to turn it off, in Ghostty
-            # by default, and in tmux. Lillecarl/pymux#798.
+            # by default, and in tmux. Lillecarl/pyterm#800.
             PrivateMode.GRAPHEME_CLUSTERS.flag,
         }
 
@@ -1194,7 +1194,7 @@ class Screen:
 
         #: The slot a single shift named, for the next character only.
         #: `draw` takes one character from it and puts this back.
-        #: Lillecarl/pymux#373.
+        #: Lillecarl/pyterm#375.
         self.single_shift: int | None = None
 
         # From ``man terminfo`` -- "... hardware tabs are initially
@@ -1356,14 +1356,14 @@ class Screen:
     # pure. A count that only goes up needs no emptying. Each reader
     # keeps the count it last drew, per row, and a reader that attaches
     # late remembers nothing, so every row looks new and it draws the
-    # whole screen once. Lillecarl/pymux#126.
+    # whole screen once. Lillecarl/pyterm#128.
 
     # ------------------------------------------------------------------
     # What a reader has to draw again.
     #
     # The screen counts writes per row and every reader keeps its own
     # mark, because two widgets and several clients read one screen.
-    # Lillecarl/pymux#128.
+    # Lillecarl/pyterm#130.
 
     def touch(self, row: int) -> None:
         "Say that one row of `data_buffer` has changed."
@@ -1398,7 +1398,7 @@ class Screen:
         full screen program and closing it again touches every row four
         times, which at fifty thousand rows of history was a million
         and a half bytecode instructions for two escape sequences.
-        Lillecarl/pymux#8.
+        Lillecarl/pyterm#10.
         """
         self.writes += 1
         self.everything_at = self.writes
@@ -1442,13 +1442,13 @@ class Screen:
         #: the rows it keeps. A pane at fifty thousand rows prunes a
         #: hundred of them at a time, and reading the whole buffer to
         #: find those hundred made printing a line three times as
-        #: expensive as it is at two thousand. Lillecarl/pymux#8.
+        #: expensive as it is at two thousand. Lillecarl/pyterm#10.
         self.history_floor = 0
 
         #: The lowest row that is laid out at the width the screen has
         #: now. A reflow lays out the screen and the lines that reach
         #: it, and leaves the history alone, so a row under this one
-        #: keeps the width it was written at. Lillecarl/pymux#135.
+        #: keeps the width it was written at. Lillecarl/pyterm#137.
         self.reflow_floor = 0
 
     #: The two page widths that DECCOLM names.
@@ -1583,7 +1583,7 @@ class Screen:
         `ceil(pixels / cell)` cells, and that count is only as good as
         the cell it was counted against. A placement the program sized
         itself is left alone: it asked for cells, and cells are what it
-        still gets. Lillecarl/pymux#369.
+        still gets. Lillecarl/pyterm#371.
 
         tmux throws every image away instead (`image_free_all`, on any
         resize). **Counting again rather than dropping is what makes
@@ -1655,7 +1655,7 @@ class Screen:
             # The same row for the page nobody is looking at, worked out
             # before the height changes for the same reason. It cannot
             # be read off `line_offset`, which answers for the page that
-            # is showing. Lillecarl/pymux#203.
+            # is showing. Lillecarl/pyterm#205.
             stashed, stashed_vars = self._the_page_that_is_not_showing()
             stashed_bottom = None if stashed is None else self._bottom_for(stashed_vars["max_y"])
 
@@ -1681,19 +1681,19 @@ class Screen:
             # the content says how far the buffer reaches, the screen
             # is the last rows of it, and the cursor is held inside the
             # screen rather than the screen held to the cursor.
-            # Lillecarl/pymux#146.
+            # Lillecarl/pyterm#148.
             #
             # The alternate screen is cut down instead. A full-screen
             # program owns that screen and redraws it, and five of the
             # seven judges of the panel do the same. `_clip` says the
-            # rest. Lillecarl/pymux#192.
+            # rest. Lillecarl/pyterm#194.
             if self.in_alternate_screen:
                 self._clip()
             else:
                 self._reflow(bottom)
 
             # And the one nobody is looking at, which used to come back
-            # at the width it was stashed at. Lillecarl/pymux#203.
+            # at the width it was stashed at. Lillecarl/pyterm#205.
             if stashed is not None:
                 self._lay_out_the_stashed_page(stashed, stashed_vars, stashed_bottom)
 
@@ -1734,12 +1734,12 @@ class Screen:
         screen 20 columns wide, which every reader of it disagrees
         about. It is the ordinary case and not a corner -- a person
         resizes the window while `vim` is up, and quits it.
-        Lillecarl/pymux#203.
+        Lillecarl/pyterm#205.
 
         **The stashed page is laid out the way it would be if it were
         showing.** The first screen reflows and the alternate one is cut
         down, which is the same rule as in `resize` and for the same
-        reasons. Lillecarl/pymux#192.
+        reasons. Lillecarl/pyterm#194.
 
         libvterm and kitty both do this. `resize()` in libvterm's
         `src/screen.c` calls `resize_buffer` for buffer 0 and then for
@@ -1801,7 +1801,7 @@ class Screen:
     #
     # The buffer holds the history above the screen, so a row number is
     # not a row of the screen. `line_offset` is the first row shown.
-    # A note about a row lives on the `Row`. Lillecarl/pymux#134.
+    # A note about a row lives on the `Row`. Lillecarl/pyterm#136.
 
     @property
     def line_offset(self) -> int:
@@ -1846,7 +1846,7 @@ class Screen:
     def mark_row(self, mark: page_module.RowMark) -> None:
         """
         Put `mark` on the row the cursor stands on, the row tmux's
-        `input_osc_133` marks. Lillecarl/pymux#500.
+        `input_osc_133` marks. Lillecarl/pyterm#502.
 
         It counts as a write, though nothing draws differently: a later
         freeze takes only the rows written since the one before.
@@ -1866,7 +1866,7 @@ class Screen:
         **It does not read the buffer.** `max(data_buffer)` walks every
         key, and the buffer holds the history: fifty thousand rows on a
         pane a person set up to scroll back a long way, once per frame.
-        Lillecarl/pymux#130.
+        Lillecarl/pyterm#132.
 
         The search is the screen instead, and usually nothing at all. A
         row is written where the cursor stands or inside the scrolling
@@ -2089,7 +2089,7 @@ class Screen:
         sign for ``ESC ( A #`` with the mode off; xterm alone gates it
         and Alacritty has no national sets at all. Five against one is
         a rule and not a choice, the same reading `charsets.py` makes
-        of the newline symbol. Lillecarl/pymux#111.
+        of the newline symbol. Lillecarl/pyterm#113.
 
         .. warning:: User-defined charsets are currently not supported.
         """
@@ -2180,7 +2180,7 @@ class Screen:
                 # The buffer is replaced rather than written into, so
                 # both sets of rows have to say so: the ones a reader
                 # holds, and the ones that take their numbers.
-                # Lillecarl/pymux#126.
+                # Lillecarl/pyterm#128.
                 self.touch_everything()
                 self.page = self._alternate_screen
                 for name, value in self._alternate_screen_vars.items():
@@ -2228,7 +2228,7 @@ class Screen:
             # stands. xterm does, and its own description of "?1049"
             # is a save, a switch and a clear, with no move. Alacritty,
             # Ghostty, libvterm and xterm.js leave it too; kitty and
-            # WezTerm put it home. Lillecarl/pymux#34.
+            # WezTerm put it home. Lillecarl/pyterm#36.
             self.pt_cursor_position.x = held_column
             self.pt_cursor_position.y = held_row + self.line_offset
             self.ensure_bounds()
@@ -2290,7 +2290,7 @@ class Screen:
             # `pending_wrap` is a swap variable, so the screen that
             # comes back would otherwise bring the wait it was taken
             # with -- which is the wait of a cursor that is not the one
-            # being kept. Lillecarl/pymux#35.
+            # being kept. Lillecarl/pyterm#37.
             waiting = self.pending_wrap
 
             # The screen that is given back is kept, not thrown away:
@@ -2306,14 +2306,14 @@ class Screen:
                 self._alternate_screen_vars = {name: getattr(self, name) for name in self.swap_variables}
 
             # The rows of the screen that is being left, and then the
-            # rows of the one that comes back. Lillecarl/pymux#126.
+            # rows of the one that comes back. Lillecarl/pyterm#128.
             self.touch_everything()
             for k, v in self._original_screen_vars.items():
                 setattr(self, k, v)
             self.page = self._original_screen
             self.touch_everything()
             # Any of the three gives the page back, so none of them is
-            # set after. Lillecarl/pymux#856.
+            # set after. Lillecarl/pyterm#858.
             self.mode.difference_update(self._ALTERNATE_SCREEN_MODES)
 
             self._original_screen = None
@@ -2507,7 +2507,7 @@ class Screen:
         # it draws, so the rows this run changed are the ones from here
         # to wherever the cursor ends up. Counting them after the loop
         # keeps the loop itself, which runs once per character, exactly
-        # as it was. Lillecarl/pymux#126.
+        # as it was. Lillecarl/pyterm#128.
         first_row = cursor_position_y
         first_column = cursor_position_x
 
@@ -2516,7 +2516,7 @@ class Screen:
         # the readers keep what they built: a frame after a program
         # repaints its screen then rebuilds one row. Nearly every run
         # stays on one row, so the common case is two numbers and no
-        # allocation. Lillecarl/pymux#126.
+        # allocation. Lillecarl/pyterm#128.
         changed_first = -1
         changed_last = -1
         # A double width character or a combining mark took a path
@@ -2530,7 +2530,7 @@ class Screen:
         # character that opens a cluster: both go the long way, which
         # asks. A first character in ASCII is not asked: it joins only a
         # prepended sign, and every keystroke would pay for the question.
-        # Lillecarl/pymux#798.
+        # Lillecarl/pyterm#800.
         clusters = PrivateMode.GRAPHEME_CLUSTERS.flag in self.mode
         ask_first = clusters and chars >= "\x80"
 
@@ -2609,7 +2609,7 @@ class Screen:
             # xterm reads it this way: after `CSI Z` the cursor really
             # is a tab stop back -- a `CSI D` from there lands one
             # column left of it -- and the next character wraps anyway.
-            # Lillecarl/pymux#106.
+            # Lillecarl/pyterm#108.
             if char_width > 0 and (waiting_to_wrap or cursor_position_x + char_width > edge):
                 if PrivateMode.AUTOWRAP.flag in self.mode:
                     # The moves below read the cursor from the screen,
@@ -2764,7 +2764,7 @@ class Screen:
         moves: 1 when the cluster grew a column, as a flag's second half
         does. None leaves `char` a cell of its own: no cluster takes it,
         or the cluster would grow past `edge` or onto a cell it does not
-        own. Lillecarl/pymux#798.
+        own. Lillecarl/pyterm#800.
         """
         previous = x - 1
         cell = row.get(previous)
@@ -2816,7 +2816,7 @@ class Screen:
 
         **Only a cursor that is really past the edge comes back.** A
         tab stop move carries the wait to a column that is not the
-        edge (Lillecarl/pymux#106), and folding there would take a
+        edge (Lillecarl/pyterm#108), and folding there would take a
         column off a cursor that never gained one.
         """
         if self.pending_wrap:
@@ -2892,7 +2892,7 @@ class Screen:
             # exactly one row behind, and waiting for the hundredth
             # would leave a hundred rows for copy mode to offer. One
             # row is one `pop`, which is cheaper than the count that
-            # decides whether to look. Lillecarl/pymux#132.
+            # decides whether to look. Lillecarl/pyterm#134.
             #
             # The field and not `in_alternate_screen`: this runs once
             # per line a program prints, and the property costs a
@@ -2983,7 +2983,7 @@ class Screen:
         finished message by setting a region from the first row to the
         row above the composer and feeding lines at the bottom of it,
         so every line of the transcript leaves through the top of a
-        region. Lillecarl/pymux#423.
+        region. Lillecarl/pyterm#425.
         """
         if top == 0 and self.horizontal_margins is None and self._original_screen is None:
             self._slide_the_screen_under_the_region(bottom, amount)
@@ -3023,7 +3023,7 @@ class Screen:
         # Without this the first scrolls of a fresh screen dropped
         # their rows, where every other terminal kept them: a screen is
         # always `lines` rows tall to them, and this "not filled once"
-        # state is ours alone. Lillecarl/pymux#424.
+        # state is ours alone. Lillecarl/pyterm#426.
         if self.max_y < lines - 1:
             self.max_y = lines - 1
 
@@ -3104,7 +3104,7 @@ class Screen:
         # a program does, so this is one call for the whole region
         # rather than one per row. It comes before the move, so that a
         # helper the move calls counts on top of a number that is
-        # already written back. Lillecarl/pymux#126.
+        # already written back. Lillecarl/pyterm#128.
         self.touch_rows(row + line_offset for row in rows)
 
         for row in rows:
@@ -3134,11 +3134,11 @@ class Screen:
             # that mark describes a line the move has taken away. A
             # reflow then reads the blank row and the rows under it as
             # one line, and the blank line disappears into the next
-            # one. Lillecarl/pymux#179.
+            # one. Lillecarl/pyterm#181.
             #
             # `erase_in_display` says the same thing about the row
             # under the range it erases, and cites libvterm and xterm
-            # for it. Lillecarl/pymux#142.
+            # for it. Lillecarl/pyterm#144.
             #
             under_the_blanks = top + steps if amount < 0 else bottom + 1
             self._forget_the_wrap_marks([under_the_blanks + line_offset])
@@ -3162,7 +3162,7 @@ class Screen:
             # and xterm.js join them. The vote is in
             # `ptterm/tests/test_a_scroll_and_the_wrap_mark.py`, which
             # is where a resize can see the mark at all.
-            # Lillecarl/pymux#188.
+            # Lillecarl/pyterm#190.
             if amount > 0:
                 self._forget_the_wrap_marks([top + line_offset])
 
@@ -3237,7 +3237,7 @@ class Screen:
         chose for the scrollback of their shell. Copy mode is where
         that showed: it reads from the lowest row of the buffer to the
         highest, so the history it offered was taller than the screen
-        a program drew. Lillecarl/pymux#132.
+        a program drew. Lillecarl/pyterm#134.
         """
         if self.in_alternate_screen:
             remove_above = self.line_offset
@@ -3257,7 +3257,7 @@ class Screen:
 
         This is the one thing about a row that the row does not carry,
         and it is outside on purpose: the *reader* owns it, and a pure
-        screen may not track its readers. Lillecarl/pymux#126. Whether a
+        screen may not track its readers. Lillecarl/pyterm#128. Whether a
         wrap brought the row into being rides on the row itself, so
         dropping the row drops that.
 
@@ -3380,7 +3380,7 @@ class Screen:
         go back a tab stop -- a `CSI D` from there lands one column
         left of it -- and the next character wraps anyway. xterm reads
         it this way, and Alacritty, Ghostty and xterm.js draw the same
-        screen. Lillecarl/pymux#106.
+        screen. Lillecarl/pyterm#108.
 
         Nothing here clears the flag, which is the whole of it: this is
         one of the two moves that never reach `ensure_bounds`.
@@ -3547,7 +3547,7 @@ class Screen:
                 # rather than a thing beside it. Without this a save
                 # and a restore with nothing between them moved the
                 # next character a row up. xterm, Alacritty, Ghostty
-                # and WezTerm all bring it back. Lillecarl/pymux#88.
+                # and WezTerm all bring it back. Lillecarl/pyterm#90.
                 self.pending_wrap,
             )
         ]
@@ -3594,7 +3594,7 @@ class Screen:
             # wait, and a restore is not a move. The column comes back
             # with it, since a cursor that waits sits one past the last
             # column and the bounds folded it in.
-            # Lillecarl/pymux#88.
+            # Lillecarl/pyterm#90.
             if savepoint.pending_wrap:
                 self.pt_cursor_position.x = savepoint.cursor_x
                 self.pending_wrap = True
@@ -3786,7 +3786,7 @@ class Screen:
         "CSI > Pp ; Pv f" is XTFMTKEYS, which says which form a key
         with a modifier goes out in. Reading that as a position moved
         the cursor to row four, and every character the program drew
-        after it landed in the wrong place. Lillecarl/pymux#183.
+        after it landed in the wrong place. Lillecarl/pyterm#185.
 
         In origin mode the region is the whole page that a program
         sees. A row past the bottom of it holds at the bottom, the way
@@ -3968,7 +3968,7 @@ class Screen:
         # where the wait sat. Every judge of the panel lands one column
         # left, which is what falls out of `ensure_bounds`, and a panel
         # that agrees against xterm alone is the panel's to win.
-        # Lillecarl/pymux#106.
+        # Lillecarl/pyterm#108.
         if self._reverse_wrap_mode() is not None:
             self._walk_back(count)
             return
@@ -4032,7 +4032,7 @@ class Screen:
     #
     # An erased cell takes the background that is set now, and it is an
     # `ErasedCell`: a combining mark falls off one and hangs on a space
-    # that a program wrote. Lillecarl/pymux#56.
+    # that a program wrote. Lillecarl/pyterm#58.
 
     def erase_appearance(self) -> Appearance | None:
         "How an erased cell is drawn now: `sgr.erased_appearance` of the rendition."
@@ -4396,7 +4396,7 @@ class Screen:
             #
             # libvterm clears the mark there, and xterm clears the flag
             # of every row `ClearBufRows` empties, which is the same
-            # statement one row up. Lillecarl/pymux#142.
+            # statement one row up. Lillecarl/pyterm#144.
             if interval:
                 self.set_wrapped(interval.stop, False)
 
@@ -4595,7 +4595,7 @@ class Screen:
         because `src/state.c` has no case for the sequence.
 
         So a rectangle can leave a row that holds nothing and still
-        says it continues the row above. Lillecarl/pymux#142.
+        says it continues the row above. Lillecarl/pyterm#144.
         """
         if corners is None:
             return
@@ -4690,7 +4690,7 @@ class Screen:
         program can paint a background on an area. kitty does that in
         both extents. xterm does it only in a rectangle and skips such a
         cell in a stream, which leaves kitty's colours out of a stream.
-        Lillecarl/pymux#895.
+        Lillecarl/pyterm#897.
         """
         sgr = tuple(params[4:])
         self._restyle_area(params, lambda rendition: after_sgr(rendition, sgr))
@@ -4863,7 +4863,7 @@ class Screen:
 
         A private marker makes another sequence, and it is not TBC.
         "CSI ? Pp g" is XTQFMTKEYS, which asks which form a key with a
-        modifier goes out in. Lillecarl/pymux#183.
+        modifier goes out in. Lillecarl/pyterm#185.
         """
         if private is True:
             self.report_key_format_options(type_of)
@@ -5399,10 +5399,10 @@ class Screen:
         # reflow leaves the history at the width it was written at. So
         # the rows that just arrived may be laid out at another width,
         # and this is the one path that brings such a row back onto the
-        # screen. Lay them out again. Lillecarl/pymux#135.
+        # screen. Lay them out again. Lillecarl/pyterm#137.
         #
         # **Not on the alternate screen**, which does not reflow at all
-        # (Lillecarl/pymux#192). There is no history above it to slide
+        # (Lillecarl/pyterm#194). There is no history above it to slide
         # over, so there is nothing here to lay out again -- but
         # `reflow_floor` belongs to the screen and not to the page, so
         # it still carries the number the primary page left, and
@@ -5675,7 +5675,7 @@ class Screen:
         """
         kitty's multiple cursors ("CSI > SHAPE ; WHERE : COORDINATES ...
         SP q"): set or clear extra cursors, set their colours, or answer
-        what is set. Lillecarl/pymux#891.
+        what is set. Lillecarl/pyterm#893.
 
         Each parameter after the first is one group, as kitty's parser
         splits them: a kind, then its coordinates as subparameters.
@@ -6223,7 +6223,7 @@ class Screen:
             self.osc(*xterm)
         elif param == REPORT_CELL_SIZE:
             # Points and the pixels in one, which a pane cannot tell
-            # apart: a scale of one. Lillecarl/pymux#783.
+            # apart: a scale of one. Lillecarl/pyterm#785.
             self.reply(
                 OscString(
                     Osc.TERMINAL_EXTENSION,
@@ -6307,7 +6307,7 @@ class Screen:
         The terminal of the user paints the palette that a program asks
         for by number, so a pane's answers ought to describe the same
         table. This is what an embedder that learned the theme of a
-        client hands in. Lillecarl/pymux#283.
+        client hands in. Lillecarl/pyterm#285.
 
         The colours that a program set stay: they are explicit asks,
         and a different base does not take them back. A reset does.
@@ -6402,7 +6402,7 @@ class Screen:
         Five of the seven judges of `ptterm/tests/panel.py` do exactly
         this -- alacritty, Ghostty, kitty, WezTerm and xterm.js all show
         the screen cut down, with nothing re-wrapped.
-        Lillecarl/pymux#192.
+        Lillecarl/pyterm#194.
 
         **kitty is the one to read, because kitty changed to it.** Its
         `resize_screen_buffer_without_rewrap` in `kitty/resize.c` is
@@ -6448,7 +6448,7 @@ class Screen:
         width = self.columns
 
         # **The alternate screen keeps nothing above itself**, the way
-        # Lillecarl/pymux#132 says. A row that a shorter screen leaves
+        # Lillecarl/pyterm#134 says. A row that a shorter screen leaves
         # behind is not scrollback, because no scrollback reaches this
         # screen: it is a row nobody can read.
         line_offset = self.line_offset
@@ -6509,7 +6509,7 @@ class Screen:
         # a number nobody wrote, and a row made here is a row the
         # reflow then lays out. A row no longer makes a cell, which is
         # what gave a line a run of blanks nobody wrote before
-        # Lillecarl/pymux#227. Lillecarl/pymux#143.
+        # Lillecarl/pyterm#229. Lillecarl/pyterm#145.
         #
         # **Only a character a program wrote counts.** The trim below
         # takes the blanks an erase left off the end of a line, so a
@@ -6576,12 +6576,12 @@ class Screen:
         # left the rows above it in the buffer for nothing to draw:
         # six lines of "E" narrowed from ten columns to four gave
         # eighteen rows and a screen that reached six of them.
-        # Lillecarl/pymux#146.
+        # Lillecarl/pyterm#148.
         #
         # The cursor is on the screen, so the screen reaches it. It can
         # stand past the last cell of the last line and so on a row
         # that holds none, which no longer exists now that a reflow
-        # does not make one for it. Lillecarl/pymux#143.
+        # does not make one for it. Lillecarl/pyterm#145.
         self.max_y = max(highest, cursor_position.y)
 
         # The cursor stands on the character it stood on, and that

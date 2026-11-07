@@ -20,7 +20,7 @@ holds the stack of "OSC 22" and `ColorOverrides` holds what "OSC 4",
 "OSC 5" and "OSC 10" set. That is where `GraphicsState` sits for the
 graphics protocol, in `images.py`. Neither one writes a sequence: each
 returns the payload to answer with, and the screen sends it.
-Lillecarl/pymux#129.
+Lillecarl/pyterm#131.
 """
 
 from __future__ import annotations
@@ -112,9 +112,9 @@ class Osc(StrEnum):
     #: "OSC 9 ; text": iTerm2's desktop notification, which kitty,
     #: Ghostty and Windows Terminal read too. A number and a semicolon
     #: first make it ConEmu's instead, "OSC 9 ; 4 ; state ; percent" a
-    #: progress bar among them. Lillecarl/pymux#787.
+    #: progress bar among them. Lillecarl/pyterm#789.
     MESSAGE = "9"
-    #: "OSC 6": the colour of the tab, iTerm2's. Lillecarl/pymux#786.
+    #: "OSC 6": the colour of the tab, iTerm2's. Lillecarl/pyterm#788.
     TAB_COLOR = "6"
     #: "OSC 7": the working directory of the program, as a file URL.
     #: xterm defined it; iTerm2 reads it as CurrentDir with a host.
@@ -156,14 +156,14 @@ FORWARDED_OSC = frozenset(
 #: "OSC 1337 ; ClearScrollback": iTerm2's spelling of "CSI 3 J". The one
 #: subcommand of 1337 that is the screen's own state, so a screen does
 #: it itself, and still hands it on: through a multiplexer the terminal
-#: of the user clears its own history too. Lillecarl/pymux#504.
+#: of the user clears its own history too. Lillecarl/pyterm#506.
 CLEAR_SCROLLBACK = "ClearScrollback"
 
 #: "OSC 1337 ; SetColors=key=value": iTerm2's way to set one colour. Each
 #: key it shares with xterm is written as the xterm sequence that sets the
 #: same colour: the code, and the index for OSC 4 and OSC 5. A key with no
 #: such colour (link, curfg) is left alone, and "tab" is the tab colour
-#: of "OSC 6". Lillecarl/pymux#782.
+#: of "OSC 6". Lillecarl/pyterm#784.
 SET_COLORS = "SetColors"
 _ITERM_ANSI = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white"]
 ITERM_COLOR_KEYS: Final[dict[str, tuple[str, str]]] = {
@@ -207,7 +207,7 @@ def _six_digits(color: str) -> str | None:
 
 #: "OSC 6 ; 1 ; bg ; red ; brightness ; N" sets one channel of the tab
 #: colour, 0 to 255, and "OSC 6 ; 1 ; bg ; * ; default" takes the colour
-#: away. A channel nothing set yet is 0. Lillecarl/pymux#786.
+#: away. A channel nothing set yet is 0. Lillecarl/pyterm#788.
 TAB_CHANNELS: Final = ("red", "green", "blue")
 TabColor = tuple[int, int, int]
 
@@ -240,7 +240,7 @@ REPORT_CELL_SIZE = "ReportCellSize"
 
 #: "OSC 1337 ; CursorShape=N": iTerm2's shape of the cursor, which keeps
 #: the blinking as it was. Each number names the blinking DECSCUSR shape
-#: it means. Lillecarl/pymux#781.
+#: it means. Lillecarl/pyterm#783.
 CURSOR_SHAPE = "CursorShape"
 ITERM_CURSOR_SHAPES: Final = {"0": 1, "1": 5, "2": 3}
 
@@ -299,7 +299,7 @@ def parse_kitty_color_query(param: str) -> list[tuple[str, str | None]] | None:
     holds nothing. The value is `None` for a part that names a colour
     and nothing else, QUERY for a query, and the colour to set for
     everything else. A set reaches the same table a query reads, the
-    way the xterm sequences pair up. Lillecarl/pymux#286.
+    way the xterm sequences pair up. Lillecarl/pyterm#288.
     """
     parts = [part for part in param.split(";") if part != ""]
     if not parts:
@@ -623,7 +623,7 @@ class ColorBase(NamedTuple):
     A pane starts on `COLOR_BASE`. An embedder that knows better -- a
     pane is drawn on the terminal of the user, and that terminal holds
     its own theme -- hands in its own with `Screen.set_color_base`.
-    Lillecarl/pymux#283.
+    Lillecarl/pyterm#285.
     """
 
     palette: Sequence[Color]
@@ -644,7 +644,7 @@ def color_base_data(base: ColorBase) -> dict[str, Any]:
     """
     A base as named data, for a pymux server that tells another one
     what its terminals hold. The two may run different builds, so
-    nothing names a class. Lillecarl/pymux#759.
+    nothing names a class. Lillecarl/pyterm#761.
     """
     return {
         "palette": [list(color) for color in base.palette],
@@ -956,7 +956,7 @@ class ColorOverrides:
         part whose value is "?" asks; every other part sets, the way
         the xterm sequences do, into the same table a query reads.
         The protocol is kitty's, and ghostty speaks it too.
-        Lillecarl/pymux#286.
+        Lillecarl/pyterm#288.
         """
         keys = parse_kitty_color_query(param)
         if keys is None:

@@ -4,7 +4,7 @@ The gate draws the same examples every run.
 A property test with no seed is a different test every time it runs.
 This suite had one: `test_a_size_change_keeps_every_line` failed about
 one run in eight, and a gate that is red by luck teaches everybody to
-run it again instead of to look. Lillecarl/pymux#180.
+run it again instead of to look. Lillecarl/pyterm#182.
 
 `tests/conftest.py` names the two profiles and loads one. This file
 holds the promise each one makes, because the promise lives in the

@@ -4,7 +4,7 @@ history.
 
 A front end has to know how many rows there are, and it read
 `max(data_buffer)` to find out: fifty thousand keys per frame, and the
-depth is a number the person chooses. Lillecarl/pymux#130.
+depth is a number the person chooses. Lillecarl/pyterm#132.
 
 **The scan does not need the history.** A row is written where the
 cursor is or inside the scrolling region, and both are inside the
@@ -71,7 +71,7 @@ def say_nothing_sits_above_the_screen(screen) -> None:
     # The other answer that rests on the same bound. A reflow asks for
     # the highest row the *buffer* holds, which can sit below `max_y`,
     # and it also has to be what reading the whole buffer says.
-    # Lillecarl/pymux#145.
+    # Lillecarl/pyterm#147.
     if buffer:
         found = highest_row_held(screen.page.data_buffer, last, screen.lines)
         assert found == max(buffer), "the buffer top was read as %d and the whole buffer says %d (%s)" % (

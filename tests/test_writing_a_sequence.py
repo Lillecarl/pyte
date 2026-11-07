@@ -6,7 +6,7 @@ thousand places. Every one of them packs typed values into positional
 slots of a plain string: `"\\x1b[97;5u"` carries a code point and a
 mask of modifiers, `"\\x1b[?1049h"` carries a mode number. Getting a
 digit wrong compiles and passes review as easily as getting it right.
-Lillecarl/pymux#165.
+Lillecarl/pyterm#167.
 
 **This file keeps its literals, and it is the only one that should.**
 The bytes here are what proves the builder, so writing them through

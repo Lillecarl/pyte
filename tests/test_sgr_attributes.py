@@ -4,7 +4,7 @@ Every attribute SGR turns on, another SGR number turns off.
 ECMA-48 8.3.117 pairs them: 1 and 2 end at 22, 3 at 23, 4 at 24, 5 at
 25, 7 at 27, 8 at 28 and 9 at 29. A screen that reads the first of a
 pair and not the second keeps the attribute until a reset. pyte read 8
-and not 28, so text a program hid stayed hidden. Lillecarl/pymux#848.
+and not 28, so text a program hid stayed hidden. Lillecarl/pyterm#850.
 
 The numbers are written as the standard writes them, and not through
 `Sgr`: this judges the reader, and a wrong member would pass a test

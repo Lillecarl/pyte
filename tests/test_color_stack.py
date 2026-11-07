@@ -3,7 +3,7 @@ The colour stack: xterm's XTPUSHCOLORS, XTPOPCOLORS and XTREPORTCOLORS
 ("CSI # P", "CSI # Q", "CSI # R"), and kitty's "OSC 30001" and
 "OSC 30101" for the first two. The arithmetic is kitty's
 (`colorprofile_push_colors` and its neighbours, kitty/colors.c).
-Lillecarl/pymux#894.
+Lillecarl/pyterm#896.
 """
 
 from __future__ import annotations

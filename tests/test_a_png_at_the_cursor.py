@@ -1,6 +1,6 @@
 """
 `GraphicsState.add_png`: an image the embedder decoded and sized, placed
-at the cursor. pymux puts iTerm2's inline images here. Lillecarl/pymux#789.
+at the cursor. pymux puts iTerm2's inline images here. Lillecarl/pyterm#791.
 """
 
 from __future__ import annotations

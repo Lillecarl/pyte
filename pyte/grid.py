@@ -6,7 +6,7 @@ The peer holds the visible page and nothing else. The owner keeps the
 history and runs what reads it (copy mode, search, capture), so the
 peer has no state to keep in step with the owner's, and each frame
 holds only the rows that changed since the last one it was sent.
-Lillecarl/pymux#759.
+Lillecarl/pyterm#761.
 
 **The format is the protocol between two builds** that a person
 upgrades at different times. So it names nothing of this package: a
@@ -121,7 +121,7 @@ def _cursor_of(screen: Screen) -> dict[str, Any]:
 
 
 def _extra_cursors_of(screen: Screen) -> dict[str, Any]:
-    "kitty's extra cursors, each a row, a column and a shape, and their two colours. Lillecarl/pymux#891."
+    "kitty's extra cursors, each a row, a column and a shape, and their two colours. Lillecarl/pyterm#893."
     extra = screen.extra_cursors
     return {
         "cells": [[row, column, int(shape)] for row, column, shape in extra.listed()],
@@ -162,7 +162,7 @@ def _text_sizes_of(screen: Screen) -> list[dict[str, Any]]:
     """
     The blocks of text at another size that lie wholly on the page,
     which is all a renderer draws. The cells under them cross as rows.
-    Lillecarl/pymux#910.
+    Lillecarl/pyterm#912.
     """
     top = screen.line_offset
     bottom = top + screen.lines

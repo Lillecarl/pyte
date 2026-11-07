@@ -6,7 +6,7 @@ one through Rust, and every cell, the cursor and the write counts
 have to agree. A cell is compared by what it is and not by identity:
 an erase makes a cell of its own on each screen. The write counts
 are what say whether a row kept its objects, so they hold that.
-Lillecarl/pymux#566.
+Lillecarl/pyterm#568.
 """
 
 from __future__ import annotations

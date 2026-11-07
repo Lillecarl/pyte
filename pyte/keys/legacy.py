@@ -57,7 +57,7 @@ CTRL_TAKES_OFF_A_SYMBOL = ord("\\") - 28
 #: The VT220 put NUL, ESC to US and DEL on the row of digits as well,
 #: and xterm and kitty keep it: kitty's `ctrled_key`
 #: (`kitty/key_encoding.c`) is this table. A key that is not here has
-#: no control code, so ctrl on it is lost. Lillecarl/pymux#686.
+#: no control code, so ctrl on it is lost. Lillecarl/pyterm#688.
 CONTROL_CODE_OF = {
     ord(" "): 0,
     ord("2"): 0,
@@ -122,7 +122,7 @@ MODIFIERS_THE_LEGACY_ENCODING_DROPS = Modifier.SUPER | Modifier.HYPER | Modifier
 #: as it does from kitty. A keyboard that reports them sets one of
 #: them on every key while it is on, and Hyprland turns num lock on
 #: at login for a keyboard that has no key for it: every arrow then
-#: reached bash as "CSI 1 ; 129 D". Lillecarl/pymux#684.
+#: reached bash as "CSI 1 ; 129 D". Lillecarl/pyterm#686.
 LOCK_MODIFIERS = Modifier.CAPS_LOCK | Modifier.NUM_LOCK
 
 
@@ -209,13 +209,13 @@ def folded(event: KeyEvent, flags: int, profile: KeyProfile = DEFAULT_KEY_PROFIL
     character no keyboard has and no program wants. A keypad key folds
     onto its normal key. Every other one -- a lock key, a modifier key,
     a media key, F13 upwards -- has no legacy form, so a pane that
-    speaks the legacy encoding does not hear it. Lillecarl/pymux#166.
+    speaks the legacy encoding does not hear it. Lillecarl/pyterm#168.
 
     **This is a choice, and the terminals split on it.** Ghostty sends
     nothing too. kitty sends "CSI 57376 u" for F13, and WezTerm the
     rxvt form "CSI 25 ~". A program that knows neither prints "7376u",
-    the symptom of Lillecarl/pymux#684, so the rxvt form is the one a
-    `KeyProfile` may choose. Lillecarl/pymux#692.
+    the symptom of Lillecarl/pyterm#686, so the rxvt form is the one a
+    `KeyProfile` may choose. Lillecarl/pyterm#694.
     """
     if event.final == "u" and event.code == FunctionalKey.MENU and legacy_mode(flags) and (flags or profile.menu):
         # kitty's legacy mode, which is wider than the legacy encoding:
@@ -230,7 +230,7 @@ def folded(event: KeyEvent, flags: int, profile: KeyProfile = DEFAULT_KEY_PROFIL
         if flags:
             # A pane that pushed any flag reads the number, as kitty, Ghostty
             # and WezTerm all send it: none of them drops a key once the
-            # pane speaks the protocol at all. Lillecarl/pymux#695.
+            # pane speaks the protocol at all. Lillecarl/pyterm#697.
             return event
         if profile.rxvt_function_keys and event.code in _RXVT_FUNCTION_KEY:
             return event._replace(code=_RXVT_FUNCTION_KEY[event.code], final="~")
@@ -245,7 +245,7 @@ def shifted_key_of(event: KeyEvent) -> int | None:
 
     Only a key with shift held and a shifted key of its own, and never
     a letter under ctrl: ctrl+shift+a is the control code of a, which
-    is what kitty writes too (Lillecarl/pymux#168).
+    is what kitty writes too (Lillecarl/pyterm#170).
     """
     if not event.mods & Modifier.SHIFT or not event.alternates or event.alternates[0] is None:
         return None
@@ -290,7 +290,7 @@ def ctrl_stays_on_the_unshifted_key(code: int, shifted: int, mods: int, profile:
 
     xterm and WezTerm do where the shifted key has none: ctrl+shift+[ is
     ESC there, and "{" in kitty. ctrl+shift+; is ":" in all three.
-    Lillecarl/pymux#704.
+    Lillecarl/pyterm#706.
     """
     return (
         profile.ctrl_on_the_unshifted_key

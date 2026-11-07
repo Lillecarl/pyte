@@ -115,7 +115,7 @@ def test_the_alternate_screen_mode_is_reported():
 
 
 def test_another_page_mode_gives_the_page_back_and_clears_all_three():
-    "xterm reads 47, 1047 and 1049 from one page. Lillecarl/pymux#856."
+    "xterm reads 47, 1047 and 1049 from one page. Lillecarl/pyterm#858."
     screen, stream, answers = make_screen()
     stream.feed("\x1b[?1049h\x1b[?47h")
     for mode in (47, 1047, 1049):

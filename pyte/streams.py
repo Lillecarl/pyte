@@ -58,7 +58,7 @@ def fit_parameters(handler: Callable[..., None]) -> Callable[..., None]:
     sequence may not stop a whole terminal.
 
     **It fills in the default of a parameter the program left out.** An
-    omitted parameter arrives as None (Lillecarl/pymux#178), and the
+    omitted parameter arrives as None (Lillecarl/pyterm#180), and the
     signature is the default table of the sequence: `erase_in_line`
     declares `type_of: int = 0`, so "CSI K" reads as "CSI 0 K" without
     the handler doing anything.
@@ -110,7 +110,7 @@ MAX_OSC_CODE_LENGTH = 8
 #: parser reads on to the terminator and drops the sequence, so a program
 #: cannot make a screen hold any amount. Large enough for an iTerm2
 #: download in one sequence, which is base64 and so a third larger than
-#: the 64 MiB pymux takes. Lillecarl/pymux#744.
+#: the 64 MiB pymux takes. Lillecarl/pyterm#746.
 MAX_OSC_LENGTH = 96 * 1024 * 1024
 
 
@@ -143,7 +143,7 @@ _TEXT = re.compile("[^" + "".join(map(re.escape, _SPECIAL)) + "]+").match
 #: What ends a run of APC, DCS, SOS or PM payload, and of OSC payload.
 #: The parser takes a payload one run at a time and decides only on the
 #: last character of each, since a kitty image is hundreds of kilobytes.
-#: Lillecarl/pymux#717.
+#: Lillecarl/pyterm#719.
 _STRING_END = re.compile("[" + re.escape(ctrl.CAN + ctrl.SUB + ctrl.ST_C1 + ctrl.ESC) + "]").search
 _OSC_END = re.compile("[" + re.escape(ctrl.BEL + ctrl.ST_C1 + ctrl.ESC) + "]").search
 
@@ -167,7 +167,7 @@ def _take_ground(
     the parser takes over from there. It dispatches what the parser would
     dispatch, through the same tables, in the same order. Returning
     `offset` itself says the parser has to read the next character.
-    Lillecarl/pymux#570.
+    Lillecarl/pyterm#572.
     """
     match = _TEXT(data, offset)
     if match is None:
@@ -240,7 +240,7 @@ class Stream:
     #:
     #: The four DEC line attributes become kitty's text sizing, OSC 66:
     #: `text_sizes.py` says how, and why DECDWL draws wrong in kitty.
-    #: Lillecarl/pymux#890.
+    #: Lillecarl/pyterm#892.
     sharp = {
         Sharp.DECDHL_TOP: "double_height_top",
         Sharp.DECDHL_BOTTOM: "double_height_bottom",
@@ -350,7 +350,7 @@ class Stream:
     #: The parser is a suspended generator, which no snapshot can hold.
     #: A load starts it on the ground state, and the bytes of a
     #: sequence it was in the middle of are replayed into it.
-    #: Lillecarl/pymux#399.
+    #: Lillecarl/pyterm#401.
     KEEP: ClassVar[dict[str, Keep]] = {
         "screen": Keep.REBUILT,
         "strict": Keep.REBUILT,
@@ -520,7 +520,7 @@ class Stream:
         would otherwise leave the parser reading every later byte
         through the wrong state. The screen keeps everything it drew;
         only the bytes of the sequence that never finished go.
-        Lillecarl/pymux#390.
+        Lillecarl/pyterm#392.
         """
         self._initialize_parser()
 
@@ -648,12 +648,12 @@ class Stream:
                         #
                         # "*" and "+" name G2 and G3, which a locking
                         # or a single shift then brings in.
-                        # Lillecarl/pymux#373.
+                        # Lillecarl/pyterm#375.
                         code = yield None
                         # "ESC ( % 6" names the Portuguese national
                         # set. A name that does not fit in one byte
                         # starts with "%", and the byte after it
-                        # finishes the name. Lillecarl/pymux#111.
+                        # finishes the name. Lillecarl/pyterm#113.
                         if code == "%":
                             code += yield None
                         screen.define_charset(code, mode=char)
@@ -728,7 +728,7 @@ class Stream:
                             # that a handler can tell "the program said
                             # nothing here" from "the program said zero".
                             # Some sequences read the two differently.
-                            # Lillecarl/pymux#178.
+                            # Lillecarl/pyterm#180.
                             params.append(None if current == "" else int(current))
                         else:
                             params.append(tuple([*subparams, int(current or 0)]))
@@ -852,7 +852,7 @@ class GroundTimer:
     and only when the program has written nothing that is still unread:
     a reader held up past the deadline is not a program gone quiet. An
     18s stall of the loop otherwise dropped `ESC[?20` and drew `26l` as
-    text. Lillecarl/pymux#390, Lillecarl/pymux#484, Lillecarl/pymux#938.
+    text. Lillecarl/pyterm#392, Lillecarl/pyterm#486, Lillecarl/pyterm#940.
     """
 
     def __init__(

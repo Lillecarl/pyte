@@ -70,7 +70,7 @@ def test_the_entry_under_a_hashed_directory(tmp_path):
 def test_the_entry_of_the_package_is_the_one_that_is_used():
     """
     The build compiles it in, so a program finds it with nothing to
-    configure. Lillecarl/pymux#125.
+    configure. Lillecarl/pyterm#127.
 
     This fails when the tests run against a source tree rather than
     against what a build made, which is what the suites do.
@@ -216,7 +216,7 @@ def test_preparing_works_without_a_hook_of_their_own():
 
 
 def test_preparing_leaves_this_process_alone():
-    "It edits the program's copy. Lillecarl/pymux#553."
+    "It edits the program's copy. Lillecarl/pyterm#555."
     before = dict(os.environ)
     preparing()({"TERM": "nothing"})
     assert dict(os.environ) == before

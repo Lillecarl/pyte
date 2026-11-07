@@ -5,7 +5,7 @@ Both take random scanlines: every filter, an unknown one and data cut
 short for the first; every valid depth and colour type, with palettes and
 transparency keys that match and that do not, for the second. They have
 to agree on the bytes, and on the error and its message.
-Lillecarl/pymux#574.
+Lillecarl/pyterm#576.
 """
 
 from __future__ import annotations

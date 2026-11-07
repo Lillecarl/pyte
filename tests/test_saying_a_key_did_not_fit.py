@@ -8,7 +8,7 @@ silence it replaces.
 
 What was missing is that nothing found out. `translate_key_data` takes
 a `report` now, and the caller decides whether to say anything.
-Lillecarl/pymux#238.
+Lillecarl/pyterm#240.
 """
 
 from __future__ import annotations

@@ -3,7 +3,7 @@
 
 The Python is the reference. Each test builds rows, asks both, and
 compares the runs field by field, the appearance by identity, because
-a front end looks a style up by the object. Lillecarl/pymux#566.
+a front end looks a style up by the object. Lillecarl/pyterm#568.
 """
 
 from __future__ import annotations

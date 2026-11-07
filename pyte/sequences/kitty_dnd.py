@@ -1,7 +1,7 @@
 """
 kitty's drag and drop protocol, "OSC 72 ; metadata ; payload ST": one
 packet, either way. https://sw.kovidgoyal.net/kitty/dnd-protocol/.
-Lillecarl/pymux#892.
+Lillecarl/pyterm#894.
 
 The metadata is "key=value" pairs joined by colons, with one letter
 keys. `t` is a letter, every other value an integer. The four location

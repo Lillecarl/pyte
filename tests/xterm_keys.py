@@ -7,7 +7,7 @@ writes to its pty is what a key sends. `ptterm/tests/xterm_oracle.py`
 runs xterm the same way to read a screen.
 
 xterm defines modifyOtherKeys, so it is the judge that settles the
-extended mode (Lillecarl/pymux#698). It speaks no kitty protocol, so it
+extended mode (Lillecarl/pyterm#700). It speaks no kitty protocol, so it
 answers for a pane that pushed no flag, and abstains for every other.
 
 **Every answer ends at a key that says it is done.** After the key
@@ -19,7 +19,7 @@ Settings that are not xterm's defaults, and why:
 
 - `metaSendsEscape`: alt sends ESC before the key, as every other judge
   does. Out of the box xterm sets the eighth bit, which no program in
-  use reads; Lillecarl/pymux#186 is about letting a pane choose.
+  use reads; Lillecarl/pyterm#188 is about letting a pane choose.
 - `backarrowKey: false`, `deleteIsDEL: false`: Backspace sends DEL and
   Delete sends "CSI 3 ~", the pair a pty reports and every judge sends.
 - `omitTranslation`: the keys xterm keeps for itself reach the program.

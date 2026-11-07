@@ -15,7 +15,7 @@ spelling for it. It travels as a surrogate, and the backend encodes it
 back with "surrogateescape". These tests read the wire, not the string.
 
 libvterm's `26state_query.test` line 62 asks the same question.
-Lillecarl/pymux#94.
+Lillecarl/pyterm#96.
 """
 
 from __future__ import annotations

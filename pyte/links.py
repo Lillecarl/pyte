@@ -8,11 +8,11 @@ URL. Where a link and a URL in the text overlap, the link wins: it is
 what the program meant, and the text may only show its name.
 
 The pattern is foot's (`[url].regex` in `foot.ini`), which is where URL
-mode comes from. Lillecarl/pymux#608.
+mode comes from. Lillecarl/pyterm#610.
 
 A caller may add rules that make a link of text that is not one: an
 issue number, say. A rule's match never takes a place a link or a URL
-already holds. Lillecarl/pymux#776.
+already holds. Lillecarl/pyterm#778.
 """
 
 from __future__ import annotations
@@ -110,7 +110,7 @@ def _joined(page: Page, lines: list[TextLine], columns: int | None) -> list[tupl
     with a hard break, and the next one starts with their indentation.
     So a URL whose last character sits on the last column goes on after
     the next row's leading spaces. kitty does the same, across a hard
-    break, but stops at a space. Lillecarl/pymux#926.
+    break, but stops at a space. Lillecarl/pyterm#928.
     """
     joined: list[tuple[str, list[tuple[int, int]]]] = []
     for line in lines:

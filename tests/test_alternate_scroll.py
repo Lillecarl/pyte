@@ -4,7 +4,7 @@
 That screen has no history, so a wheel has nothing to scroll there. A
 pager or a transcript on it scrolls on arrows instead, and this mode
 says the wheel sends them. codex sets it for its transcript.
-Lillecarl/pymux#422.
+Lillecarl/pyterm#424.
 
 It starts on. Ghostty and Alacritty start it on, and kitty (`fake_scroll`
 in `mouse.c`) and WezTerm send the arrows with no mode at all; xterm

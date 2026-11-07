@@ -211,7 +211,7 @@ def test_a_kitty_colour_set_of_a_name_the_pane_cannot_read_sets_nothing():
 
 def test_a_kitty_colour_set_reads_back_through_the_xterm_query():
     # The asymmetry the issue describes: the colour one protocol set,
-    # the other protocol reads. Lillecarl/pymux#286.
+    # the other protocol reads. Lillecarl/pyterm#288.
     _screen, stream, responses = make_screen()
     stream.feed(osc(Osc.KITTY_COLORS, "1=#00ff00"))
     stream.feed(osc(Osc.PALETTE_COLOR, "1", "?", end=Terminator.BEL))

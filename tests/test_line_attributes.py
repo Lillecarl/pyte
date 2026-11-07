@@ -5,7 +5,7 @@ The DEC line attributes, which become kitty's text sizing, OSC 66.
 wide, and "ESC # 5" one size again. A double height line has an exact
 form, "s=2" on its top row. A double width line has none: kitty cannot
 stretch a glyph sideways, so it becomes "w=2" and each glyph keeps its
-own size, two cells apart. Lillecarl/pymux#890.
+own size, two cells apart. Lillecarl/pyterm#892.
 """
 
 from __future__ import annotations

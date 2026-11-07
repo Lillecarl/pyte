@@ -14,7 +14,7 @@ screen that obeys them.
 `modes.py` holds the parameters of "CSI Ps h", which are a group of
 their own, `terminfo.py` holds the answers a program reads back, and
 `titles.py` holds the titles that `TitleMode` and `TitlePart` name.
-Lillecarl/pymux#129.
+Lillecarl/pyterm#131.
 """
 
 from __future__ import annotations

@@ -87,7 +87,7 @@ class Sharp(StrEnum):
 
     Four of the five draw a line at twice the width or twice the
     height on a VT100. A screen turns them into kitty's text sizing,
-    as `text_sizes.py` says. Lillecarl/pymux#890.
+    as `text_sizes.py` says. Lillecarl/pyterm#892.
     """
 
     #: Double height, top half.

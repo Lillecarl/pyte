@@ -10,7 +10,7 @@ wrapped away any more, so the line below is a line of its own.
 
 libvterm's `32state_flow.test` is the only thing that asks. No judge on
 the panel reports the mark, and it is visible from the outside only
-through a resize. Lillecarl/pymux#58.
+through a resize. Lillecarl/pyterm#60.
 """
 
 from __future__ import annotations
@@ -95,7 +95,7 @@ def test_erasing_the_display_up_to_the_cursor_ends_the_wrap_under_it():
     cursor, and the erase of the cursor's own row runs to the cursor
     and not to the last column, which is the only thing `EL` reads.
     libvterm answers `?lineinfo` with no mark here.
-    Lillecarl/pymux#142.
+    Lillecarl/pyterm#144.
     """
     screen = _screen("a" * 20 + csi(escape.CUP, 3, 3) + csi(escape.ED, 1))
     assert not _continues(screen, 2)
@@ -121,7 +121,7 @@ def test_a_rectangle_erase_leaves_the_marks():
     while `ClearRight` and `ClearBufRows` both hold one. libvterm has
     no opinion, because it has no case for the sequence. So a rectangle
     can leave a row that holds nothing and still says it continues the
-    row above. Lillecarl/pymux#142.
+    row above. Lillecarl/pyterm#144.
     """
     screen = _screen("a" * 20 + csi(Csi.DECERA, 0, 0, 0, 0))
     assert _continues(screen, 1)
@@ -129,7 +129,7 @@ def test_a_rectangle_erase_leaves_the_marks():
 
 
 # ----------------------------------------------------------------------
-# A move that brings blank rows in. Lillecarl/pymux#179.
+# A move that brings blank rows in. Lillecarl/pyterm#181.
 
 
 def test_a_scroll_down_ends_the_wrap_under_the_blank_row():
@@ -148,7 +148,7 @@ def test_a_scroll_down_ends_the_wrap_under_the_blank_row():
     into one line, while `_first_row_to_lay_out` reads a row the buffer
     does not hold as a line of its own. A resize answered with the
     second reading, and a blank line appeared out of nothing.
-    Lillecarl/pymux#179.
+    Lillecarl/pyterm#181.
     """
     screen = _screen("a" * 32 + csi(escape.DECSTBM, 2, 4) + csi(Csi.SD))
 
@@ -165,7 +165,7 @@ def test_a_scroll_up_ends_the_wrap_under_the_blank_row():
 
     The row at the top of the region loses its mark as well, and for
     the other reason: the row it continued is one the scroll dropped.
-    Lillecarl/pymux#188 below says why that is not the same question.
+    Lillecarl/pyterm#190 below says why that is not the same question.
     """
     screen = _screen("a" * 32 + csi(escape.DECSTBM, 2, 3) + (csi(escape.CUP, 3, 1) + csi(Csi.SU)))
 
@@ -178,7 +178,7 @@ def test_a_region_at_the_top_ends_the_wrap_under_its_blank_row():
 
     That path moves no row of the region and writes the blank one at
     the bottom of it by hand, so it has to take the mark off the row
-    below by hand too. Lillecarl/pymux#423.
+    below by hand too. Lillecarl/pyterm#425.
     """
     screen = _screen("a" * 32 + csi(escape.DECSTBM, 1, 3) + csi(escape.CUP, 3, 1) + csi(Csi.SU))
 
@@ -188,7 +188,7 @@ def test_a_region_at_the_top_ends_the_wrap_under_its_blank_row():
 
 
 # ----------------------------------------------------------------------
-# A move that drops the row a line continued. Lillecarl/pymux#188.
+# A move that drops the row a line continued. Lillecarl/pyterm#190.
 
 
 def test_a_scroll_up_inside_a_region_ends_the_wrap_on_its_top_row():
@@ -221,7 +221,7 @@ def test_a_scroll_up_that_keeps_the_history_keeps_the_mark():
 
     So the row at the top of the screen keeps its mark. This is the
     opposite answer to the one above, and it is the same rule: the mark
-    goes when the row it names goes. Lillecarl/pymux#423.
+    goes when the row it names goes. Lillecarl/pyterm#425.
     """
     screen = _screen("a" * 32 + csi(Csi.SU))
 

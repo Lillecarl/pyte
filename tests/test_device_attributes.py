@@ -87,9 +87,9 @@ def test_the_charset_claims_follow_the_charsets_that_exist():
     something for a national set and for the technical one. It does
     not: `MAPS` holds `B`, `0`, `U` and `V`, and every other code is
     dropped without a word. vttest read the answer back and found the
-    claim. Lillecarl/pymux#112.
+    claim. Lillecarl/pyterm#114.
 
-    Implementing the sets is Lillecarl/pymux#111. This test is what
+    Implementing the sets is Lillecarl/pyterm#113. This test is what
     puts the numbers back with the code, and what fails if either
     moves without the other.
     """
@@ -113,7 +113,7 @@ def test_selecting_a_set_that_is_not_named_changes_nothing(pane):
     The other side of it: what a program gets if it tries anyway.
 
     `!` names no set in any terminal. `A` did until
-    Lillecarl/pymux#111, which is why this asks with something else.
+    Lillecarl/pyterm#113, which is why this asks with something else.
     """
     screen, stream, _responses = pane
 

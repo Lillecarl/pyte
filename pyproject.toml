@@ -36,7 +36,7 @@ docs = ["sphinx", "myst-parser", "furo"]
 # screen: a recording holds what one program happened to write, and the
 # paths that move whole ranges of rows are the ones a recording is least
 # likely to reach.
-# `nix/checks.nix` reads this. Lillecarl/pymux#319.
+# `nix/checks.nix` reads this. Lillecarl/pyterm#321.
 test = [
     "pytest",
     "pytest-xdist",
@@ -48,7 +48,7 @@ Homepage = "https://github.com/Lillecarl/pyte"
 Documentation = "https://lillecarl.github.io/pyte/"
 # Work happens in the monorepo this repository is exported from.
 Source = "https://github.com/Lillecarl/pyterm"
-Issues = "https://github.com/Lillecarl/pymux/issues"
+Issues = "https://github.com/Lillecarl/pyterm/issues"
 
 [build-system]
 requires = ["hatchling"]

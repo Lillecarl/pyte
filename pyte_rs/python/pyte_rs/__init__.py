@@ -5,7 +5,7 @@ Rust kernels for pyte's per-cell loops.
 replaces. Nothing changes until it is called, and the Python stays the
 reference: every kernel gives the same answer, and the parity tests
 hold it to that. An embedder calls `install()` once, early.
-Lillecarl/pymux#566.
+Lillecarl/pyterm#568.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ __all__ = [
     "unfilter",
 ]
 
-#: One row of a page, stored by column in Rust. Lillecarl/pymux#570.
+#: One row of a page, stored by column in Rust. Lillecarl/pyterm#572.
 Row = _native.Row
 
 #: Set to anything but "" or "0", and `install()` installs nothing.
@@ -60,7 +60,7 @@ draw_on_row = _native.draw_on_row
 take_ground = _native.take_ground
 
 #: `pyte.png._unfilter` and `pyte.png._rgba_of`, in Rust, with the GIL
-#: released while they work. Lillecarl/pymux#574.
+#: released while they work. Lillecarl/pyterm#576.
 unfilter = _native.unfilter
 rgba_of = _native.rgba_of
 

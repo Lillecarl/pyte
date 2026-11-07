@@ -5,7 +5,7 @@ What the rewriting tool does, and what it refuses to touch.
 to the builders in `pyte.sequences`. It has changed a few hundred
 lines across three repositories, so what it will and will not do is
 worth holding here rather than in the memory of whoever ran it.
-Lillecarl/pymux#165.
+Lillecarl/pyterm#167.
 
 The rules it must not lose are the refusals. A tool that rewrites the
 expected value of an assertion turns a test into one that passes

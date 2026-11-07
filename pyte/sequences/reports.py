@@ -578,7 +578,7 @@ class ExtraCursorsSupport(CsiReport):
     """
     kitty's answer to "CSI > SP q": "CSI > 1;2;3;29;30;40;100;101 SP q",
     the shapes and commands of the multiple cursors protocol it reads.
-    No numbers says it reads none. Lillecarl/pymux#891.
+    No numbers says it reads none. Lillecarl/pyterm#893.
     """
 
     supported: tuple[int, ...]

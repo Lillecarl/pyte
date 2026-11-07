@@ -8,7 +8,7 @@
 # backend it resolves comes from nixpkgs' Python set, which has no maturin:
 # nixpkgs ships maturin as a program. So the wheel is built with that program,
 # offline, against crates vendored from `Cargo.lock`, and `pyprojectHook`
-# installs it like any other. Lillecarl/pymux#566.
+# installs it like any other. Lillecarl/pyterm#568.
 {
   lib,
   stdenv,
@@ -82,7 +82,7 @@ let
 
   # pyte's whole unit suite, with the Rust row and kernels installed by
   # `tests/conftest.py`. Every behaviour pyte has tests for, through
-  # the storage that replaces the dict. Lillecarl/pymux#570.
+  # the storage that replaces the dict. Lillecarl/pyterm#572.
   #
   #     nix build --file . checks.pyte-rs-unit
   checks.unit = suite {
@@ -114,7 +114,7 @@ let
   # Spread over four workers: each property test draws thousands of
   # examples, and one after another they were the gate's longest wall,
   # 107 s for 57 CPU seconds. Four took 17 s and 38, sixteen 11 s and
-  # 61. Lillecarl/pymux#579.
+  # 61. Lillecarl/pyterm#581.
   #
   #     nix build --file . checks.pyte-rs-parity
   checks.parity = suite {

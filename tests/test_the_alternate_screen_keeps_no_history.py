@@ -15,7 +15,7 @@ the hundredth one, and up to a hundred of them at once.
 **Copy mode is where that shows.** It reads from the lowest row of the
 buffer to the highest, so those rows are lines of the document, and
 the history pymux shows is taller than the screen a program drew.
-Lillecarl/pymux#132.
+Lillecarl/pyterm#134.
 """
 
 from __future__ import annotations

@@ -298,7 +298,7 @@ def placement_screen_rows(screen):
 
     A scroll that keeps history moves the screen down the buffer and
     leaves the rows where they are, so an absolute row says nothing
-    about where a person sees the image. Lillecarl/pymux#423.
+    about where a person sees the image. Lillecarl/pyterm#425.
     """
     offset = screen.line_offset
     return sorted((placement.image_id, placement.y - offset) for placement in screen.graphics.placements)
@@ -335,7 +335,7 @@ def test_a_placement_that_leaves_a_region_at_the_top_goes_to_the_history():
     A region that starts at the first row scrolls the top of the screen
     away and the rows go to the scrollback, so the image goes with
     them: it is above the screen now, and `prune_above` takes it when
-    the history is trimmed. Lillecarl/pymux#423.
+    the history is trimmed. Lillecarl/pyterm#425.
     """
     screen, stream, _ = make_screen()
     stream.feed(csi(escape.DECSTBM, 1, 10))
@@ -405,7 +405,7 @@ def _a_full_screen(screen, stream):
 
     A region that starts at the first row keeps the rows it scrolls
     away, and `line_offset` can only grow once `max_y` has reached the
-    last row. Lillecarl/pymux#423.
+    last row. Lillecarl/pyterm#425.
     """
     stream.feed("\r\n".join("row %d" % row for row in range(screen.lines)))
 

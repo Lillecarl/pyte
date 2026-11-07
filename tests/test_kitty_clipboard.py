@@ -1,6 +1,6 @@
 """
 kitty's clipboard protocol, OSC 5522: what a screen assembles, and
-what it answers by itself. Lillecarl/pymux#893.
+what it answers by itself. Lillecarl/pyterm#895.
 """
 
 from __future__ import annotations

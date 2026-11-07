@@ -62,7 +62,7 @@ def test_a_payload_reads_the_same_however_it_is_split(pieces, data):
     """
     A payload is taken in runs, up to the next character that can end
     it. One character per feed is the parser's own pace, so any split
-    has to leave what that leaves. Lillecarl/pymux#717.
+    has to leave what that leaves. Lillecarl/pyterm#719.
     """
     text = "".join(pieces)
     cuts = sorted(data.draw(st.sets(st.integers(0, len(text)))))
@@ -173,7 +173,7 @@ def test_osc_still_works():
 
 
 def test_an_osc_past_its_bound_is_dropped_whole(monkeypatch):
-    "Nothing of it is held or drawn, and what follows it is read. Lillecarl/pymux#744."
+    "Nothing of it is held or drawn, and what follows it is read. Lillecarl/pyterm#746."
     monkeypatch.setattr(pyte.streams, "MAX_OSC_LENGTH", 8)
     screen = a_screen(20, 5)
     stream = pyte.Stream(screen)

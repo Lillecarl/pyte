@@ -4,7 +4,7 @@ A screen as plain data, and back.
 `freeze` walks an object's `KEEP` (`pyte.keep`) and turns every saved
 field into JSON-shaped values; `thaw` writes them into a fresh object.
 A hot upgrade carries a screen to a new build this way
-(Lillecarl/pymux#399), so nothing here is pickled: a new build reads
+(Lillecarl/pyterm#401), so nothing here is pickled: a new build reads
 the values, never the old build's classes.
 
 **Containers are tagged, scalars are not.** A list, tuple, set and dict
@@ -157,7 +157,7 @@ class Freezer:
     a time, so a second freeze costs what was written since the first,
     not the depth of the history. That is what bounds the pause of an
     upgrade: the first freeze runs while the server still serves, and
-    only the second runs in the pause. Lillecarl/pymux#399.
+    only the second runs in the pause. Lillecarl/pyterm#401.
 
     The root says what changed through two methods: `write_mark()`,
     which names this moment, and `changes_since(mark)`, which gives

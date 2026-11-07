@@ -11,7 +11,7 @@ so kitty answers both halves of the question:
 - what that same key sends to a pane that pushed `flags`.
 
 pyte translates the first into the second, and kitty says what the
-second should be. Lillecarl/pymux#684 is what the comparison would
+second should be. Lillecarl/pyterm#686 is what the comparison would
 have caught: kitty takes the locks off for a pane that pushed no flag,
 and pyte did not.
 

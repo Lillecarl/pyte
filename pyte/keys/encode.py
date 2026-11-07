@@ -55,7 +55,7 @@ def _has_a_shifted_character(code: int, text: str) -> bool:
     gives nothing, which is why shift+Tab is the example xterm uses
     for the level where all the modifiers apply. Space is the same: it
     writes itself with shift held, so shift+space is "CSI 27 ; 2 ; 32 ~",
-    as Ghostty and WezTerm send it. Lillecarl/pymux#699.
+    as Ghostty and WezTerm send it. Lillecarl/pyterm#701.
     """
     if text:
         return text != chr(code)
@@ -67,7 +67,7 @@ def _typed_code(code: int, mods: int, text: str, alternates: tuple[int | None, .
     """
     The character the key types, which is what xterm writes in the
     escape form: its keysym, after shift and caps lock. alt+shift+minus
-    is "CSI 27 ; 4 ; 95 ~", the underscore. Lillecarl/pymux#702.
+    is "CSI 27 ; 4 ; 95 ~", the underscore. Lillecarl/pyterm#704.
     """
     if len(text) == 1:
         return ord(text)
@@ -104,7 +104,7 @@ def _wants_the_escape_form(level: int, code: int, typed: int, mods: int, text: s
             return False
         if code == KeyCode.TAB:
             # The back tab, "CSI Z", which is what xterm sends, and not
-            # the "CSI 27 ; 2 ; 9 ~" of its own manual. Lillecarl/pymux#693.
+            # the "CSI 27 ; 2 ; 9 ~" of its own manual. Lillecarl/pyterm#695.
             return False
         # A key with no text, which is what super leaves, still has a
         # shifted one when the terminal named it: super+shift+1 is "!".
@@ -126,21 +126,21 @@ def _ctrl_or_shift_has_no_legacy_form(code: int, typed: int, mods: int) -> bool:
     Elsewhere ctrl takes it on a key with
     no control code, so ctrl+1 is "CSI 27 ; 5 ; 49 ~" and ctrl+a is still
     0x01, and shift alone never does: the character carries it.
-    Lillecarl/pymux#701.
+    Lillecarl/pyterm#703.
     """
     ctrl_or_shift = mods & (Modifier.CTRL | Modifier.SHIFT)
     if code == KeyCode.ENTER:
         return bool(ctrl_or_shift)
     if code == KeyCode.TAB:
         # Shift makes it the back tab, ctrl or not: xterm sends "CSI Z"
-        # for ctrl+shift+Tab here. Lillecarl/pymux#693.
+        # for ctrl+shift+Tab here. Lillecarl/pyterm#695.
         return ctrl_or_shift == Modifier.CTRL
     if code in (KeyCode.ESCAPE, KeyCode.BACKSPACE):
         return False
     if not mods & Modifier.CTRL:
         return False
     # Nor where the key under the shifted one has a control code:
-    # ctrl+shift+[ is ESC in xterm, as ctrl+[ is. Lillecarl/pymux#704.
+    # ctrl+shift+[ is ESC in xterm, as ctrl+[ is. Lillecarl/pyterm#706.
     # Where shift made another key, xterm's own test decides, which is
     # `IsControlInput`, 0x40 to 0x7F: ctrl+shift+/ still takes the
     # escape form, because "?" is below it.
@@ -173,7 +173,7 @@ def _serialize(
     (`serialize` in `kitty/key_encoding.c`, and Home is `S(1, 'H')`
     there). A pane does, because it reads what the terminal of the
     person sends, and xterm sends "CSI 1 ~" for Home.
-    Lillecarl/pymux#152.
+    Lillecarl/pyterm#154.
     """
     second = mods_value != 1 or event != EventType.PRESS
     third = bool(text)
@@ -218,7 +218,7 @@ _CONTROL_KEYS = (*_CONTROL_CODES, KeyCode.ESCAPE)
 #: keypad onto the main keyboard before it sends anything, so nothing
 #: downstream can tell a keypad 0 from the 0 above the letters. It
 #: works because pymux asks every terminal to disambiguate, and a
-#: terminal that does stops folding. Lillecarl/pymux#175.
+#: terminal that does stops folding. Lillecarl/pyterm#177.
 _KEYPAD_APPLICATION = {
     **{FunctionalKey.KP_0 + n: chr(ord("p") + n) for n in range(10)},
     FunctionalKey.KP_MULTIPLY: "j",
@@ -253,7 +253,7 @@ def _xterm_keypad_form(
     keypad plus is "SS3 2 k". Num lock turns DECKPAM off for a key that
     types a character (`real_NumLock`), and then, as at any level of
     modifyOtherKeys, the key is that character and nothing else.
-    Lillecarl/pymux#700.
+    Lillecarl/pyterm#702.
 
     Only a pane in the legacy mode: one that pushed a kitty flag reads
     the number of the key.
@@ -280,7 +280,7 @@ def _sends_its_text(flags: int, mods: int, text: str, kind: int) -> bool:
     unless the pane asked for every key as an escape code, whatever
     else it asked for. So a repeat, a shifted key with its alternates,
     and a keypad digit with num lock reach a pane that disambiguates as
-    "a", "A" and "0". Lillecarl/pymux#690.
+    "a", "A" and "0". Lillecarl/pyterm#692.
 
     kitty has no text for a key with ctrl or alt held, so it never
     meets that case. A terminal that sends some keeps the escape code.
@@ -288,7 +288,7 @@ def _sends_its_text(flags: int, mods: int, text: str, kind: int) -> bool:
     The caller asks for any pane that pushed a flag: the rule does not
     look at DISAMBIGUATE, and Ghostty and WezTerm keep it too, so a
     repeated "a" is "a" to a pane that pushed only the event types.
-    Lillecarl/pymux#695.
+    Lillecarl/pyterm#697.
     """
     if flags & KeyboardFlag.REPORT_ALL_KEYS or kind == EventType.RELEASE:
         return False
@@ -317,7 +317,7 @@ def _encode_event(
     # At level 3 xterm writes the modifier field for a key held with only
     # a lock or super, which it counts and does not name: caps lock on
     # Delete is "CSI 3 ; 1 ~", and on keypad + under DECKPAM "SS3 1 k".
-    # Lillecarl/pymux#700.
+    # Lillecarl/pyterm#702.
     bare = (
         modify_other_keys == ModifyOtherKeys.EVERY_KEY
         and not flags
@@ -354,7 +354,7 @@ def _encode_event(
             return ""
     # The repeat of a plain Enter, Tab or Backspace is its byte, as the
     # press is: kitty writes both before it looks at the event type.
-    # Lillecarl/pymux#690.
+    # Lillecarl/pyterm#692.
     if (
         kind == EventType.REPEAT
         and final == "u"
@@ -376,7 +376,7 @@ def _encode_event(
         if flags and code not in _CONTROL_KEYS and not a_legacy_form_carries(code, mods, shifted):
             # A pane that pushed any flag reads the locks as modifiers, so
             # num lock and alt on keypad 1 is "CSI 57400 ; 131 u" in kitty,
-            # Ghostty and WezTerm alike. Lillecarl/pymux#695.
+            # Ghostty and WezTerm alike. Lillecarl/pyterm#697.
             return _serialize(event.code, mods_value, "u", alternates, kind, embedded)
         ambiguous = (
             bool(mods & MODIFIERS_THAT_MAKE_A_KEY_AMBIGUOUS)
@@ -384,14 +384,14 @@ def _encode_event(
             # Enter, Tab and Backspace write no text, so shift has no
             # character to hide in: kitty writes shift+Enter as "CSI 13 ;
             # 2 u" once a pane disambiguates (`encode_function_key`).
-            # Lillecarl/pymux#689.
+            # Lillecarl/pyterm#691.
             or (code in _CONTROL_CODES and bool(mods & ~LOCK_MODIFIERS))
         )
         # Outside the legacy mode a modified Enter, Tab, Backspace or
         # Escape has no legacy form either: kitty's `encode_function_key`
         # takes `legacy_functional_key_encoding_with_modifiers` only in
         # it, so shift+Enter to a pane that pushed the event types alone
-        # is "CSI 13 ; 2 u". Lillecarl/pymux#695.
+        # is "CSI 13 ; 2 u". Lillecarl/pyterm#697.
         modified_control_key = not legacy_mode(flags) and code in _CONTROL_KEYS and bool(mods & ~LOCK_MODIFIERS)
         # A functional key still here belongs to a pane that reads the
         # number of a key: `folded` took it away from every other one.
@@ -418,13 +418,13 @@ def _encode_event(
         # The extended mode, which a pane asks for with XTMODKEYS and
         # not with the flag stack. A pane in one of the kitty modes
         # never gets here, because every branch above answers first.
-        # Lillecarl/pymux#169.
+        # Lillecarl/pyterm#171.
         escape_code = code
         if code == KeyCode.BACKSPACE and modify_other_keys >= ModifyOtherKeys.EVERY_MODIFIER:
             # xterm's back-arrow toggle (`IsBackarrowToggle`, `input.c`):
             # ctrl flips which of BS and DEL the key writes, and is no
             # modifier to the level-2 test. So ctrl+Backspace stays BS, and
-            # ctrl+shift+Backspace is "CSI 27 ; 6 ; 8 ~". Lillecarl/pymux#703.
+            # ctrl+shift+Backspace is "CSI 27 ; 6 ; 8 ~". Lillecarl/pyterm#705.
             ctrl = bool(mods & Modifier.CTRL)
             escape_code = 0x7F if (not backarrow_sends_backspace) != ctrl else 0x08
             wants_it = modify_other_keys == ModifyOtherKeys.EVERY_KEY or bool(mods & ~(Modifier.CTRL | LOCK_MODIFIERS))
@@ -443,13 +443,13 @@ def _encode_event(
             # the same way, in
             # `legacy_functional_key_encoding_with_modifiers`. Ctrl
             # has no legacy form here and is lost, as it is there.
-            # Lillecarl/pymux#174.
+            # Lillecarl/pyterm#176.
             prefix = "\x1b\x1b" if mods & Modifier.ALT else "\x1b"
             return prefix + BACK_TAB
         if code == KeyCode.BACKSPACE and backarrow_sends_backspace:
             # DECBKM: "Backarrow key sends backspace". Without it the
             # key sends a delete, which is what a fresh pty reports as
-            # the erase character. Lillecarl/pymux#184.
+            # the erase character. Lillecarl/pyterm#186.
             prefix = "\x1b" if mods & Modifier.ALT else ""
             return prefix + ("\x7f" if mods & Modifier.CTRL else "\x08")
         if text and not mods & (Modifier.CTRL | Modifier.ALT):
@@ -459,7 +459,7 @@ def _encode_event(
             # The shifted key is the key, and shift is spent on it:
             # alt+shift+1 is "ESC !", and ctrl+shift+minus is ctrl on an
             # underscore. kitty's `encode_printable_ascii_key_legacy`.
-            # Lillecarl/pymux#691.
+            # Lillecarl/pyterm#693.
             if not ctrl_stays_on_the_unshifted_key(code, shifted, mods, profile):
                 code = shifted
             mods &= ~Modifier.SHIFT
@@ -469,7 +469,7 @@ def _encode_event(
                 if code == KeyCode.ENTER:
                     # A CR, as kitty, xterm and WezTerm send. Ghostty's
                     # "CSI 27 ; 5 ; 13 ~" prints junk in a shell, and an LF
-                    # is no terminal's. Lillecarl/pymux#694.
+                    # is no terminal's. Lillecarl/pyterm#696.
                     result += "\r"
                 elif code == KeyCode.TAB:
                     result += "\t"
@@ -492,7 +492,7 @@ def _encode_event(
         # A key with no text of its own, which is what super leaves: shift
         # takes the shifted key and caps lock turns a letter over, as
         # xterm and Ghostty write super+shift+[ as "{" and super+a under
-        # caps lock as "A". Lillecarl/pymux#693.
+        # caps lock as "A". Lillecarl/pyterm#695.
         char = chr(shifted) if mods & Modifier.SHIFT and shifted is not None else chr(code)
         if mods & Modifier.SHIFT and shifted is None and char.isalpha():
             char = char.upper()
@@ -504,9 +504,9 @@ def _encode_event(
         # A pane that speaks the protocol reads F3 as a number, because
         # kitty's own decoder refuses the letter: "CSI R" and "CSI 1;5R"
         # both raise there, and "CSI 13~" and "CSI 13;5~" come back as
-        # F3. Lillecarl/pymux#242. Any flag is enough for a modified
+        # F3. Lillecarl/pyterm#244. Any flag is enough for a modified
         # one: kitty, Ghostty and WezTerm send "CSI 13 ; 2 ~" to a pane
-        # that pushed only the other keys. Lillecarl/pymux#695.
+        # that pushed only the other keys. Lillecarl/pyterm#697.
         code, final = TildeKey.F3, "~"
 
     if bare and mods == 0:
@@ -521,7 +521,7 @@ def _encode_event(
         if legacy_mode(flags):
             # DECCKM moves Home, End and keypad Begin with the arrows:
             # kitty's `encode_function_key` lists all seven, and xterm
-            # does the same. Lillecarl/pymux#687.
+            # does the same. Lillecarl/pyterm#689.
             if application_mode and final in "ABCDEFH":
                 return "\x1bO" + final
             if final in "PQRS":

@@ -1,7 +1,7 @@
 """
 A resize lays the buffer out again and changes nothing that was in it.
 
-This is the oracle for Lillecarl/pymux#135. That issue wants the
+This is the oracle for Lillecarl/pyterm#137. That issue wants the
 history to stop being laid out on every column change, and the whole
 risk of it is that a deferred reflow quietly loses something. So the
 property has to exist and pass on the eager reflow we have now, before
@@ -13,16 +13,16 @@ unwraps every run of wrapped rows back into the line a program wrote
 and lays that line out again. The line itself has no width in it, so a
 column change may not touch it. `logical_lines` reads exactly that, and
 it is the same function `_reflow` builds and throws away, and the same
-one that Lillecarl/pymux#135 would keep.
+one that Lillecarl/pyterm#137 would keep.
 
 What it is not: a round trip. `_reflow` trims the erased cells off the
-end of a line on purpose (Lillecarl/pymux#56), so a buffer is not equal
+end of a line on purpose (Lillecarl/pyterm#58), so a buffer is not equal
 to itself across a resize. The content is.
 
 **The alternate screen is outside this, and it has to be.** It does not
 reflow at all: a resize cuts it down and the cells that no longer fit
 are gone, which is what five of the seven judges of the panel do and
-what Lillecarl/pymux#192 landed. Losing content is the whole of that
+what Lillecarl/pyterm#194 landed. Losing content is the whole of that
 trade, so a property saying a resize loses none cannot describe it. The
 generated chunks can turn the alternate screen on, so every property
 test below says `assume` and leaves those examples to
@@ -36,7 +36,7 @@ resize for a while, because a reflow read the cell the cursor stood on
 and the read made it, so a cursor parked past the end of a line gave
 that line a blank nobody wrote. The cursor travels as an offset now
 and no read makes a cell, so the lines after the first resize are the
-lines before it. Lillecarl/pymux#143.
+lines before it. Lillecarl/pyterm#145.
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ def _trimmed(cells):
     One line without the blanks an erase left at the end of it.
 
     `_reflow` does this so that a line which was never filled does not
-    carry its width around (Lillecarl/pymux#56). The test is the class
+    carry its width around (Lillecarl/pyterm#58). The test is the class
     and not the character: a space that a program drew is a
     `WrittenCell` and stays.
 
@@ -85,7 +85,7 @@ def logical_lines(screen):
 
     **Nothing here writes.** `data_buffer` is a defaultdict, so asking
     it about a row makes one, and a row made below `history_floor` is a
-    row that came back from the dead (Lillecarl/pymux#134). Every read
+    row that came back from the dead (Lillecarl/pyterm#136). Every read
     goes through `.get`.
     """
     data_buffer = screen.page.data_buffer
@@ -119,7 +119,7 @@ def logical_lines(screen):
     #
     # "CSI 0 T" is what found it: a scroll down puts a blank row in
     # the region, the buffer leaves that row absent, and a reflow
-    # makes it. Lillecarl/pymux#179 holds the part this oracle cannot
+    # makes it. Lillecarl/pyterm#181 holds the part this oracle cannot
     # judge.
     lines = [line for line in lines if line]
 
@@ -142,7 +142,7 @@ def test_a_cursor_waiting_to_wrap_invents_no_blank():
 
     `_reflow` read that place to know what the cursor stood on, the
     buffer made the cell, and the line came out of the resize one
-    space longer. Lillecarl/pymux#143.
+    space longer. Lillecarl/pyterm#145.
     """
     screen = a_screen(columns=10, lines=6)
     Stream(screen).feed("text" * 4 + esc(escape.RI) + "text")
@@ -160,7 +160,7 @@ def test_a_double_width_character_keeps_its_second_half(columns):
     reflow put it at the next free column, where the next character
     landed on it. Every wide character came out of a resize followed by
     a blank: "wide 漢 字", in the first pictures with a CJK font.
-    Lillecarl/pymux#548.
+    Lillecarl/pyterm#550.
 
     7 and 6 put 漢 against the edge, where it moves to the next row
     whole, its half with it.
@@ -203,7 +203,7 @@ def test_a_column_change_keeps_every_line(chunks, widths):
 #: screen is the case that a width alone never reaches: the reflow
 #: looks for the top of the buffer at the last row of the screen, and
 #: a smaller height moves that row down past rows the buffer holds.
-#: Lillecarl/pymux#145.
+#: Lillecarl/pyterm#147.
 SIZES = st.lists(st.tuples(st.integers(1, 12), st.integers(4, 24)), min_size=1, max_size=4)
 
 
@@ -216,7 +216,7 @@ SIZES = st.lists(st.tuples(st.integers(1, 12), st.integers(4, 24)), min_size=1, 
 # The corpus, and today it holds one.
 #
 # **A drawn example is not remembered.** The gate draws the same
-# examples every run now (Lillecarl/pymux#180), which is what makes it
+# examples every run now (Lillecarl/pyterm#182), which is what makes it
 # a gate, and it also means a case outside that draw is a case nobody
 # sees again. A database would not help: a nix sandbox throws its
 # `.hypothesis` directory away. So an example that once failed is
@@ -226,7 +226,7 @@ SIZES = st.lists(st.tuples(st.integers(1, 12), st.integers(4, 24)), min_size=1, 
 # This one is a scroll down inside a region. The buffer leaves the
 # blank row it made absent, a reflow makes the row, and the resize
 # reads as a line that was not there before. It failed about one run
-# in eight. Lillecarl/pymux#179 holds the part of it that is still
+# in eight. Lillecarl/pyterm#181 holds the part of it that is still
 # open: the oracle stopped counting a blank line, and the two ends
 # still do not agree about whether the row is real.
 @example(
@@ -262,13 +262,13 @@ def test_the_alternate_screen_loses_what_no_longer_fits():
     the one character the last row held. The height takes all of it
     here; `_clip` cuts a row to the new width as well.
 
-    That is Lillecarl/pymux#192, and this is the case the panel never
+    That is Lillecarl/pyterm#194, and this is the case the panel never
     saw: every row of
     `ptterm/tests/test_the_alternate_screen_reflow.py` fills its screen
     exactly, so none of them wraps.
 
     **It is not in the `@example` corpus above**, where
-    Lillecarl/pymux#426 asked for it. The property now says `assume`,
+    Lillecarl/pyterm#428 asked for it. The property now says `assume`,
     so hypothesis marks an explicit example of it invalid and asserts
     nothing. A test that says what the resize does says more.
     """

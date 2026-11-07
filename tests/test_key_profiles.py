@@ -2,7 +2,7 @@
 What a legacy pane reads where the terminals split, profile by profile.
 
 `test_keys_against_the_key_panel.py` holds each answer to the terminal
-it copies. Lillecarl/pymux#706.
+it copies. Lillecarl/pyterm#708.
 """
 
 from __future__ import annotations
@@ -81,7 +81,7 @@ def test_ctrl_and_shift_keep_the_shifted_key_where_the_key_has_no_control_code()
 def test_modify_other_keys_is_xterms_whatever_the_profile():
     """
     It is xterm's own mode, so xterm answers under it: super is gone
-    from Delete, as xterm and WezTerm send it. Lillecarl/pymux#693.
+    from Delete, as xterm and WezTerm send it. Lillecarl/pyterm#695.
     """
     for level in (ModifyOtherKeys.ALT_AND_META, ModifyOtherKeys.EVERY_MODIFIER):
         assert sent("\x1b[3;9~", KITTY, modify_other_keys=level) == "\x1b[3~"

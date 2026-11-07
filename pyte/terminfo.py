@@ -19,7 +19,7 @@ It names `xterm-256color` as its parent, because that is what a pane
 emulates apart from the capabilities below. `tic` copies the parent
 in, so what comes out stands on its own.
 
-Lillecarl/pymux#129.
+Lillecarl/pyterm#131.
 """
 
 from __future__ import annotations
@@ -184,8 +184,8 @@ class DeviceExtension(IntEnum):
 #: `ESC ( A` and `ESC ( >` reached `define_charset`, matched nothing
 #: and were dropped without a word: a program that read 9 and selected
 #: a national set drew the wrong glyph with nothing to say it had.
-#: vttest found that (Lillecarl/pymux#112), the sets were written
-#: (Lillecarl/pymux#111), and the claim came back with them.
+#: vttest found that (Lillecarl/pyterm#114), the sets were written
+#: (Lillecarl/pyterm#113), and the claim came back with them.
 #: `test_the_charset_claims_follow_the_charsets_that_exist` is what
 #: ties the two together, and it fails if either moves alone.
 DEVICE_EXTENSIONS = (

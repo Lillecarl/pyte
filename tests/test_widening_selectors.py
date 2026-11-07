@@ -1,6 +1,6 @@
 """
 What a terminal that widens a text emoji with U+FE0F is given instead.
-Lillecarl/pymux#539.
+Lillecarl/pyterm#541.
 """
 
 from __future__ import annotations

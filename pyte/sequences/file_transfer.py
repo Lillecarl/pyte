@@ -2,7 +2,7 @@
 kitty's file transfer protocol, "OSC 5113 ; key=value ; ... ST": one
 command of a transfer session, either way.
 https://sw.kovidgoyal.net/kitty/file-transfer-protocol/.
-Lillecarl/pymux#912.
+Lillecarl/pyterm#914.
 
 This follows kitty's `FileTransmissionCommand` (`kitty/file_transmission.py`)
 and not only the spec page: the same short keys and defaults, a field

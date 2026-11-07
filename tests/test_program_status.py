@@ -1,7 +1,7 @@
 """
 "OSC 7501", the Program Status Protocol: a screen answers the feature
 query and keeps the records, by the rules of spec revision 0.4.
-Lillecarl/pymux#927.
+Lillecarl/pyterm#929.
 """
 
 from __future__ import annotations

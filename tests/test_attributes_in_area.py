@@ -2,7 +2,7 @@
 DECCARA ("CSI Pt ; Pl ; Pb ; Pr ; Ps... $ r") applies an SGR to an area,
 and DECRARA ("... $ t") turns attributes over there. DECSACE ("CSI Ps *
 x") picks a stream or a rectangle. DECCARA takes every SGR, as kitty
-does; DECRARA follows xterm, since kitty has none. Lillecarl/pymux#895.
+does; DECRARA follows xterm, since kitty has none. Lillecarl/pyterm#897.
 """
 
 from __future__ import annotations

@@ -7,7 +7,7 @@ can see -- the order of two declarations, a run split in two -- and
 would still not say that the characters land in the right columns. So
 the document goes through `html.parser` and what comes out is a row of
 text and the style of each piece, which is what a person looking at the
-page would see. Lillecarl/pymux#452.
+page would see. Lillecarl/pyterm#454.
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ class _Read(HTMLParser):
 
     Both halves of that, because a span carries its classes and its
     attribute and a reader cannot know which half a rendition took.
-    Lillecarl/pymux#460.
+    Lillecarl/pyterm#462.
     """
 
     def __init__(self) -> None:
@@ -157,7 +157,7 @@ def test_a_plain_cell_has_nothing_to_say():
 #
 # Each of these was a declaration on every span that had it, and a
 # screen of underlined text repeated the same forty characters per run.
-# Lillecarl/pymux#460.
+# Lillecarl/pyterm#462.
 
 
 @pytest.mark.parametrize(
@@ -194,7 +194,7 @@ def test_underline_and_strike_are_one_class_and_not_two():
     [("double", "double"), ("curly", "wavy"), ("dotted", "dotted"), ("dashed", "dashed")],
 )
 def test_the_shape_of_an_underline_is_a_class(shape, drawn):
-    "What Rich cannot carry (Lillecarl/pymux#82), a browser draws."
+    "What Rich cannot carry (Lillecarl/pyterm#84), a browser draws."
     assert "pyte-" + drawn in _style(underline=True, underline_style=shape).classes
 
 
@@ -543,7 +543,7 @@ def test_a_measured_run_says_its_cells_and_a_foreign_glyph_stands_alone():
     """
     A glyph that is not printable ASCII is a run of its own, so a reader
     that pins each run to its cells pins that glyph to its own cells.
-    Lillecarl/pymux#948.
+    Lillecarl/pyterm#950.
     """
     row = _screen(3, 20, "ab●cd漢ef\x1b[1mgh\x1b[0m").page.data_buffer[0]
 

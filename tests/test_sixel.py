@@ -215,7 +215,7 @@ def test_a_sixel_image_becomes_a_placement():
 
 
 def test_the_screen_reserves_the_cells_without_decoding(monkeypatch):
-    "The size is read; the pixels wait for whoever draws them. Lillecarl/pymux#575."
+    "The size is read; the pixels wait for whoever draws them. Lillecarl/pyterm#577."
 
     def refuse(payload):
         raise AssertionError("the screen decoded a sixel image")
@@ -260,7 +260,7 @@ def pieces(screen):
 
 
 def test_text_over_a_sixel_image_cuts_it_around_the_cell():
-    "Lillecarl/pymux#598."
+    "Lillecarl/pyterm#600."
     screen, stream, _ = make_screen()
     stream.feed(THREE_BY_THREE)
     stream.feed("\x1b[2;2Hx")
