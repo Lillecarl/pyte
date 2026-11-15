@@ -14,6 +14,7 @@ numbers. `replies.parse_reply` tries them all.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from enum import IntEnum
 from typing import ClassVar
@@ -534,6 +535,11 @@ class FocusReport(CsiReport):
         return None
 
 
+#: A whole SGR mouse report, pixels signed. An empty number is zero,
+#: as in every CSI sequence.
+SGR_MOUSE_RE = re.compile(r"(?:\x1b\[|\x9b)<(\d*);(-?\d*);(-?\d*)([Mm])")
+
+
 @dataclass(frozen=True)
 class SgrMouseReport(CsiReport):
     """
@@ -542,6 +548,11 @@ class SgrMouseReport(CsiReport):
     `column` and `row` are as the terminal wrote them: counted from one
     in cells, or in pixels under DEC 1016, where a terminal may count
     from zero. `button` carries the modifier and motion bits.
+
+    kitty writes a negative pixel for a pointer left of or above its
+    window (`mouse.c`, `cell_for_pos` clamps the cell, never the pixel).
+    The minus is no parameter byte in ECMA-48, so `CsiSequence` cannot
+    read it, and `parse` reads this report on its own.
     """
 
     PRESS: ClassVar[str] = "M"
@@ -558,7 +569,11 @@ class SgrMouseReport(CsiReport):
 
     @classmethod
     def parse(cls, text: str) -> SgrMouseReport | None:
-        return cls.read(CsiSequence.parse(text))
+        match = SGR_MOUSE_RE.fullmatch(text)
+        if match is None:
+            return None
+        button, column, row, final = match.groups()
+        return cls(int(button or 0), int(column or 0), int(row or 0), released=final == cls.RELEASE)
 
     @classmethod
     def read(cls, sequence: CsiSequence | None) -> SgrMouseReport | None:

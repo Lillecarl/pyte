@@ -160,6 +160,13 @@ def test_a_report_that_is_not_its_own_is_refused():
     assert SgrMouseReport.parse("\x1b[64;60;10M") is None
 
 
+def test_a_negative_pixel_is_read():
+    "kitty, under DEC 1016, for a pointer left of or above its window."
+    assert SgrMouseReport.parse("\x1b[<73;-1673;-1124M") == SgrMouseReport(73, -1673, -1124)
+    assert SgrMouseReport.parse("\x1b[<0;-1;-1m") == SgrMouseReport(0, -1, -1, released=True)
+    assert SgrMouseReport.parse("\x1b[<-1;5;5M") is None
+
+
 def test_a_string_no_class_names_is_still_a_reply():
     "A terminal answers in protocols pyte has no class for, and they must not reach a pane."
     # DECRPTUI, the answer to DA3.
