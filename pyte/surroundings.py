@@ -35,3 +35,6 @@ class Surroundings(NamedTuple):
     keyboard_source_flags: int
     synthesize_key_events: bool
     extended_keys_allowed: bool
+    #: The form a key leaves the legacy encoding in when the program
+    #: never said (`FormatOtherKeys`).
+    other_keys_form: int

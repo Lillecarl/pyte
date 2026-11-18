@@ -435,6 +435,7 @@ class Screen:
         "keyboard_source_flags": Keep.REBUILT,
         "synthesize_key_events": Keep.REBUILT,
         "extended_keys_allowed": Keep.REBUILT,
+        "other_keys_form": Keep.REBUILT,
         # The embedder's callbacks.
         "write_process_input": Keep.REBUILT,
         "bell_func": Keep.REBUILT,
@@ -611,6 +612,11 @@ class Screen:
         # capability that is claimed and not served is worse than one
         # that is missing. Lillecarl/pyterm#175.
         self.extended_keys_allowed: bool = True
+
+        # The form a key leaves the legacy encoding in when the program
+        # never said, with XTFMTKEYS: tmux's `extended-keys-format`.
+        # The host sets it.
+        self.other_keys_form: int = FormatOtherKeys.TILDE
 
         # The shapes of the pointer that "OSC 22" pushed. Each screen
         # keeps its own, the way kitty does.
@@ -847,7 +853,7 @@ class Screen:
         """
         if not self.extended_keys_allowed:
             return FormatOtherKeys.TILDE
-        return self.key_format_options.get(KeyModifierResource.OTHER_KEYS, FormatOtherKeys.TILDE)
+        return self.key_format_options.get(KeyModifierResource.OTHER_KEYS, self.other_keys_form)
 
     def set_key_format_options(self, *params: int) -> None:
         """
@@ -1600,22 +1606,27 @@ class Screen:
         self.graphics.count_the_cells_again(self)
         self.surroundings_func(self.surroundings)
 
-    def set_keyboard_source(self, flags: int, synthesize: bool, extended_allowed: bool) -> None:
+    def set_keyboard_source(
+        self, flags: int, synthesize: bool, extended_allowed: bool, other_keys_form: int = FormatOtherKeys.TILDE
+    ) -> None:
         """
         Say what the keyboard in front of this screen can report, in
         kitty's flags, whether to make up the halves of an event it
-        cannot send, and whether anything but the legacy encoding is
-        allowed. The three fields `__init__` describes.
+        cannot send, whether anything but the legacy encoding is
+        allowed, and the form of a key that leaves it when the program
+        never said. The four fields `__init__` describes.
         """
-        if (flags, synthesize, extended_allowed) == (
+        if (flags, synthesize, extended_allowed, other_keys_form) == (
             self.keyboard_source_flags,
             self.synthesize_key_events,
             self.extended_keys_allowed,
+            self.other_keys_form,
         ):
             return
         self.keyboard_source_flags = flags
         self.synthesize_key_events = synthesize
         self.extended_keys_allowed = extended_allowed
+        self.other_keys_form = other_keys_form
         self.surroundings_func(self.surroundings)
 
     @property
@@ -1628,6 +1639,7 @@ class Screen:
             self.keyboard_source_flags,
             self.synthesize_key_events,
             self.extended_keys_allowed,
+            self.other_keys_form,
         )
 
     def surround(self, surroundings: Surroundings) -> None:
@@ -1638,6 +1650,7 @@ class Screen:
             surroundings.keyboard_source_flags,
             surroundings.synthesize_key_events,
             surroundings.extended_keys_allowed,
+            surroundings.other_keys_form,
         )
 
     def resize(self, lines: int | None = None, columns: int | None = None) -> None:

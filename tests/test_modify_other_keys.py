@@ -406,6 +406,19 @@ def test_the_form_can_be_put_back():
     assert screen.encode_key("\x01") == "\x1b[27;5;97~"
 
 
+def test_the_host_picks_the_form_a_program_never_said():
+    "tmux's `extended-keys-format`: the host's form, until the program asks for one."
+    screen, stream, _ = a_screen()
+    screen.set_keyboard_source(0, False, True, FormatOtherKeys.CSI_U)
+    stream.feed("\x1b[>4;2m")
+
+    assert screen.encode_key("\x01") == "\x1b[97;5u"
+
+    stream.feed("\x1b[>4;0f")
+
+    assert screen.encode_key("\x01") == "\x1b[27;5;97~"
+
+
 def test_xtfmtkeys_does_not_move_the_cursor():
     """
     Its final byte is the one HVP has, and the private marker is the
