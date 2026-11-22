@@ -581,7 +581,8 @@ def _renditions() -> str:
 
 
 #: The custom properties are the theme, and a page that wants another
-#: one redefines them on `.pyte-screen`. The values here are the
+#: one redefines them on `.pyte-screen`: `--pyte-font` too, the font
+#: list, which `pymux web` sets to the fonts it serves. The values here are the
 #: palette this package already holds, so there is one copy of them.
 #:
 #: The rules under it answer the classes a span takes. `Drawn` says why
@@ -589,7 +590,7 @@ def _renditions() -> str:
 CSS = """.%s {
 %s
   white-space: pre;
-  font-family: monospace;
+  font-family: var(--pyte-font, monospace);
   color: var(%s);
   background-color: var(%s);
 }
